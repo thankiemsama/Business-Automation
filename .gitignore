@@ -1,0 +1,67 @@
+# ===================== Go / Backend =====================
+# Compiled binaries
+*.exe
+*.test
+*.out
+BACKEND/bin/
+BACKEND/dist/
+
+# Go build cache
+.go-cache/
+vendor/
+
+# Binary artifacts
+*.zip
+*.tar.gz
+*.tgz
+
+# ===================== Node / Frontend =====================
+# Dependencies
+node_modules/
+
+# Next.js build output
+FRONTEND/.next/
+out/
+
+# Production build
+build/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# ===================== Environment / Secrets =====================
+# Never commit secrets or local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# ===================== OS / Editor / IDE =====================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ===================== Misc =====================
+# Coverage
+coverage/
+*.coverprofile
+
+# Test output
+tmp/
+temp/
+
+# Agnes workspace
+.agnes/
