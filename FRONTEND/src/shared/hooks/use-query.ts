@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { errorMessage } from "../api/http-client";
 
 // Callers provide a stable loader; cleanup prevents stale responses after navigation.
-export function useQuery<T>(loader: (signal: AbortSignal) => Promise<T>) {
+export function useQuery<T>(
+  loader: (signal: AbortSignal) => Promise<T>,
+  refreshEvent?: string,
+) {
   const [state, setState] = useState<{
     data?: T;
     error?: string;
@@ -13,19 +16,29 @@ export function useQuery<T>(loader: (signal: AbortSignal) => Promise<T>) {
   const [version, setVersion] = useState(0);
   const generation = useRef(0);
   useEffect(() => {
-    const controller = new AbortController();
-    const current = ++generation.current;
-    loader(controller.signal)
-      .then((data) => {
-        if (!controller.signal.aborted && current === generation.current)
-          setState({ data, loading: false, loader });
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted && current === generation.current)
-          setState({ error: errorMessage(error), loading: false, loader });
-      });
-    return () => controller.abort();
-  }, [loader, version]);
+    let controller: AbortController | undefined;
+    function fetchData() {
+      controller?.abort();
+      const active = new AbortController();
+      controller = active;
+      const current = ++generation.current;
+      loader(active.signal)
+        .then((data) => {
+          if (!active.signal.aborted && current === generation.current)
+            setState({ data, loading: false, loader });
+        })
+        .catch((error) => {
+          if (!active.signal.aborted && current === generation.current)
+            setState({ error: errorMessage(error), loading: false, loader });
+        });
+    }
+    fetchData();
+    if (refreshEvent) window.addEventListener(refreshEvent, fetchData);
+    return () => {
+      controller?.abort();
+      if (refreshEvent) window.removeEventListener(refreshEvent, fetchData);
+    };
+  }, [loader, version, refreshEvent]);
   function reload() {
     setState((previous) => ({ ...previous, error: undefined, loading: true }));
     setVersion((v) => v + 1);

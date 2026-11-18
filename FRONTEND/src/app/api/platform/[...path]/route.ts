@@ -1,10 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const SESSION_COOKIE = "nexa_session";
-const resource = "(?:customers|conversations|tickets|knowledge|automations)";
+const id = "[a-zA-Z0-9_-]+";
+const token = "[a-zA-Z0-9_.-]+";
+const resource =
+  "(?:customers|conversations|tickets|knowledge|automations|templates)";
+
 const allowedPath = new RegExp(
-  `^(?:auth/(?:login|register|me|logout)|team|dashboard|${resource}(?:/[a-zA-Z0-9_-]+)?|conversations/[a-zA-Z0-9_-]+/(?:messages|reply))$`,
+  `^(?:auth/(?:login|register|me|logout|password|forgot|redeem|oidc-exchange)|` +
+    `branding|oidc/providers|account/(?:sessions(?:/revoke)?|mfa)|admin/(?:settings|brand|audit|usage|export|backup|fields|billing|crm|custom/(?:customers|tickets|conversations)/${id})|` +
+    `chat/${token}(?:/(?:events|voice-status|transcribe))?|` +
+    `team(?:/${id})?|` +
+    `ai/(?:status|search|transcribe|summary/(?:conversations|tickets)/${id}|suggestion/${id})|` +
+    `dashboard|reports(?:/export|/analytics)?|operations/(?:workflows|schedules)(?:/remove|/migrate)?|events|push|search|` +
+    `notifications(?:/read)?|views(?:/remove)?|` +
+    `kb/${token}(?:/${token})?|` +
+    `sat/${token}|` +
+    `portal/${token}/(?:code|login|tickets)(?:/${id})?|` +
+    `${resource}(?:/${id})?|` +
+    `customers/${id}/(?:profile|notes)|` +
+    `conversations/${id}/(?:messages|reply|draft|assignment|read)|` +
+    `conversations/${id}/messages/${id}/deliver|` +
+    `tickets/${id}/(?:assignment|escalate|response)|` +
+    `channels(?:/${id})?|` +
+    `webhooks(?:/${id}(?:/remove)?)?|` +
+    `api-keys(?:/${id}/revoke)?|` +
+    `public/(?:openapi\\.json|v1/(?:customers|tickets|conversations)(?:/${id})?))$`,
 );
+
+// Endpoints that can be reached without the session cookie (guests, portal
+// tokens, or developer API keys). Everything else requires the HttpOnly cookie.
+function isPublicEndpoint(path: string) {
+  return (
+    path === "auth/login" ||
+    [
+      "auth/register",
+      "auth/forgot",
+      "auth/redeem",
+      "auth/oidc-exchange",
+      "branding",
+      "oidc/providers",
+    ].includes(path) ||
+    path.startsWith("chat/") ||
+    path.startsWith("kb/") ||
+    path.startsWith("sat/") ||
+    path.startsWith("portal/") ||
+    path.startsWith("public/")
+  );
+}
+
+// These families carry their own credential in the Authorization header (a chat
+// token, a portal session token, or a developer API key) rather than the cookie.
+function usesHeaderAuth(path: string) {
+  return (
+    path.startsWith("chat/") ||
+    path.startsWith("portal/") ||
+    path.startsWith("public/")
+  );
+}
+
+// The browser BFF forwards most paths to /api/v1/*, but the developer API-key
+// surface lives under a distinct backend base path, /api/public/*.
+function backendPath(path: string) {
+  if (path.startsWith("public/")) return "/api/public/" + path.slice(7);
+  return `/api/v1/${path}`;
+}
 
 async function forward(
   request: NextRequest,
@@ -15,43 +75,114 @@ async function forward(
     NextResponse.json({ data: null, message, code: "ERROR" }, { status });
   if (!allowedPath.test(path)) return fail("Endpoint không tồn tại", 404);
   // Next normalizes loopback names in nextUrl; the browser's Host retains the actual origin.
-  const expectedOrigin =
+  let expectedOrigin =
     process.env.APP_ORIGIN ||
     `${request.nextUrl.protocol}//${request.headers.get("host")}`;
   if (
     request.method !== "GET" &&
     request.headers.get("origin") !== expectedOrigin
-  )
-    return fail("Nguồn yêu cầu không hợp lệ", 403);
-  const publicEndpoint = path === "auth/login" || path === "auth/register";
+  ) {
+    const host = request.headers.get("host") ?? "";
+    const candidate = `https://${host}`;
+    if (
+      !/^[a-z0-9.-]+$/i.test(host) ||
+      request.headers.get("origin") !== candidate
+    )
+      return fail("Nguồn yêu cầu không hợp lệ", 403);
+    try {
+      const backend = process.env.BACKEND_URL || "http://127.0.0.1:8080";
+      const lookup = await fetch(
+        `${backend}/api/v1/branding?${new URLSearchParams({ host })}`,
+        { cache: "no-store", signal: AbortSignal.timeout(2000) },
+      );
+      const result = await lookup.json();
+      if (!lookup.ok || !result.data || !Object.hasOwn(result.data, "name"))
+        return fail("Tên miền chưa cấu hình", 403);
+      expectedOrigin = candidate;
+    } catch {
+      return fail("Không kiểm tra được tên miền", 502);
+    }
+  }
+  const publicEndpoint = isPublicEndpoint(path);
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!publicEndpoint && !token)
     return fail("Vui lòng đăng nhập để tiếp tục", 401);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+  const proxySecret = process.env.NEXA_PROXY_SECRET;
+  const ingressIP = request.headers.get("x-nexa-ingress-ip");
+  if (
+    process.env.NEXA_TRUST_INGRESS_IP === "true" &&
+    proxySecret &&
+    ingressIP
+  ) {
+    headers["X-Nexa-Proxy-Secret"] = proxySecret;
+    headers["X-Nexa-Client-IP"] = ingressIP;
+  }
+  const stream =
+    request.method === "GET" && (path === "events" || path.endsWith("/events"));
+  const eventID = request.headers.get("last-event-id");
+  if (stream && eventID) headers["Last-Event-ID"] = eventID;
   if (token && !publicEndpoint) headers.Authorization = `Bearer ${token}`;
+  if (usesHeaderAuth(path))
+    headers.Authorization = request.headers.get("authorization") ?? "";
   try {
-    const body = request.method === "GET" ? undefined : await request.text();
-    if (body && new TextEncoder().encode(body).length > 65536)
+    const audio = path.endsWith("/transcribe") && request.method === "POST";
+    const body = audio
+      ? await readAudio(request)
+      : request.method === "GET"
+        ? undefined
+        : await request.text();
+    if (audio && !body) return fail("Tệp vượt 4 MiB hoặc trống", 413);
+    if (audio) headers["Content-Type"] = "application/octet-stream";
+    if (
+      typeof body === "string" &&
+      new TextEncoder().encode(body).length > 65536
+    )
       return fail("Dữ liệu vượt quá 64 KiB", 413);
     const upstream = await fetch(
-      `${process.env.BACKEND_URL || "http://127.0.0.1:8080"}/api/v1/${path}${request.nextUrl.search}`,
+      `${process.env.BACKEND_URL || "http://127.0.0.1:8080"}${backendPath(path)}${request.nextUrl.search}`,
       {
         method: request.method,
         headers,
         body: body || undefined,
         cache: "no-store",
-        signal: AbortSignal.timeout(15000),
+        signal: stream
+          ? request.signal
+          : AbortSignal.timeout(
+              path.endsWith("/draft") || path.startsWith("ai/") || audio
+                ? 30000
+                : 15000,
+            ),
         redirect: "error",
       },
     );
+    if (
+      upstream.ok &&
+      (stream ||
+        ["reports/export", "admin/export", "admin/backup"].includes(path))
+    ) {
+      const headers = new Headers({ "Cache-Control": "no-store" });
+      for (const key of [
+        "Content-Type",
+        "Content-Disposition",
+        "X-Accel-Buffering",
+      ]) {
+        const value = upstream.headers.get(key);
+        if (value) headers.set(key, value);
+      }
+      return new Response(upstream.body, { status: upstream.status, headers });
+    }
     const envelope = await upstream.json();
-    const login = path === "auth/login" && upstream.ok;
+    const login =
+      (path === "auth/login" || path === "auth/oidc-exchange") && upstream.ok;
     const response = NextResponse.json(
       login ? { ...envelope, data: { authenticated: true } } : envelope,
       { status: upstream.status, headers: { "Cache-Control": "no-store" } },
     );
+    const retry = upstream.headers.get("retry-after");
+    if (retry) response.headers.set("Retry-After", retry);
     if (login)
       response.cookies.set(SESSION_COOKIE, envelope.data.access_token, {
         httpOnly: true,
@@ -69,5 +200,22 @@ async function forward(
       502,
     );
   }
+}
+async function readAudio(request: Request) {
+  const reader = request.body?.getReader();
+  if (!reader) return null;
+  const parts: Uint8Array<ArrayBuffer>[] = [];
+  let size = 0;
+  while (true) {
+    const next = await reader.read();
+    if (next.done) break;
+    size += next.value.byteLength;
+    if (size > 4 * 1024 * 1024) {
+      await reader.cancel();
+      return null;
+    }
+    parts.push(new Uint8Array(next.value));
+  }
+  return size ? new Blob(parts) : null;
 }
 export { forward as GET, forward as POST, forward as PUT };

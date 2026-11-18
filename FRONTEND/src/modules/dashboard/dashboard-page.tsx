@@ -12,6 +12,7 @@ import {
   PageHeading,
   dateLabel,
 } from "@/shared/ui/primitives";
+import { OperationsReport } from "./operations-report";
 import { Icon, type IconName } from "@/shared/ui/icon";
 const metrics: {
   key: "customers" | "conversations" | "open_tickets" | "messages";
@@ -66,8 +67,8 @@ export function DashboardPage() {
       services.tickets.list({ status: "open", limit: 5 }, signal),
     [services],
   );
-  const dashboard = useQuery(load);
-  const tickets = useQuery(ticketLoad);
+  const dashboard = useQuery(load, "workspace-refresh");
+  const tickets = useQuery(ticketLoad, "workspace-refresh");
   const data = dashboard.data;
   const resolved = data ? data.tickets - data.open_tickets : 0;
   const rate = data?.tickets ? Math.round((resolved / data.tickets) * 100) : 0;
@@ -149,6 +150,7 @@ export function DashboardPage() {
           </Link>
         ))}
       </section>
+      <OperationsReport />
       <div className="dashboard-columns">
         <section className="panel">
           <div className="panel-header">

@@ -1,19 +1,21 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { useUser } from "@/shared/providers/workspace-provider";
 import { useServices } from "@/shared/providers/services-provider";
 import { errorMessage } from "@/shared/api/http-client";
-import {
-  Avatar,
-  EmptyState,
-  ErrorState,
-  PageHeading,
-} from "@/shared/ui/primitives";
+import { Avatar, ErrorState, PageHeading } from "@/shared/ui/primitives";
+import { AccountForm } from "../auth/account-form";
 import { Icon } from "@/shared/ui/icon";
+import { useQuery } from "@/shared/hooks/use-query";
 import type { User } from "@/shared/domain/models";
 export function TeamPage() {
   const user = useUser();
   const { auth } = useServices();
+  const load = useCallback(
+    (signal: AbortSignal) => auth.members(signal),
+    [auth],
+  );
+  const members = useQuery(load);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<User | null>(null);
@@ -31,6 +33,7 @@ export function TeamPage() {
         password: String(values.get("password")),
       });
       setCreated(agent);
+      members.reload();
       form.reset();
     } catch (error) {
       setError(errorMessage(error));
@@ -38,14 +41,7 @@ export function TeamPage() {
       setBusy(false);
     }
   }
-  if (user.role !== "owner")
-    return (
-      <EmptyState
-        icon="shield"
-        title="Khu vực quản trị viên"
-        description="Chỉ chủ doanh nghiệp được tạo tài khoản nhân viên."
-      />
-    );
+  if (user.role !== "owner") return <AccountForm action="auth/password" />;
   return (
     <>
       <PageHeading
@@ -53,6 +49,76 @@ export function TeamPage() {
         title="Đội ngũ"
         description="Thêm những người đồng hành vào không gian chăm sóc khách hàng."
       />
+      <AccountForm action="auth/password" />
+      <AccountForm action="team/invite" />
+      {error && <ErrorState message={error} />}
+      <section className="panel team-form">
+        <h2>Thành viên</h2>
+        {members.error && (
+          <ErrorState message={members.error} retry={members.reload} />
+        )}
+        {members.data?.map((member) =>
+          member.role === "agent" ? (
+            <form
+              key={member.id + member.name + member.email + member.disabled}
+              className="form-stack"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const values = new FormData(event.currentTarget);
+                setBusy(true);
+                setError("");
+                try {
+                  await auth.updateMember(member.id, {
+                    name: String(values.get("name")),
+                    email: String(values.get("email")),
+                    disabled: values.has("disabled"),
+                  });
+                  members.reload();
+                } catch (error) {
+                  setError(errorMessage(error));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <label>
+                Họ và tên{" "}
+                <input
+                  name="name"
+                  defaultValue={member.name}
+                  required
+                  maxLength={200}
+                />
+              </label>
+              <label>
+                Email{" "}
+                <input
+                  name="email"
+                  type="email"
+                  defaultValue={member.email}
+                  required
+                  maxLength={254}
+                />
+              </label>
+              <label>
+                <input
+                  name="disabled"
+                  type="checkbox"
+                  defaultChecked={member.disabled}
+                />{" "}
+                Vô hiệu hóa
+              </label>
+              <button className="button secondary" disabled={busy}>
+                Lưu thông tin
+              </button>
+            </form>
+          ) : (
+            <p key={member.id}>
+              {member.name} · {member.email} · Chủ doanh nghiệp
+            </p>
+          ),
+        )}
+      </section>
       <div className="team-grid">
         <section className="panel team-form">
           <div className="panel-header">
@@ -96,7 +162,7 @@ export function TeamPage() {
                 autoComplete="new-password"
               />
             </label>
-            {error && <ErrorState message={error} />}
+
             {created && (
               <div className="notice" role="status">
                 <Icon name="check" size={18} />

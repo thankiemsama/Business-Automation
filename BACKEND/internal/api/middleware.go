@@ -23,6 +23,9 @@ func (h *Handler) protected(next authenticatedHandler) http.HandlerFunc {
 			respond(w, http.StatusUnauthorized, nil, err)
 			return
 		}
+		if !h.tenantAccess(w, r, u.TenantID) {
+			return
+		}
 		next(w, r, u, token)
 	}
 }

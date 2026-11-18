@@ -1,3 +1,7 @@
+import { cookies } from "next/headers";
+import { LocaleProvider } from "@/shared/i18n/provider";
+import { messages } from "@/shared/i18n/messages";
+import { PWAProvider } from "@/shared/ui/platform-tools";
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -10,10 +14,17 @@ export const metadata: Metadata = {
     "Quản lý khách hàng, hội thoại và tự động hóa trong một không gian làm việc.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale =
+    (await cookies()).get("nexa_locale")?.value === "en" ? "en" : "vi";
   return (
-    <html lang="vi">
-      <body>{children}</body>
+    <html lang={locale}>
+      <body>
+        <LocaleProvider locale={locale} messages={messages[locale]}>
+          <PWAProvider />
+          {children}
+        </LocaleProvider>
+      </body>
     </html>
   );
 }

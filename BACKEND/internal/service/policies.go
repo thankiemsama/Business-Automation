@@ -18,6 +18,7 @@ func DefaultPolicies() map[string]ResourcePolicy {
 		core.KindConversations: ConversationPolicy{},
 		core.KindTickets:       TicketPolicy{},
 		core.KindKnowledge:     KnowledgePolicy{},
+		"templates":            KnowledgePolicy{},
 		core.KindAutomations:   AutomationPolicy{},
 	}
 }
@@ -110,7 +111,7 @@ func (KnowledgePolicy) Validate(store core.Reader, user core.User, record *core.
 	if record.Subject == "" || record.Content == "" {
 		return core.Fail(400, "Tiêu đề và nội dung kiến thức là bắt buộc")
 	}
-
+	assignKnowledgeSlug(store, record)
 	return nil
 }
 

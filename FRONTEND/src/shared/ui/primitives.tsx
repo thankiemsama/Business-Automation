@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Icon, type IconName } from "./icon";
 export function Brand() {
   return (
@@ -42,16 +43,17 @@ const labels: Record<string, string> = {
   phone: "Điện thoại",
 };
 export function Badge({ value }: { value: string }) {
+  const t=useTranslations("Common");
   return (
     <span className={`badge badge-${value}`}>
       <span />
-      {labels[value] || value}
+      {t.has(value) ? t(value) : labels[value] || value}
     </span>
   );
 }
 export function EmptyState({
-  title = "Chưa có dữ liệu",
-  description = "Bắt đầu bằng cách tạo mục đầu tiên.",
+  title,
+  description,
   icon = "grid",
   children,
 }: {
@@ -60,13 +62,14 @@ export function EmptyState({
   icon?: IconName;
   children?: ReactNode;
 }) {
+  const t=useTranslations("Common");
   return (
     <div className="empty-state">
       <span className="empty-icon">
         <Icon name={icon} size={27} />
       </span>
-      <h3>{title}</h3>
-      <p>{description}</p>
+      <h3>{title??t("empty")}</h3>
+      <p>{description??t("start")}</p>
       {children}
     </div>
   );
@@ -78,23 +81,25 @@ export function ErrorState({
   message: string;
   retry?: () => void;
 }) {
+  const t=useTranslations("Common");
   return (
     <div className="error-state" role="alert">
       <Icon name="info" />
       <span>{message}</span>
       {retry && (
         <button className="button secondary compact" onClick={retry}>
-          Thử lại
+          {t("retry")}
         </button>
       )}
     </div>
   );
 }
 export function Loading() {
+ const t=useTranslations("Common");
   return (
     <div className="loading" role="status">
       <span className="spinner" />
-      Đang tải dữ liệu…
+      {t("loading")}
     </div>
   );
 }
@@ -131,6 +136,7 @@ export function Pagination({
   limit: number;
   onChange: (page: number) => void;
 }) {
+  const t=useTranslations("Common");
   const last = Math.max(1, Math.ceil(total / limit));
   return (
     <div className="pagination">
@@ -138,21 +144,21 @@ export function Pagination({
         {total
           ? `${(page - 1) * limit + 1}–${Math.min(page * limit, total)}`
           : "0"}{" "}
-        trên {total} kết quả
+        {t("results",{total})}
       </span>
       <div>
         <button
-          aria-label="Trang trước"
+          aria-label={t("previous")}
           disabled={page <= 1}
           onClick={() => onChange(page - 1)}
         >
           ←
         </button>
         <span>
-          Trang {page} / {last}
+          {t("page",{page,last})}
         </span>
         <button
-          aria-label="Trang sau"
+          aria-label={t("next")}
           disabled={page >= last}
           onClick={() => onChange(page + 1)}
         >
@@ -173,6 +179,7 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const t=useTranslations("Common");
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
@@ -202,7 +209,7 @@ export function Modal({
           type="button"
           className="icon-button"
           onClick={onClose}
-          aria-label="Đóng"
+          aria-label={t("close")}
         >
           <Icon name="close" />
         </button>

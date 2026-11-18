@@ -20,6 +20,8 @@ type AuthService struct {
 	clock  Clock
 	ids    IDGenerator
 	hasher PasswordHasher
+	mailer *EmailMailer
+	origin string
 }
 
 func NewAuth(repo core.Repository, clock Clock, ids IDGenerator, hasher PasswordHasher) *AuthService {
@@ -94,13 +96,26 @@ func (s *AuthService) Login(credentials Credentials) (string, error) {
 		salt = "dummy-login-salt"
 	}
 	hash := s.hasher.Hash(credentials.Password, salt)
-	if subtle.ConstantTimeCompare([]byte(hash), []byte(user.PasswordHash)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(hash), []byte(user.PasswordHash)) != 1 || user.Disabled {
 		return "", core.Fail(401, "Thông tin đăng nhập không đúng")
 	}
 	token := s.ids.NewID()
 	err := s.repo.Update(func(store core.Writer) error {
+		current, ok := store.UserByID(user.ID)
+		if !ok || current.Disabled || current.PasswordHash != user.PasswordHash {
+			return core.Fail(401, "Thông tin đăng nhập không đúng")
+		}
+		if current.TOTPSecret != "" {
+			if credentials.Code == "" {
+				return core.Fail(409, "Cần mã xác thực hai lớp")
+			}
+			if err := s.useSecondFactor(&current, credentials.Code); err != nil {
+				return err
+			}
+			store.PutUser(current)
+		}
 		store.ExpireSessions(s.clock.Now())
-		store.PutSession(tokenHash(token), core.Session{UserID: user.ID, ExpiresAt: s.clock.Now().Add(core.SessionLifetime)})
+		store.PutSession(tokenHash(token), core.Session{UserID: user.ID, CreatedAt: s.clock.Now(), ExpiresAt: s.clock.Now().Add(core.SessionLifetime)})
 		return nil
 	})
 	return token, err
@@ -114,7 +129,7 @@ func (s *AuthService) Authenticate(token string) (core.User, error) {
 			return core.Fail(401, "Phiên đăng nhập không hợp lệ")
 		}
 		user, ok = store.UserByID(session.UserID)
-		if !ok {
+		if !ok || user.Disabled {
 			return core.Fail(401, "Tài khoản không tồn tại")
 		}
 		return nil

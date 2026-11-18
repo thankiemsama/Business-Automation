@@ -18,7 +18,7 @@ func (s *DashboardService) Dashboard(user core.User) (map[string]int, error) {
 	}
 	err := s.repo.View(func(store core.Reader) error {
 		for _, record := range store.Records(user.TenantID, "") {
-			if record.TenantID == user.TenantID {
+			if _, isDashboardKind := counts[record.Kind]; record.TenantID == user.TenantID && isDashboardKind {
 				counts[record.Kind]++
 				if record.Kind == core.KindTickets && record.Status != core.StatusResolved {
 					counts["open_tickets"]++

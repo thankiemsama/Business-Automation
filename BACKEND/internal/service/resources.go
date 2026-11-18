@@ -3,6 +3,7 @@ package service
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"businessautomation/internal/core"
 )
@@ -39,15 +40,21 @@ func (s *ResourceService) Save(user core.User, kind, recordID string, input core
 	if !policy.CanWrite(user) {
 		return result, core.Fail(403, "Chỉ owner được chỉnh sửa cấu hình")
 	}
-	err := s.repo.Update(func(store core.Writer) error {
+	err := updateAs(s.repo, user.ID, func(store core.Writer) error {
 		prepared, err := s.prepareRecord(store, user, kind, recordID, input)
 		if err != nil {
 			return err
 		}
 		input = prepared
+		input.Tags, err = normalizeTags(input.Tags)
+		if err != nil {
+			return err
+		}
 		if err := policy.Validate(store, user, &input); err != nil {
 			return err
 		}
+		input.Unread = false
+		input.Overdue = false
 		store.PutRecord(input)
 		result = input
 		return nil
@@ -66,8 +73,27 @@ func (s *ResourceService) List(user core.User, kind, recordID string) ([]core.Re
 				return err
 			}
 		}
+		latest := map[string]uint64{}
+		if kind == core.KindConversations {
+			for _, message := range store.Records(user.TenantID, core.KindMessages) {
+				if message.Sender == core.SenderCustomer {
+					latest[message.ConversationID] = max(latest[message.ConversationID], message.Sequence)
+				}
+			}
+		}
 		for _, record := range store.Records(user.TenantID, kind) {
 			if record.TenantID == user.TenantID && record.Kind == kind && (recordID == "" || record.ID == recordID || (kind == core.KindMessages && record.ConversationID == recordID)) {
+				if kind == core.KindConversations {
+					marker, _ := store.Record(user.TenantID, user.ID+":"+record.ID, "read_markers")
+					record.Unread = latest[record.ID] > marker.Sequence
+				}
+				if kind == core.KindTickets {
+					response, resolution := ticketDeadlines(record)
+					record.ResponseDueAt, record.ResolutionDueAt = &response, &resolution
+					now := s.clock.Now()
+					record.Overdue = ticketOverdue(record, now)
+					record.DueSoon = !record.Overdue && ticketOverdue(record, now.Add(30*time.Minute))
+				}
 				result = append(result, record)
 			}
 		}
@@ -109,8 +135,36 @@ func (s *ResourceService) prepareRecord(store core.Reader, user core.User, kind,
 			return input, core.Fail(409, "Không được đổi khách hàng của hội thoại")
 		}
 		input.AutomationID = existing.AutomationID
+		input.AssigneeID = existing.AssigneeID
+		input.CustomValues = existing.CustomValues
+		input.Summary, input.SummarySource, input.RiskReason = existing.Summary, existing.SummarySource, existing.RiskReason
+		if input.Tags == nil {
+			input.Tags = existing.Tags
+		}
+		if kind == core.KindConversations {
+			input.Email = existing.Email
+		}
+		input.FirstResponseAt = existing.FirstResponseAt
+		input.ResolvedAt = existing.ResolvedAt
+		input.ResolvedBy = existing.ResolvedBy
+		input.EscalatedAt = existing.EscalatedAt
+		input.RespondedBy = existing.RespondedBy
+		input.Rating, input.RatedAt, input.RatingComment = existing.Rating, existing.RatedAt, existing.RatingComment
+		if kind == core.KindKnowledge {
+			input.Slug = existing.Slug
+		}
 		input.ID = recordID
 		input.CreatedAt = existing.CreatedAt
+	}
+	if kind == core.KindTickets {
+		if input.Status == core.StatusResolved && input.ResolvedAt == nil {
+			input.ResolvedAt = &now
+			input.ResolvedBy = user.ID
+		}
+		if input.Status != core.StatusResolved {
+			input.ResolvedAt = nil
+			input.ResolvedBy = ""
+		}
 	}
 	return input, nil
 }

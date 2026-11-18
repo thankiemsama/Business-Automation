@@ -1,5 +1,7 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { WorkspaceRepository } from "../api/workspace";
+import { PlatformRepository } from "../api/platform";
 import { FetchHttpClient, type HttpClient } from "../api/http-client";
 import {
   ApiResourceRepository,
@@ -22,6 +24,8 @@ export function createServices(http: HttpClient) {
     };
   return {
     auth: new AuthRepository(http),
+    workspace: new WorkspaceRepository(http),
+    platform: new PlatformRepository(http),
     dashboard: new DashboardRepository(http),
     ...resources,
     conversations,

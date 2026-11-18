@@ -6,8 +6,13 @@ export const knowledge: ModuleDefinition<"knowledge"> = {
   icon: "book",
   ownerOnly: true,
   description: "Nguồn thông tin tin cậy cho những câu trả lời nhất quán.",
-  defaults: { subject: "", content: "", enabled: true },
+  defaults: { subject: "", content: "", enabled: true, public: false },
   fields: [
+    {
+      name: "public",
+      label: "Xuất bản trong trung tâm trợ giúp công khai",
+      type: "checkbox",
+    },
     {
       name: "subject",
       label: "Tiêu đề bài viết",
@@ -31,5 +36,6 @@ export const knowledge: ModuleDefinition<"knowledge"> = {
     subject: text(values, "subject"),
     content: text(values, "content"),
     enabled: !!values.enabled,
+    public: !!values.public,
   }),
 };

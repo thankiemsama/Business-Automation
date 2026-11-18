@@ -1,12 +1,30 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { LanguageSelect, TenantBrand } from "@/shared/ui/platform-tools";
+import { useEffect, useState, type FormEvent } from "react";
 import { useServices } from "@/shared/providers/services-provider";
-import { errorMessage } from "@/shared/api/http-client";
+import {
+  ApiError,
+  errorMessage,
+  FetchHttpClient,
+} from "@/shared/api/http-client";
 import type { User } from "@/shared/domain/models";
 import { Brand, ErrorState } from "@/shared/ui/primitives";
 import { Icon } from "@/shared/ui/icon";
 export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
+  const t = useTranslations("Auth");
   const { auth } = useServices();
+  const [providers, setProviders] = useState<string[]>([]);
+  const [needCode, setNeedCode] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    new FetchHttpClient()
+      .request<string[]>("oidc/providers", { signal: controller.signal })
+      .then(setProviders)
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -18,11 +36,16 @@ export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
     const credentials = {
       email: String(fields.get("email")),
       password: String(fields.get("password")),
+      ...(needCode && mode === "login"
+        ? { code: String(fields.get("code")) }
+        : {}),
       ...(mode === "register" ? { name: String(fields.get("name")) } : {}),
     };
     try {
       onSuccess(await auth[mode](credentials));
     } catch (error) {
+      if (mode === "login" && error instanceof ApiError && error.status === 409)
+        setNeedCode(true);
       setError(errorMessage(error));
     } finally {
       setBusy(false);
@@ -31,7 +54,7 @@ export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
   return (
     <div className="auth-page">
       <section className="auth-story">
-        <Brand />
+        <TenantBrand guest fallback={<Brand />} />
         <div className="auth-story-content">
           <span className="story-label">
             <span className="status-dot" /> CUSTOMER EXPERIENCE PLATFORM
@@ -70,12 +93,11 @@ export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
       <section className="auth-form-side">
         <span className="auth-top-note">KHÔNG GIAN LÀM VIỆC CỦA BẠN</span>
         <div className="auth-form-wrap">
+          <LanguageSelect />
           <span className="auth-symbol">
             <Icon name="globe" size={26} />
           </span>
-          <h2>
-            {mode === "login" ? "Chào mừng trở lại" : "Bắt đầu cùng Nexa"}
-          </h2>
+          <h2>{t(mode === "login" ? "welcome" : "start")}</h2>
           <p>
             {mode === "login"
               ? "Đăng nhập để tiếp tục chăm sóc khách hàng của bạn."
@@ -95,7 +117,7 @@ export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
               </label>
             )}
             <label>
-              Email công việc
+              {t("email")}
               <input
                 type="email"
                 name="email"
@@ -106,7 +128,7 @@ export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
               />
             </label>
             <label>
-              Mật khẩu
+              {t("password")}
               <input
                 type="password"
                 name="password"
@@ -123,16 +145,45 @@ export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
                 }
               />
             </label>
+            {mode === "login" && needCode && (
+              <label>
+                Mã xác thực hoặc mã khôi phục
+                <input
+                  name="code"
+                  required
+                  autoComplete="one-time-code"
+                  maxLength={20}
+                />
+              </label>
+            )}
             {error && <ErrorState message={error} />}
             <button className="button primary full" disabled={busy}>
               {busy
                 ? "Đang xử lý…"
                 : mode === "login"
-                  ? "Đăng nhập"
+                  ? t("login")
                   : "Tạo không gian làm việc"}
               <Icon name="arrow" size={18} />
             </button>
           </form>
+          {mode === "login" && (
+            <Link className="text-link" href="/account/forgot">
+              Quên mật khẩu?
+            </Link>
+          )}
+          {mode === "login" && providers.length > 0 && (
+            <div className="form-stack">
+              {providers.map((provider) => (
+                <a
+                  key={provider}
+                  className="button secondary"
+                  href={`/api/oidc/${provider}/start`}
+                >
+                  SSO · {provider}
+                </a>
+              ))}
+            </div>
+          )}
           <div className="auth-switch">
             {mode === "login"
               ? "Chưa có không gian làm việc?"

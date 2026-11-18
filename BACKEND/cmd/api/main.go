@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,9 +35,9 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	server := &http.Server{Addr: addr, Handler: app.NewHandler(repo), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	server := &http.Server{Addr: addr, Handler: app.NewHandlerWithContext(ctx, repo), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	done := make(chan error, 1)
 	go func() { slog.Info("API listening", "address", addr); done <- server.ListenAndServe() }()
 	select {

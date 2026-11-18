@@ -1,9 +1,10 @@
 "use client";
-import { useCallback, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
 import { errorMessage } from "@/shared/api/http-client";
-import type { Conversation } from "@/shared/domain/models";
+import type { Conversation, Knowledge } from "@/shared/domain/models";
 import {
   Avatar,
   Badge,
@@ -12,22 +13,30 @@ import {
   Loading,
   Pagination,
 } from "@/shared/ui/primitives";
+import { AISummary, VoiceInput } from "../ai/assist";
+import { ReplyTemplates } from "./reply-templates";
+import { Assignment } from "../team/assignment";
 import { Icon } from "@/shared/ui/icon";
 export function ConversationThread({
   conversation,
   onEdit,
   onChanged,
+  onAssigned,
 }: {
   conversation: Conversation;
   onEdit: () => void;
   onChanged: () => void;
+  onAssigned: (conversation: Conversation) => void;
 }) {
-  const { conversations, customers } = useServices();
+  const { conversations, customers, knowledge } = useServices();
   const [page, setPage] = useState(1);
+  const [file, setFile] = useState<File | null>(null);
+  const [fileVersion, setFileVersion] = useState(0);
   const [content, setContent] = useState("");
-  const [sender, setSender] = useState<"agent" | "customer">("agent");
+  const [sender, setSender] = useState<"agent" | "customer" | "note">("agent");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [source, setSource] = useState<Knowledge | null>(null);
   const [notice, setNotice] = useState("");
   const load = useCallback(
     (signal: AbortSignal) =>
@@ -38,13 +47,23 @@ export function ConversationThread({
     (signal: AbortSignal) => customers.get(conversation.customer_id, signal),
     [customers, conversation.customer_id],
   );
-  const messages = useQuery(load);
+  const messages = useQuery(load, "workspace-refresh");
+  const seen = Math.max(
+    0,
+    ...(messages.data?.items ?? []).map((message) =>
+      message.sender === "customer" ? (message.sequence ?? 0) : 0,
+    ),
+  );
+  useEffect(() => {
+    if (seen) void conversations.read(conversation.id, seen).catch(() => {});
+  }, [conversations, conversation.id, seen]);
   const customer = useQuery(customerLoad);
   const closed = conversation.status === "closed";
   async function mutate(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
     setNotice("");
+    setSource(null);
     try {
       await action();
       messages.reload();
@@ -58,7 +77,18 @@ export function ConversationThread({
   async function send(event: FormEvent) {
     event.preventDefault();
     await mutate(async () => {
-      await conversations.send(conversation.id, content, sender);
+      if (file && file.size > 32 * 1024) throw new Error("Tệp tối đa 32 KiB.");
+      const attachment = file
+        ? {
+            attachment_name: file.name,
+            attachment_data: btoa(
+              String.fromCharCode(...new Uint8Array(await file.arrayBuffer())),
+            ),
+          }
+        : undefined;
+      await conversations.send(conversation.id, content, sender, attachment);
+      setFile(null);
+      setFileVersion((version) => version + 1);
       setContent("");
       const total = (messages.data?.total || 0) + 1;
       setPage(Math.ceil(total / 30));
@@ -66,13 +96,19 @@ export function ConversationThread({
   }
   async function reply() {
     await mutate(async () => {
-      const reply = await conversations.reply(conversation.id);
+      const reply = await conversations.draft(conversation.id);
+      if (!reply.needs_human) {
+        setContent(reply.message.content);
+        setSender("agent");
+        if (reply.source_id) setSource(await knowledge.get(reply.source_id));
+      }
       setNotice(
         reply.needs_human
-          ? "Chưa có kiến thức phù hợp. Nhân viên cần tiếp tục hỗ trợ khách hàng."
-          : `Đã phản hồi từ bài kiến thức #${reply.source_id?.slice(0, 8)}.`,
+          ? "Đã tạo phiếu để nhân viên tiếp tục hỗ trợ."
+          : reply.source_id
+            ? `Đã soạn bản nháp từ bài #${reply.source_id.slice(0, 8)}. Kiểm tra trước khi gửi.`
+            : "Gợi ý AI tổng quát, chưa có nguồn nội bộ. Kiểm tra trước khi gửi.",
       );
-      setPage(Math.ceil(((messages.data?.total || 0) + 1) / 30));
     });
   }
   return (
@@ -106,6 +142,12 @@ export function ConversationThread({
             <Icon name="edit" size={17} />
           </button>
         </div>
+        <Link className="text-link" href={`/conversations/${encodeURIComponent(conversation.id)}`}>Chi tiết và trường tùy chỉnh</Link>
+        <AISummary
+          kind="conversations"
+          id={conversation.id}
+          saved={conversation.ai_summary}
+        />
         <div className="thread-messages" aria-live="polite">
           {messages.loading ? (
             <Loading />
@@ -132,9 +174,39 @@ export function ConversationThread({
                       ? customer.data?.name || "Khách hàng"
                       : message.sender === "assistant"
                         ? "Trợ lý kiến thức"
-                        : "Nhân viên"}
+                        : message.sender === "note"
+                          ? "Ghi chú nội bộ"
+                          : "Nhân viên"}
                   </span>
                   <p>{message.content}</p>
+                  {message.sentiment === "angry" && (
+                    <strong role="status">Khách có dấu hiệu tức giận</strong>
+                  )}
+                  {message.sentiment === "negative" && (
+                    <small>Cảm xúc tiêu cực</small>
+                  )}
+                  {message.attachment_data && (
+                    <a
+                      download={message.attachment_name}
+                      href={`data:application/octet-stream;base64,${message.attachment_data}`}
+                    >
+                      {message.attachment_name}
+                    </a>
+                  )}
+                  {message.status === "pending" && (
+                    <button
+                      type="button"
+                      className="text-link"
+                      disabled={busy}
+                      onClick={() =>
+                        void mutate(() =>
+                          conversations.deliver(conversation.id, message.id),
+                        )
+                      }
+                    >
+                      Email chưa gửi · Thử lại
+                    </button>
+                  )}
                   <time>
                     {new Intl.DateTimeFormat("vi-VN", {
                       hour: "2-digit",
@@ -148,6 +220,15 @@ export function ConversationThread({
             </>
           )}
         </div>
+        {messages.data && messages.data.total > page * 30 && (
+          <button
+            className="text-link"
+            type="button"
+            onClick={() => setPage(Math.ceil((messages.data?.total ?? 1) / 30))}
+          >
+            Đến tin nhắn mới nhất
+          </button>
+        )}
         {messages.data && messages.data.total > 30 && (
           <Pagination
             page={page}
@@ -162,6 +243,12 @@ export function ConversationThread({
             {notice}
           </div>
         )}
+        {source && (
+          <details className="subtle-note">
+            <summary>Nguồn · {source.subject}</summary>
+            <p>{source.content}</p>
+          </details>
+        )}
         {error && <ErrorState message={error} />}
         {closed ? (
           <div className="closed-notice">
@@ -173,17 +260,26 @@ export function ConversationThread({
           </div>
         ) : (
           <form className="composer" onSubmit={send}>
+            <ReplyTemplates
+              onSelect={(content) => {
+                setContent(content);
+                setSender("agent");
+              }}
+            />
             <div className="composer-toolbar">
               <label>
                 Gửi với vai trò
                 <select
                   value={sender}
                   onChange={(event) =>
-                    setSender(event.target.value as "agent" | "customer")
+                    setSender(
+                      event.target.value as "agent" | "customer" | "note",
+                    )
                   }
                   disabled={busy}
                 >
                   <option value="agent">Nhân viên</option>
+                  <option value="note">Ghi chú nội bộ</option>
                   <option value="customer">Khách hàng (ghi nhận)</option>
                 </select>
               </label>
@@ -194,7 +290,7 @@ export function ConversationThread({
                 onClick={reply}
               >
                 <Icon name="bolt" size={15} />
-                Phản hồi từ kiến thức
+                Soạn nháp từ kiến thức
               </button>
             </div>
             <textarea
@@ -202,15 +298,33 @@ export function ConversationThread({
               placeholder="Nhập nội dung tin nhắn…"
               value={content}
               onChange={(event) => setContent(event.target.value)}
-              required
+              required={!file}
               maxLength={16000}
               disabled={busy}
+            />
+            <label>
+              Tệp đính kèm (PNG, JPEG, PDF · tối đa 32 KiB)
+              <input
+                key={fileVersion}
+                type="file"
+                accept="image/png,image/jpeg,application/pdf"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                disabled={busy}
+              />
+            </label>
+            <VoiceInput
+              disabled={busy}
+              onText={(text) =>
+                setContent((current) =>
+                  current ? `${current}\n${text}` : text,
+                )
+              }
             />
             <div className="composer-footer">
               <span>Tin nhắn được lưu trong hội thoại.</span>
               <button
                 className="button primary compact"
-                disabled={busy || !content.trim()}
+                disabled={busy || (!content.trim() && !file)}
               >
                 <Icon name="send" size={16} />
                 {busy ? "Đang gửi…" : "Gửi tin nhắn"}
@@ -220,6 +334,13 @@ export function ConversationThread({
         )}
       </section>
       <aside className="customer-detail">
+        <Assignment
+          assignee={conversation.assignee_id}
+          save={async (id, claim) => {
+            onAssigned(await conversations.assign(conversation.id, id, claim));
+            onChanged();
+          }}
+        />
         <h3>Thông tin khách hàng</h3>
         {customer.loading ? (
           <Loading />

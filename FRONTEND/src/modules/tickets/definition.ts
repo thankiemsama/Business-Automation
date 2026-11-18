@@ -3,6 +3,7 @@ import {
   ticketStatuses,
   type ModuleDefinition,
 } from "../resources/module-definition";
+import { parseTags } from "@/shared/api/workspace";
 import type { Ticket } from "@/shared/domain/models";
 export const tickets: ModuleDefinition<"tickets"> = {
   kind: "tickets",
@@ -12,6 +13,7 @@ export const tickets: ModuleDefinition<"tickets"> = {
   description:
     "Từ yêu cầu đầu tiên đến khi được giải quyết. Không bỏ lỡ điều gì.",
   defaults: {
+    tags: "",
     subject: "",
     content: "",
     customer_id: "",
@@ -20,6 +22,7 @@ export const tickets: ModuleDefinition<"tickets"> = {
     priority: "normal",
   },
   fields: [
+    { name: "tags", label: "Nhãn (phân cách bằng dấu phẩy)" },
     {
       name: "subject",
       label: "Tiêu đề",
@@ -52,6 +55,7 @@ export const tickets: ModuleDefinition<"tickets"> = {
     },
   ],
   serialize: (values) => ({
+    tags: parseTags(text(values, "tags")),
     subject: text(values, "subject"),
     content: text(values, "content"),
     customer_id: text(values, "customer_id"),

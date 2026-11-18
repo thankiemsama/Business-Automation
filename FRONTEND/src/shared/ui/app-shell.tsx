@@ -1,9 +1,12 @@
 "use client";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { PlatformTools, TenantBrand } from "./platform-tools";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import type { User } from "../domain/models";
 import { errorMessage } from "../api/http-client";
+import { WorkspaceTools } from "./workspace-tools";
 import { Avatar, Brand } from "./primitives";
 import { Icon, type IconName } from "./icon";
 const navigation: {
@@ -39,10 +42,24 @@ const navigation: {
   },
   {
     href: "/automations",
-    title: "Tự động hóa",
+    title: "Quy tắc từ khóa",
     icon: "bolt",
     group: "VẬN HÀNH",
   },
+  {
+    href: "/integrations",
+    title: "Tích hợp",
+    icon: "globe",
+    group: "VẬN HÀNH",
+  },
+  {
+    href: "/workflows",
+    title: "Workflow và lịch gửi",
+    icon: "bolt",
+    group: "VẬN HÀNH",
+  },
+  { href: "/admin", title: "Quản trị", icon: "shield", group: "VẬN HÀNH" },
+  { href: "/security", title: "Bảo mật", icon: "shield", group: "VẬN HÀNH" },
   { href: "/team", title: "Đội ngũ", icon: "shield", group: "VẬN HÀNH" },
 ];
 export function AppShell({
@@ -55,6 +72,11 @@ export function AppShell({
   children: ReactNode;
 }) {
   const path = usePathname();
+  const translate = useTranslations("Shell");
+  const navTitle = (href: string, fallback: string) =>
+    translate.has(href.slice(1) || "home")
+      ? translate(href.slice(1) || "home")
+      : fallback;
   const [menu, setMenu] = useState(false);
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -65,9 +87,16 @@ export function AppShell({
   }, []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const active = navigation.find((item) => item.href === path);
+  const active = navigation.find(
+    (item) =>
+      item.href === path ||
+      (item.href !== "/" && path.startsWith(item.href + "/")),
+  );
   return (
     <div className="workspace">
+      <a className="skip-link" href="#workspace-content">
+        {translate("skip")}
+      </a>
       {menu && (
         <button
           className="sidebar-backdrop"
@@ -80,7 +109,7 @@ export function AppShell({
         className={`sidebar ${menu ? "is-open" : ""}`}
       >
         <Link href="/" className="brand-link" aria-label="Nexa — Tổng quan">
-          <Brand />
+          <TenantBrand fallback={<Brand />} />
         </Link>
         <div className="workspace-switch">
           <span className="workspace-logo">N</span>
@@ -96,7 +125,11 @@ export function AppShell({
         </div>
         <nav>
           {navigation
-            .filter((item) => user.role === "owner" || item.href !== "/team")
+            .filter(
+              (item) =>
+                !["/workflows", "/admin"].includes(item.href) ||
+                user.role === "owner",
+            )
             .map((item, index, items) => (
               <div key={item.href}>
                 {(index === 0 || items[index - 1].group !== item.group) && (
@@ -104,12 +137,19 @@ export function AppShell({
                 )}
                 <Link
                   href={item.href}
+                  aria-current={active?.href === item.href ? "page" : undefined}
                   onClick={() => setMenu(false)}
-                  className={`nav-link ${path === item.href ? "active" : ""}`}
+                  className={`nav-link ${active?.href === item.href ? "active" : ""}`}
                 >
                   <Icon name={item.icon} size={19} />
-                  <span>{item.title}</span>
-                  {path === item.href && <span className="nav-active-dot" />}
+                  <span>
+                    {item.href === "/team" && user.role === "agent"
+                      ? "Tài khoản"
+                      : navTitle(item.href, item.title)}
+                  </span>
+                  {active?.href === item.href && (
+                    <span className="nav-active-dot" />
+                  )}
                 </Link>
               </div>
             ))}
@@ -121,7 +161,10 @@ export function AppShell({
             </span>
             <strong>Để công việc tự vận hành</strong>
             <p>Từ khóa đúng. Hỗ trợ kịp thời.</p>
-            <Link href="/automations" onClick={() => setMenu(false)}>
+            <Link
+              href={user.role === "owner" ? "/workflows" : "/automations"}
+              onClick={() => setMenu(false)}
+            >
               Khám phá tự động hóa <Icon name="arrow" size={15} />
             </Link>
           </div>
@@ -173,16 +216,22 @@ export function AppShell({
             </button>
             <span>Không gian làm việc</span>
             <Icon name="chevron" size={13} />
-            <strong>{active?.title || "Nexa"}</strong>
+            <strong>
+              {active ? navTitle(active.href, active.title) : "Nexa"}
+            </strong>
           </div>
           <div className="topbar-right">
+            <PlatformTools user={user.id} />
+            <WorkspaceTools navigation={navigation} />
             <span className="private-label">
               <span className="status-dot" /> Không gian riêng tư
             </span>
             <Avatar name={user.name} small />
           </div>
         </header>
-        <main className="page-content">{children}</main>
+        <main id="workspace-content" tabIndex={-1} className="page-content">
+          {children}
+        </main>
         <footer className="workspace-footer">
           <span>
             NEXA <span>/</span> CUSTOMER EXPERIENCE

@@ -17,6 +17,7 @@ type ServerFields struct {
 }
 
 type CustomerInput struct {
+	Tags []string `json:"tags"`
 	ServerFields
 	Name  string `json:"name"`
 	Email string `json:"email"`
@@ -24,10 +25,11 @@ type CustomerInput struct {
 }
 
 func (v CustomerInput) Record() core.Record {
-	return core.Record{Name: v.Name, Email: v.Email, Phone: v.Phone}
+	return core.Record{Name: v.Name, Email: v.Email, Phone: v.Phone, Tags: v.Tags}
 }
 
 type ConversationInput struct {
+	Tags []string `json:"tags"`
 	ServerFields
 	CustomerID string `json:"customer_id"`
 	Channel    string `json:"channel"`
@@ -36,10 +38,11 @@ type ConversationInput struct {
 }
 
 func (v ConversationInput) Record() core.Record {
-	return core.Record{CustomerID: v.CustomerID, Channel: v.Channel, Status: v.Status, Subject: v.Subject}
+	return core.Record{Tags: v.Tags, CustomerID: v.CustomerID, Channel: v.Channel, Status: v.Status, Subject: v.Subject}
 }
 
 type TicketInput struct {
+	Tags []string `json:"tags"`
 	ServerFields
 	Name           string `json:"name"`
 	Subject        string `json:"subject"`
@@ -52,6 +55,7 @@ type TicketInput struct {
 
 func (v TicketInput) Record() core.Record {
 	return core.Record{
+		Tags:           v.Tags,
 		Name:           v.Name,
 		Subject:        v.Subject,
 		Content:        v.Content,
@@ -63,6 +67,7 @@ func (v TicketInput) Record() core.Record {
 }
 
 type KnowledgeInput struct {
+	Public bool `json:"public"`
 	ServerFields
 	Subject string `json:"subject"`
 	Content string `json:"content"`
@@ -70,7 +75,7 @@ type KnowledgeInput struct {
 }
 
 func (v KnowledgeInput) Record() core.Record {
-	return core.Record{Subject: v.Subject, Content: v.Content, Enabled: v.Enabled}
+	return core.Record{Subject: v.Subject, Content: v.Content, Enabled: v.Enabled, Public: v.Public}
 }
 
 type AutomationInput struct {
@@ -101,12 +106,14 @@ func resourceDecoders() map[string]resourceDecoder {
 		core.KindConversations: decodeInput[ConversationInput],
 		core.KindTickets:       decodeInput[TicketInput],
 		core.KindKnowledge:     decodeInput[KnowledgeInput],
+		"templates":            decodeInput[KnowledgeInput],
 		core.KindAutomations:   decodeInput[AutomationInput],
 	}
 }
 
 // UserResponse deliberately omits all authentication secrets.
 type UserResponse struct {
+	Disabled bool   `json:"disabled"`
 	ID       string `json:"id"`
 	TenantID string `json:"tenant_id"`
 	Name     string `json:"name"`
@@ -115,5 +122,5 @@ type UserResponse struct {
 }
 
 func publicUser(u core.User) UserResponse {
-	return UserResponse{ID: u.ID, TenantID: u.TenantID, Name: u.Name, Email: u.Email, Role: u.Role}
+	return UserResponse{Disabled: u.Disabled, ID: u.ID, TenantID: u.TenantID, Name: u.Name, Email: u.Email, Role: u.Role}
 }

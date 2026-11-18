@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"time"
 
 	"businessautomation/internal/core"
 )
@@ -53,6 +54,13 @@ func clone(state databaseState) databaseState {
 	}
 	for recordID, record := range copiedState.Records {
 		record.Keywords = slices.Clone(record.Keywords)
+		record.Tags = slices.Clone(record.Tags)
+		for _, field := range []**time.Time{&record.FirstResponseAt, &record.ResolvedAt, &record.RatedAt, &record.ResponseDueAt, &record.ResolutionDueAt, &record.EscalatedAt, &record.ReadAt} {
+			if *field != nil {
+				value := **field
+				*field = &value
+			}
+		}
 		copiedState.Records[recordID] = record
 	}
 	return copiedState

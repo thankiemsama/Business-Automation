@@ -1,7 +1,9 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useUser } from "@/shared/providers/workspace-provider";
+import { errorMessage } from "@/shared/api/http-client";
 import { useQuery } from "@/shared/hooks/use-query";
 import type { ResourceKind, ResourceMap } from "@/shared/domain/models";
 import {
@@ -18,6 +20,15 @@ import { Icon } from "@/shared/ui/icon";
 import { ResourceEditor } from "./resource-editor";
 import { ResourceDetails } from "./resource-details";
 import { resourceModules } from "./registry";
+import {
+  BulkToolbar,
+  ExportLinks,
+  ViewControls,
+  emptyFilters,
+  toggleSelection,
+} from "./workspace-controls";
+import { AIKnowledgeSearch } from "../ai/assist";
+import { Assignment, AssignmentFilter } from "../team/assignment";
 import { ticketStatuses } from "./module-definition";
 
 export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
@@ -29,20 +40,36 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
   const user = useUser();
   const definition = resourceModules[kind];
   const repository = services.resources[kind];
+  const [filters, setFilters] = useState(emptyFilters);
+  const [checked, setChecked] = useState<string[]>([]);
   const [q, setQ] = useState("");
+  const [assignment, setAssignment] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [editor, setEditor] = useState<{ entity?: ResourceMap[K] } | null>(
     null,
   );
+  const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
   const [viewing, setViewing] = useState<ResourceMap[K] | null>(null);
   const loader = useCallback(
     (signal: AbortSignal) =>
-      repository.list({ page, limit: 12, q, status }, signal),
-    [repository, page, q, status],
+      repository.list(
+        {
+          page,
+          limit: 12,
+          q,
+          status,
+          assignment,
+          priority: filters.priority,
+          tag: filters.tags,
+          assignee: filters.assignee,
+        },
+        signal,
+      ),
+    [repository, page, q, status, assignment, filters],
   );
-  const result = useQuery(loader);
+  const result = useQuery(loader, "workspace-refresh");
   const canWrite = !definition.ownerOnly || user.role === "owner";
   return (
     <>
@@ -58,6 +85,9 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
         >
           <Icon name="refresh" size={17} />
         </button>
+        {(kind === "tickets" || kind === "customers") && (
+          <ExportLinks kind={kind} />
+        )}
         {canWrite && (
           <button className="button primary" onClick={() => setEditor({})}>
             <Icon name="plus" size={18} />
@@ -65,6 +95,7 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
           </button>
         )}
       </PageHeading>
+      {actionError && <ErrorState message={actionError} />}
       {notice && (
         <div className="notice" role="status">
           <Icon name="check" size={17} />
@@ -73,6 +104,11 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
             <Icon name="close" size={16} />
           </button>
         </div>
+      )}
+      {kind === "automations" && user.role === "owner" && (
+        <Link className="button secondary" href="/workflows">
+          Mở workflow nhiều bước
+        </Link>
       )}
       {kind === "automations" && (
         <div className="module-banner">
@@ -88,6 +124,18 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
           </div>
           <span className="banner-pill">TỪ KHÓA → PHIẾU HỖ TRỢ</span>
         </div>
+      )}
+      {kind === "knowledge" && (
+        <AIKnowledgeSearch
+          onSelect={async (id) => {
+            try {
+              const item = await repository.get(id);
+              setViewing(item);
+            } catch (error) {
+              setActionError(errorMessage(error));
+            }
+          }}
+        />
       )}
       {kind === "knowledge" && (
         <div className="subtle-note">
@@ -123,6 +171,15 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
               />
             </label>
             {kind === "tickets" && (
+              <AssignmentFilter
+                value={assignment}
+                onChange={(value) => {
+                  setAssignment(value);
+                  setPage(1);
+                }}
+              />
+            )}
+            {kind === "tickets" && (
               <select
                 aria-label="Lọc trạng thái"
                 value={status}
@@ -141,6 +198,41 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
             )}
           </div>
         </div>
+        {kind === "tickets" && (
+          <div className="workspace-filter-bar">
+            <ViewControls
+              current={{
+                ...filters,
+                kind: "tickets",
+                name: "",
+                status,
+                assignment,
+                search: q,
+              }}
+              onApply={(view) => {
+                setFilters({
+                  priority: view.priority,
+                  tags: view.tags,
+                  assignee: view.assignee,
+                });
+                setQ(view.search);
+                setStatus(view.status);
+                setAssignment(view.assignment);
+                setPage(1);
+                setChecked([]);
+              }}
+            />
+            <BulkToolbar
+              kind="tickets"
+              ids={checked}
+              clear={() => setChecked([])}
+              changed={() => {
+                setPage(1);
+                result.reload();
+              }}
+            />
+          </div>
+        )}
         {result.error ? (
           <ErrorState message={result.error} retry={result.reload} />
         ) : result.loading ? (
@@ -174,6 +266,29 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
             <table>
               <thead>
                 <tr>
+                  {kind === "tickets" && (
+                    <th>
+                      <input
+                        type="checkbox"
+                        aria-label="Chọn tất cả phiếu trên trang"
+                        checked={Boolean(
+                          result.data?.items.length &&
+                          result.data.items.every((item) =>
+                            checked.includes(item.id),
+                          ),
+                        )}
+                        onChange={(event) => {
+                          const pageIDs =
+                            result.data?.items.map((item) => item.id) ?? [];
+                          setChecked((ids) =>
+                            event.target.checked
+                              ? [...new Set([...ids, ...pageIDs])]
+                              : ids.filter((id) => !pageIDs.includes(id)),
+                          );
+                        }}
+                      />
+                    </th>
+                  )}
                   <th>
                     {kind === "customers"
                       ? "Khách hàng"
@@ -202,6 +317,18 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
               <tbody>
                 {result.data.items.map((item) => (
                   <tr key={item.id}>
+                    {kind === "tickets" && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          aria-label={`Chọn phiếu ${item.id.slice(0, 8)}`}
+                          checked={checked.includes(item.id)}
+                          onChange={() =>
+                            setChecked((ids) => toggleSelection(ids, item.id))
+                          }
+                        />
+                      </td>
+                    )}
                     <td>
                       <div className="entity-cell">
                         {kind === "customers" ? (
@@ -212,14 +339,30 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                           </span>
                         )}
                         <div>
-                          <strong>
-                            {"name" in item
-                              ? item.name
-                              : "subject" in item
-                                ? item.subject
-                                : ""}
-                          </strong>
+                          {kind === "tickets" && "subject" in item ? (
+                            <Link
+                              className="text-link"
+                              href={`/tickets/${encodeURIComponent(item.id)}`}
+                            >
+                              {item.subject}
+                            </Link>
+                          ) : (
+                            <strong>
+                              {"name" in item
+                                ? item.name
+                                : "subject" in item
+                                  ? item.subject
+                                  : ""}
+                            </strong>
+                          )}
                           <small>#{item.id.slice(0, 8).toUpperCase()}</small>
+                          {"tags" in item && Boolean(item.tags?.length) && (
+                            <div className="keywords">
+                              {item.tags?.map((tag) => (
+                                <span key={tag}>{tag}</span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -235,7 +378,24 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                           </small>
                         </div>
                       ) : "priority" in item ? (
-                        <Badge value={item.priority} />
+                        <>
+                          <Badge value={item.priority} />{" "}
+                          {"overdue" in item && item.overdue && (
+                            <strong role="status">Quá hạn SLA</strong>
+                          )}
+                          {"sla_risk_reason" in item &&
+                            item.sla_risk_reason && (
+                              <strong
+                                title={item.sla_risk_reason}
+                                role="status"
+                              >
+                                Nguy cơ trễ SLA
+                              </strong>
+                            )}
+                          {"due_soon" in item && item.due_soon && (
+                            <strong role="status">Sắp đến hạn SLA</strong>
+                          )}
+                        </>
                       ) : "keywords" in item ? (
                         <div className="keywords">
                           {item.keywords.map((keyword) => (
@@ -268,6 +428,75 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                       {kind !== "customers" && dateLabel(item.updated_at)}
                     </td>
                     <td>
+                      {"priority" in item &&
+                        "response_due_at" in item &&
+                        item.response_due_at && (
+                          <div>
+                            <small>
+                              Phản hồi{" "}
+                              {new Date(item.response_due_at).toLocaleString(
+                                "vi-VN",
+                              )}
+                            </small>
+                            <br />
+                            <small>
+                              Xử lý{" "}
+                              {item.resolution_due_at &&
+                                new Date(item.resolution_due_at).toLocaleString(
+                                  "vi-VN",
+                                )}
+                            </small>
+                            {!item.conversation_id &&
+                              !item.first_response_at &&
+                              item.status !== "resolved" && (
+                                <button
+                                  type="button"
+                                  className="button secondary compact"
+                                  onClick={async () => {
+                                    setActionError("");
+                                    try {
+                                      await repository.recordResponse(item.id);
+                                      result.reload();
+                                    } catch (error) {
+                                      setActionError(errorMessage(error));
+                                    }
+                                  }}
+                                >
+                                  Ghi nhận đã phản hồi
+                                </button>
+                              )}
+                            {item.escalated_at ? (
+                              <p>Đã chuyển cấp</p>
+                            ) : (
+                              item.overdue && (
+                                <button
+                                  type="button"
+                                  className="button secondary compact"
+                                  onClick={async () => {
+                                    setActionError("");
+                                    try {
+                                      await repository.escalate(item.id);
+                                      result.reload();
+                                    } catch (error) {
+                                      setActionError(errorMessage(error));
+                                    }
+                                  }}
+                                >
+                                  Chuyển cấp
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )}
+                      {"priority" in item && (
+                        <Assignment
+                          assignee={item.assignee_id}
+                          save={async (id, claim) => {
+                            await repository.assign(item.id, id, claim);
+                            result.reload();
+                          }}
+                        />
+                      )}
                       {canWrite ? (
                         <button
                           className="icon-button"

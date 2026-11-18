@@ -50,6 +50,15 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request, _ core.User, to
 }
 
 func (h *Handler) team(w http.ResponseWriter, r *http.Request, u core.User, _ string) {
+	if r.Method == http.MethodGet {
+		users, err := h.auth.Members(u)
+		members := make([]UserResponse, 0, len(users))
+		for _, user := range users {
+			members = append(members, publicUser(user))
+		}
+		respond(w, http.StatusOK, members, err)
+		return
+	}
 	if r.Method != http.MethodPost {
 		method(w, http.MethodPost)
 		return

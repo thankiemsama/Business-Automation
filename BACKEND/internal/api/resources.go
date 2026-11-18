@@ -13,7 +13,7 @@ func (h *Handler) resource(kind string, decoder resourceDecoder) authenticatedHa
 		case http.MethodGet:
 			items, err := h.resources.List(u, kind, key)
 			if key == "" {
-				h.page(w, r, items, err)
+				h.page(w, r, filterAssignments(items, u.ID, r.URL.Query().Get("assignment")), err)
 				return
 			}
 			if err != nil {
@@ -59,14 +59,16 @@ func (h *Handler) messages(w http.ResponseWriter, r *http.Request, u core.User, 
 		return
 	}
 	var input struct {
-		Content string `json:"content"`
-		Sender  string `json:"sender"`
+		Content        string `json:"content"`
+		Sender         string `json:"sender"`
+		AttachmentName string `json:"attachment_name"`
+		AttachmentData string `json:"attachment_data"`
 	}
 	if err := decode(w, r, &input); err != nil {
 		respond(w, http.StatusBadRequest, nil, err)
 		return
 	}
-	result, err := h.conversations.Message(u, key, input.Content, input.Sender)
+	result, err := h.conversations.MessageWithAttachment(u, key, input.Content, input.Sender, input.AttachmentName, input.AttachmentData)
 	respond(w, http.StatusCreated, result, err)
 }
 

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"encoding/base64"
+	"net/http"
 	"strings"
 
 	"businessautomation/internal/core"
@@ -9,28 +11,38 @@ import (
 const maximumMessageBytes = 16000
 
 type ConversationService struct {
-	repo        core.Repository
-	clock       Clock
-	ids         IDGenerator
-	replies     ReplyProvider
-	automations AutomationRunner
+	repo          core.Repository
+	clock         Clock
+	ids           IDGenerator
+	replies       ReplyProvider
+	draftProvider ReplyProvider
+	automations   AutomationRunner
+	mailer        *EmailMailer
 }
 
 func NewConversations(repo core.Repository, clock Clock, ids IDGenerator, replies ReplyProvider, automations AutomationRunner) *ConversationService {
-	return &ConversationService{repo: repo, clock: clock, ids: ids, replies: replies, automations: automations}
+	return &ConversationService{repo: repo, clock: clock, ids: ids, replies: replies, draftProvider: replies, automations: automations}
 }
 
 // Message atomically records an inbound message and executes enabled keyword rules.
 func (s *ConversationService) Message(user core.User, conversationID, content, sender string) (core.Record, error) {
+	return s.MessageWithAttachment(user, conversationID, content, sender, "", "")
+}
+
+func (s *ConversationService) MessageWithAttachment(user core.User, conversationID, content, sender, name, attachment string) (core.Record, error) {
 	var result core.Record
+	var recipient string
+	if err := validateAttachment(name, attachment); err != nil {
+		return result, err
+	}
 	content = strings.TrimSpace(content)
-	if content == "" || len(content) > maximumMessageBytes {
+	if (content == "" && attachment == "") || len(content) > maximumMessageBytes {
 		return result, core.Fail(400, "Tin nhắn phải có 1–16000 byte")
 	}
-	if sender != core.SenderCustomer && sender != core.SenderAgent {
-		return result, core.Fail(400, "Sender phải là customer hoặc agent")
+	if sender != core.SenderCustomer && sender != core.SenderAgent && sender != "note" {
+		return result, core.Fail(400, "Vai trò gửi không hợp lệ")
 	}
-	err := s.repo.Update(func(store core.Writer) error {
+	err := updateAs(s.repo, user.ID, func(store core.Writer) error {
 		conversation, err := findOwnedRecord(store, user, conversationID, core.KindConversations)
 		if err != nil {
 			return err
@@ -38,7 +50,23 @@ func (s *ConversationService) Message(user core.User, conversationID, content, s
 		if conversation.Status == core.StatusClosed {
 			return core.Fail(409, "Hội thoại đã đóng")
 		}
+		if conversation.Channel == core.ChannelEmail && conversation.Email != "" && sender == core.SenderAgent {
+			if s.mailer == nil {
+				return core.Fail(503, "Chưa cấu hình gửi email")
+			}
+			recipient = conversation.Email
+		}
 		result = s.storeMessage(store, user, conversation, content, sender)
+		if attachment != "" {
+			result.AttachmentName, result.AttachmentData = name, attachment
+			store.PutRecord(result)
+		}
+		if recipient != "" {
+			result.Status = "pending"
+			result.Email = recipient
+			result.Subject = conversation.Subject
+			store.PutRecord(result)
+		}
 		if sender == core.SenderCustomer {
 			conversation.UpdatedAt = result.UpdatedAt
 			return s.automations.Run(store, user, conversation, result)
@@ -46,6 +74,11 @@ func (s *ConversationService) Message(user core.User, conversationID, content, s
 
 		return nil
 	})
+	if err == nil && recipient != "" {
+		if delivered, deliveryErr := s.DeliverEmail(user, conversationID, result.ID); deliveryErr == nil {
+			result = delivered
+		}
+	}
 	return result, err
 }
 
@@ -120,12 +153,32 @@ func (s *ConversationService) storeMessage(store core.Writer, user core.User, co
 		ConversationID: conversation.ID,
 		Content:        content,
 		Sender:         sender,
+		AuthorID:       user.ID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 		Sequence:       nextSequence(store, user, conversation.ID),
 	}
 	store.PutRecord(message)
+	if sender == core.SenderAgent && (conversation.Channel != core.ChannelEmail || conversation.Email == "") {
+		for _, ticket := range store.Records(user.TenantID, core.KindTickets) {
+			if ticket.ConversationID == conversation.ID && ticket.Status != core.StatusResolved && ticket.FirstResponseAt == nil {
+				recordTicketResponse(store, &ticket, user.ID, now)
+			}
+		}
+	}
 	conversation.UpdatedAt = now
 	store.PutRecord(conversation)
 	return message
+}
+
+func validateAttachment(name, attachment string) error {
+	if name != "" || attachment != "" {
+		data, err := base64.StdEncoding.DecodeString(attachment)
+		mime := http.DetectContentType(data)
+		if err != nil || len(data) == 0 || len(data) > 32*1024 || len(name) == 0 || len(name) > 200 ||
+			strings.ContainsAny(name, "/\\\r\n") || (mime != "image/png" && mime != "image/jpeg" && mime != "application/pdf") {
+			return core.Fail(400, "Tệp phải là PNG, JPEG hoặc PDF, tối đa 32 KiB")
+		}
+	}
+	return nil
 }

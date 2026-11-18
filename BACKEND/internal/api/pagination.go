@@ -16,10 +16,13 @@ const (
 )
 
 type listQuery struct {
-	page   int
-	limit  int
-	search string
-	status string
+	page     int
+	limit    int
+	search   string
+	status   string
+	priority string
+	tags     []string
+	assignee string
 }
 
 type pageResponse struct {
@@ -52,8 +55,11 @@ func (h *Handler) page(w http.ResponseWriter, r *http.Request, records []core.Re
 
 func parseListQuery(values url.Values) (listQuery, error) {
 	query := listQuery{
-		search: strings.ToLower(values.Get("q")),
-		status: values.Get("status"),
+		search:   strings.ToLower(values.Get("q")),
+		status:   values.Get("status"),
+		priority: values.Get("priority"),
+		tags:     values["tag"],
+		assignee: values.Get("assignee"),
 	}
 	var err error
 	query.page, err = parseBoundedInteger(values.Get("page"), 1, maximumPageNumber, "Page phải từ 1 đến 1000000")
@@ -78,6 +84,9 @@ func parseBoundedInteger(raw string, defaultValue, maximum int, message string) 
 func filterRecords(records []core.Record, query listQuery) []core.Record {
 	filtered := make([]core.Record, 0, len(records))
 	for _, record := range records {
+		if query.priority != "" && query.priority != record.Priority || query.assignee != "" && query.assignee != record.AssigneeID || !hasTags(record.Tags, query.tags) {
+			continue
+		}
 		if query.status != "" && record.Status != query.status {
 			continue
 		}

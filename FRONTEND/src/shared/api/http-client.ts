@@ -21,7 +21,13 @@ export class FetchHttpClient implements HttpClient {
     });
     const envelope = await response.json().catch(() => null);
     if (!response.ok) {
-      if (response.status === 401 && !path.startsWith("auth/"))
+      if (
+        response.status === 401 &&
+        !path.startsWith("auth/") &&
+        !path.startsWith("chat/") &&
+        !path.startsWith("portal/") &&
+        !path.startsWith("public/")
+      )
         window.dispatchEvent(new Event("session-expired"));
       throw new ApiError(
         envelope?.message || "Không thể xử lý yêu cầu. Vui lòng thử lại.",
