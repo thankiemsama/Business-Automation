@@ -201,6 +201,9 @@ fieldset {
 .workspace-filters > .form-stack {
   padding: 10px 0;
 }
+.saved-view-controls {
+  display: contents;
+}
 .selectable-conversation {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

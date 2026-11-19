@@ -1,6 +1,12 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
 import { errorMessage } from "@/shared/api/http-client";
@@ -17,6 +23,24 @@ import { AISummary, VoiceInput } from "../ai/assist";
 import { ReplyTemplates } from "./reply-templates";
 import { Assignment } from "../team/assignment";
 import { Icon } from "@/shared/ui/icon";
+import styles from "./conversation-composer.module.css";
+
+const maxAttachmentSize = 32 * 1024;
+const composerModes = {
+  agent: {
+    placeholder: "Viết phản hồi cho khách hàng…",
+    action: "Gửi tin nhắn",
+  },
+  note: {
+    placeholder: "Viết ghi chú cho đội ngũ hỗ trợ…",
+    action: "Lưu ghi chú",
+  },
+  customer: {
+    placeholder: "Ghi lại nội dung khách hàng đã gửi…",
+    action: "Ghi nhận tin nhắn",
+  },
+} as const;
+
 export function ConversationThread({
   conversation,
   onEdit,
@@ -31,7 +55,9 @@ export function ConversationThread({
   const { conversations, customers, knowledge } = useServices();
   const [page, setPage] = useState(1);
   const [file, setFile] = useState<File | null>(null);
-  const [fileVersion, setFileVersion] = useState(0);
+  const attachmentInput = useRef<HTMLInputElement>(null);
+  const editor = useRef<HTMLTextAreaElement>(null);
+  const [attachmentError, setAttachmentError] = useState("");
   const [content, setContent] = useState("");
   const [sender, setSender] = useState<"agent" | "customer" | "note">("agent");
   const [busy, setBusy] = useState(false);
@@ -58,6 +84,7 @@ export function ConversationThread({
     ? visibleMessages.findIndex((message) => message.id === draftSourceMsg)
     : -1;
   const draftContextChanged =
+    sender === "agent" &&
     draftSourceIndex >= 0 &&
     visibleMessages
       .slice(draftSourceIndex + 1)
@@ -73,6 +100,9 @@ export function ConversationThread({
   }, [conversations, conversation.id, seen]);
   const customer = useQuery(customerLoad);
   const closed = conversation.status === "closed";
+  const mode = composerModes[sender];
+  const canSend =
+    !busy && !draftContextChanged && Boolean(content.trim() || file);
   async function mutate(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -90,8 +120,8 @@ export function ConversationThread({
   }
   async function send(event: FormEvent) {
     event.preventDefault();
+    if (!canSend) return;
     await mutate(async () => {
-      if (file && file.size > 32 * 1024) throw new Error("Tệp tối đa 32 KiB.");
       const attachment = file
         ? {
             attachment_name: file.name,
@@ -110,7 +140,7 @@ export function ConversationThread({
       if (message.status === "pending")
         setNotice("Tin nhắn đã được xếp hàng gửi.");
       setFile(null);
-      setFileVersion((version) => version + 1);
+      setAttachmentError("");
       setContent("");
       setDraftSourceMsg("");
       const total = (messages.data?.total || 0) + 1;
@@ -316,60 +346,106 @@ export function ConversationThread({
             </button>
           </div>
         ) : (
-          <form className="composer" onSubmit={send}>
-            <ReplyTemplates
-              onSelect={(content) => {
-                setDraftSourceMsg("");
-                setContent(content);
-                setSender("agent");
-              }}
-            />
-            <div className="composer-toolbar">
-              <label>
-                Gửi với vai trò
+          <form
+            className={styles.composer}
+            data-mode={sender}
+            onSubmit={send}
+            aria-busy={busy}
+          >
+            <div className={styles.toolbar}>
+              <label className={styles.mode}>
+                <span>Chế độ soạn</span>
                 <select
                   value={sender}
                   onChange={(event) =>
-                    setSender(
-                      event.target.value as "agent" | "customer" | "note",
-                    )
+                    setSender(event.target.value as keyof typeof composerModes)
                   }
                   disabled={busy}
                 >
-                  <option value="agent">Nhân viên</option>
+                  <option value="agent">Trả lời khách hàng</option>
                   <option value="note">Ghi chú nội bộ</option>
-                  <option value="customer">Khách hàng (ghi nhận)</option>
+                  <option value="customer">Ghi nhận tin của khách</option>
                 </select>
               </label>
               <button
-                className="button secondary compact"
+                className={styles.tool}
                 type="button"
                 disabled={busy}
                 onClick={reply}
               >
-                <Icon name="bolt" size={15} />
+                <Icon name="bolt" size={16} />
                 Soạn nháp từ kiến thức
               </button>
+              <ReplyTemplates
+                disabled={busy}
+                onSelect={(content) => {
+                  setDraftSourceMsg("");
+                  setContent(content);
+                  setSender("agent");
+                  editor.current?.focus();
+                }}
+              />
             </div>
             <textarea
+              ref={editor}
+              className={styles.editor}
               aria-label="Nội dung tin nhắn"
-              placeholder="Nhập nội dung tin nhắn…"
+              placeholder={mode.placeholder}
               value={content}
               onChange={(event) => setContent(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key !== "Enter" ||
+                  !(event.ctrlKey || event.metaKey) ||
+                  event.nativeEvent.isComposing
+                )
+                  return;
+                event.preventDefault();
+                if (canSend) event.currentTarget.form?.requestSubmit();
+              }}
               required={!file}
               maxLength={16000}
               disabled={busy}
             />
-            <label>
-              Tệp đính kèm (PNG, JPEG, PDF · tối đa 32 KiB)
-              <input
-                key={fileVersion}
-                type="file"
-                accept="image/png,image/jpeg,application/pdf"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                disabled={busy}
-              />
-            </label>
+            {file && (
+              <div className={styles.attachment}>
+                <Icon name="attachment" size={16} />
+                <span title={file.name}>{file.name}</span>
+                <button
+                  className={styles.tool}
+                  type="button"
+                  aria-label="Bỏ tệp đính kèm"
+                  disabled={busy}
+                  onClick={() => setFile(null)}
+                >
+                  <Icon name="close" size={15} />
+                </button>
+              </div>
+            )}
+            {attachmentError && (
+              <p className={styles.attachmentError} role="alert">
+                {attachmentError}
+              </p>
+            )}
+            <input
+              ref={attachmentInput}
+              hidden
+              type="file"
+              accept="image/png,image/jpeg,application/pdf"
+              disabled={busy}
+              onChange={(event) => {
+                const picked = event.target.files?.[0];
+                event.target.value = "";
+                if (!picked) return;
+                if (picked.size > maxAttachmentSize) {
+                  setFile(null);
+                  setAttachmentError("Tệp vượt quá giới hạn 32 KiB.");
+                  return;
+                }
+                setAttachmentError("");
+                setFile(picked);
+              }}
+            />
             <VoiceInput
               disabled={busy}
               onText={(text) =>
@@ -378,14 +454,26 @@ export function ConversationThread({
                 )
               }
             />
-            <div className="composer-footer">
-              <span>Tin nhắn được lưu trong hội thoại.</span>
+            <div className={styles.footer}>
               <button
-                className="button primary compact"
-                disabled={busy || (!content.trim() && !file)}
+                className={styles.tool}
+                type="button"
+                title="PNG, JPEG hoặc PDF · tối đa 32 KiB"
+                aria-label="Đính kèm tệp PNG, JPEG hoặc PDF, tối đa 32 KiB"
+                disabled={busy}
+                onClick={() => attachmentInput.current?.click()}
               >
-                <Icon name="send" size={16} />
-                {busy ? "Đang gửi…" : "Gửi tin nhắn"}
+                <Icon name="attachment" size={17} />
+                Đính kèm
+              </button>
+              <button
+                className={`button primary ${styles.send}`}
+                type="submit"
+                aria-keyshortcuts="Control+Enter Meta+Enter"
+                disabled={!canSend}
+              >
+                <Icon name={sender === "agent" ? "send" : "check"} size={16} />
+                {mode.action}
               </button>
             </div>
           </form>

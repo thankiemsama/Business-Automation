@@ -112,9 +112,10 @@ type ChannelProvider interface {
 
 // ChannelManager stores and validates per-tenant channel configurations.
 type ChannelManager struct {
-	repo          core.Repository
-	providers     map[string]ChannelProvider
-	conversations *ConversationService
+	repo           core.Repository
+	providers      map[string]ChannelProvider
+	conversations  *ConversationService
+	campaignOrigin string
 }
 
 func NewChannels(repo core.Repository) *ChannelManager {

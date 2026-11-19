@@ -19,6 +19,11 @@ func (s *AIService) Transcribe(data []byte) (string, error) {
 }
 
 func (s *AIService) transcribe(tenant string, data []byte) (string, error) {
+	text, err := s.transcribeAudio(tenant, data)
+	return clipped(text, 4000), err
+}
+
+func (s *AIService) transcribeAudio(tenant string, data []byte) (string, error) {
 	if !s.Enabled() {
 		return "", core.Fail(503, "Chưa cấu hình OpenAI")
 	}
@@ -71,6 +76,9 @@ func (s *AIService) transcribe(tenant string, data []byte) (string, error) {
 	}
 	request.Header.Set("Authorization", "Bearer "+s.model.key)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
+	if err := s.model.reserveRequest(tenant); err != nil {
+		return "", err
+	}
 	client := *s.model.client
 	client.Timeout = 25 * time.Second
 	response, err := client.Do(request)
@@ -90,7 +98,7 @@ func (s *AIService) transcribe(tenant string, data []byte) (string, error) {
 		result.Usage.Seconds = result.Duration
 	}
 	s.model.recordUsage(tenant, model, result.Usage)
-	return clipped(result.Text, 4000), nil
+	return result.Text, nil
 }
 
 func validSentiment(sentiment string) bool {

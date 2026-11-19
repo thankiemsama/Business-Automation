@@ -22,7 +22,7 @@ func (s *AIService) runChatbot() {
 	recent := s.clock.Now().Add(-20 * time.Minute)
 	_ = s.repo.View(func(store core.Reader) error {
 		for _, tenant := range store.Tenants() {
-			if !featureEnabled(store, tenant, "ai") {
+			if !featureEnabled(store, tenant, "ai") || !s.autoChat && !agentPresetEnabled(store, tenant, "inbox_handoff") {
 				continue
 			}
 			messages := store.Records(tenant, core.KindMessages)
@@ -45,7 +45,7 @@ func (s *AIService) runChatbot() {
 			for _, session := range sessions {
 				candidate, ok := store.Record(tenant, session.ConversationID, core.KindConversations)
 				current := latest[candidate.ID]
-				if !ok || !botChannel(candidate.Channel) || candidate.Status != core.StatusOpen || candidate.AssigneeID != "" || activeTickets[candidate.ID] || current.Sender != core.SenderCustomer || !current.CreatedAt.After(recent) || (current.Content == "" && current.AttachmentName == "" && current.AttachmentData == "") {
+				if !ok || !botChannel(candidate.Channel) || candidate.Status != core.StatusOpen || candidate.AssigneeID != "" || activeTickets[candidate.ID] || current.Sender != core.SenderCustomer || current.AutomationID == "lead_campaign_command" || !current.CreatedAt.After(recent) || (current.Content == "" && current.AttachmentName == "" && current.AttachmentData == "") {
 					continue
 				}
 				if _, done := store.Record(tenant, tokenHash("chatbot:"+current.ID), "ai_bot_markers"); done {
@@ -66,8 +66,10 @@ func (s *AIService) runChatbot() {
 		return
 	}
 	answer := Answer{NeedsHuman: true}
+	knowledgeGap := false
 	if message.Sentiment != "angry" && message.AttachmentData == "" && message.AttachmentName == "" {
 		generated, err := s.model.answer(conversation.TenantID, message.Content, articles)
+		knowledgeGap = err == nil && generated.knowledgeGap && !generalPublicIntent(message.Content)
 		_, lowerBound := s.chatCalibration.probability(generated.Confidence)
 		if err == nil && validSentiment(generated.Sentiment) && generated.Sentiment != "angry" &&
 			s.chatThreshold >= .7 && lowerBound >= s.chatThreshold &&
@@ -77,6 +79,9 @@ func (s *AIService) runChatbot() {
 	}
 	_ = s.repo.Update(func(store core.Writer) error {
 		tenant := conversation.TenantID
+		if !featureEnabled(store, tenant, "ai") || !s.autoChat && !agentPresetEnabled(store, tenant, "inbox_handoff") {
+			return nil
+		}
 		fresh, ok := store.Record(tenant, conversation.ID, core.KindConversations)
 		if !ok || fresh.Status != core.StatusOpen || fresh.AssigneeID != "" || !botChannel(fresh.Channel) {
 			return nil
@@ -131,6 +136,9 @@ func (s *AIService) runChatbot() {
 		}
 		if answer.NeedsHuman {
 			marker.Status = "handoff"
+			if knowledgeGap && knowledgeDraftEnabled(store, tenant) {
+				marker.Name, marker.MessageID = "knowledge_gap", message.ID
+			}
 			botHandoff(store, s.repo.IDs, fresh, message, now)
 		} else {
 			marker.Status = "answered"

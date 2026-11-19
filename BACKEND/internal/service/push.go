@@ -27,7 +27,7 @@ func (s *Workspace) PushKey() string {
 }
 
 func (s *Workspace) SavePush(user core.User, input PushInput) error {
-	if s.PushKey() == "" {
+	if !input.Disable && s.PushKey() == "" {
 		return core.Fail(503, "Web Push chưa được cấu hình")
 	}
 	endpoint, err := url.Parse(input.Endpoint)

@@ -37,6 +37,21 @@ export function ViewControls({
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const filterCount =
+    current.tags.length +
+    Number(Boolean(current.priority)) +
+    Number(Boolean(current.assignee));
+  function resetView() {
+    setSelected("");
+    setName("");
+    onApply({
+      ...current,
+      ...emptyFilters,
+      search: "",
+      status: "",
+      assignment: "",
+    });
+  }
   async function change(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -51,7 +66,12 @@ export function ViewControls({
   }
   return (
     <details className="workspace-filters">
-      <summary>Bộ lọc và chế độ xem đã lưu</summary>
+      <summary>
+        Bộ lọc và chế độ xem đã lưu
+        {current.kind === "tickets" && filterCount > 0 && (
+          <span className="count-pill">{filterCount}</span>
+        )}
+      </summary>
       <div className="form-stack">
         <form
           className="form-stack"
@@ -103,94 +123,104 @@ export function ViewControls({
             </select>
           </label>
           <button className="button secondary compact">Áp dụng bộ lọc</button>
+          {current.kind === "tickets" &&
+            Boolean(
+              filterCount ||
+              current.search ||
+              current.status ||
+              current.assignment,
+            ) && (
+              <button
+                className="button secondary compact"
+                type="button"
+                onClick={resetView}
+              >
+                Xóa bộ lọc
+              </button>
+            )}
         </form>
-        <select
-          aria-label="Chế độ xem đã lưu"
-          value={selected}
-          onChange={(event) => {
-            const id = event.target.value;
-            setSelected(id);
-            const view = views.data?.find((item) => item.id === id);
-            if (view) {
-              setName(view.name);
-              onApply(view);
-            } else {
-              setName("");
-              onApply({
-                ...current,
-                ...emptyFilters,
-                search: "",
-                status: "",
-                assignment: "",
-              });
-            }
-          }}
-        >
-          <option value="">Chế độ xem mặc định</option>
-          {views.data
-            ?.filter((view) => view.kind === current.kind)
-            .map((view) => (
-              <option key={view.id} value={view.id}>
-                {view.name}
-              </option>
-            ))}
-        </select>
-        <label>
-          Tên chế độ xem
-          <input
-            value={name}
-            maxLength={80}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-        <div className="toolbar-controls">
-          <button
-            type="button"
-            className="button secondary compact"
-            disabled={busy || !name.trim()}
-            onClick={() =>
-              void change(async () => {
-                const view = await workspace.saveView({
-                  ...current,
-                  name,
-                  id: undefined,
-                });
-                setSelected(view.id ?? "");
-              })
-            }
+        <div className="saved-view-controls">
+          <select
+            aria-label="Chế độ xem đã lưu"
+            value={selected}
+            onChange={(event) => {
+              const id = event.target.value;
+              setSelected(id);
+              const view = views.data?.find((item) => item.id === id);
+              if (view) {
+                setName(view.name);
+                onApply(view);
+              } else {
+                resetView();
+              }
+            }}
           >
-            Lưu mới
-          </button>
-          {selected && (
-            <>
-              <button
-                type="button"
-                className="button secondary compact"
-                disabled={busy || !name.trim()}
-                onClick={() =>
-                  void change(() =>
-                    workspace.saveView({ ...current, name, id: selected }),
-                  )
-                }
-              >
-                Cập nhật
-              </button>
-              <button
-                type="button"
-                className="button secondary compact"
-                disabled={busy}
-                onClick={() =>
-                  void change(async () => {
-                    await workspace.removeView(selected);
-                    setSelected("");
-                    setName("");
-                  })
-                }
-              >
-                Xóa
-              </button>
-            </>
-          )}
+            <option value="">Chế độ xem mặc định</option>
+            {views.data
+              ?.filter((view) => view.kind === current.kind)
+              .map((view) => (
+                <option key={view.id} value={view.id}>
+                  {view.name}
+                </option>
+              ))}
+          </select>
+          <label>
+            Tên chế độ xem
+            <input
+              value={name}
+              maxLength={80}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <div className="toolbar-controls">
+            <button
+              type="button"
+              className="button secondary compact"
+              disabled={busy || !name.trim()}
+              onClick={() =>
+                void change(async () => {
+                  const view = await workspace.saveView({
+                    ...current,
+                    name,
+                    id: undefined,
+                  });
+                  setSelected(view.id ?? "");
+                })
+              }
+            >
+              Lưu mới
+            </button>
+            {selected && (
+              <>
+                <button
+                  type="button"
+                  className="button secondary compact"
+                  disabled={busy || !name.trim()}
+                  onClick={() =>
+                    void change(() =>
+                      workspace.saveView({ ...current, name, id: selected }),
+                    )
+                  }
+                >
+                  Cập nhật
+                </button>
+                <button
+                  type="button"
+                  className="button secondary compact"
+                  disabled={busy}
+                  onClick={() =>
+                    void change(async () => {
+                      await workspace.removeView(selected);
+                      setSelected("");
+                      setName("");
+                    })
+                  }
+                >
+                  Xóa
+                </button>
+              </>
+            )}
+          </div>
         </div>
         {(error || views.error || members.error) && (
           <p role="alert">{error || views.error || members.error}</p>

@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -9,6 +10,9 @@ import (
 
 	"businessautomation/internal/core"
 )
+
+const aiJobLease = 2 * time.Minute
+const maxAIJobAttempts = 3
 
 func idleEligible(ticket, conversation core.Record, rule WorkflowRule, now time.Time) bool {
 	if ticket.Status == core.StatusResolved {
@@ -110,6 +114,54 @@ func (o *Operations) runJobs() {
 			return
 		}
 	}
+}
+
+func (o *Operations) runAIJobs() {
+	var jobs []core.Record
+	if err := o.repo.View(func(store core.Reader) error {
+		jobs = store.PendingAIWorkflowJobs(25, o.clock.Now())
+		return nil
+	}); err != nil {
+		slog.Error("AI review queue read failed", "error", err)
+		return
+	}
+	for _, job := range jobs {
+		var ran bool
+		switch job.Subject {
+		case core.WorkflowAIKnowledgeDraft:
+			ran = o.runKnowledgeDraft(job)
+		case core.WorkflowAIExtractFields:
+			ran = o.runFieldExtraction(job)
+		case core.WorkflowAIReview:
+			ran = o.runResolvedReview(job)
+		}
+		if ran {
+			return
+		}
+	}
+}
+
+func (o *Operations) deferAIJobForQuota(job core.Record, attempt uint64, cause error) bool {
+	if !errors.Is(cause, errAIQuota) {
+		return false
+	}
+	err := o.repo.UpdateTenant(job.TenantID, func(store core.Writer) error {
+		current, found := store.LockWorkflowJob(job.TenantID, job.ID)
+		if !found || current.Sequence != attempt {
+			return nil
+		}
+		now := o.clock.Now().UTC()
+		nextDay := reportDay(now).AddDate(0, 0, 1)
+		current.Sequence--
+		current.EmailRetryAt = &nextDay
+		current.Status, current.UpdatedAt = "pending", now
+		store.PutRecord(current)
+		return nil
+	})
+	if err != nil {
+		slog.Error("AI quota deferral failed", "job", job.ID, "error", err)
+	}
+	return true
 }
 
 func (o *Operations) runJob(w *workspaceWriter, job core.Record) {

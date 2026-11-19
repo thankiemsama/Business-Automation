@@ -27,6 +27,42 @@ func (h *Handler) workspaceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/reports/export", h.protected(h.export))
 	mux.HandleFunc("GET /api/v1/push", h.protected(h.push))
 	mux.HandleFunc("POST /api/v1/push", h.protected(h.push))
+	mux.HandleFunc("POST /api/v1/templates/{id}/export", h.protected(h.exportReplyTemplate))
+	mux.HandleFunc("POST /api/v1/templates/import", h.protected(h.importReplyTemplate))
+}
+
+func (h *Handler) exportReplyTemplate(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	var input struct {
+		Password string `json:"password"`
+	}
+	if err := decode(w, r, &input); err != nil {
+		respond(w, 400, nil, err)
+		return
+	}
+	if !h.acquireAuthSlot(w) {
+		return
+	}
+	defer h.releaseAuthSlot()
+	code, err := h.workspace.ExportReplyTemplate(user, r.PathValue("id"), input.Password)
+	w.Header().Set("Cache-Control", "no-store")
+	respond(w, 200, map[string]string{"code": code}, err)
+}
+
+func (h *Handler) importReplyTemplate(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	var input struct {
+		Code     string `json:"code"`
+		Password string `json:"password"`
+	}
+	if err := decode(w, r, &input); err != nil {
+		respond(w, 400, nil, err)
+		return
+	}
+	if !h.acquireAuthSlot(w) {
+		return
+	}
+	defer h.releaseAuthSlot()
+	record, err := h.workspace.ImportReplyTemplate(user, input.Code, input.Password)
+	respond(w, 200, record, err)
 }
 func (h *Handler) events(w http.ResponseWriter, r *http.Request, user core.User, token string) {
 	h.streamEvents(w, r, user.TenantID, func() bool {

@@ -13,12 +13,13 @@ const (
 )
 
 type Answer struct {
-	Content    string
-	SourceID   string
-	Provider   string
-	NeedsHuman bool
-	Confidence float64
-	Sentiment  string
+	knowledgeGap bool
+	Content      string
+	SourceID     string
+	Provider     string
+	NeedsHuman   bool
+	Confidence   float64
+	Sentiment    string
 }
 
 // ReplyProvider selects the content to persist as an assistant message.

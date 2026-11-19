@@ -264,7 +264,7 @@ func (m *ChannelManager) ingest(store core.Writer, tenant, channel, account stri
 		store.PutRecord(customer)
 	}
 	conversation, found := store.Record(tenant, link.ConversationID, core.KindConversations)
-	if found && conversation.Status == core.StatusClosed && m.acceptChannelRating(store, conversation, msg, now) {
+	if found && m.acceptChannelRating(store, conversation, msg, now) {
 		store.PutRecord(core.Record{ID: delivery, TenantID: tenant, Kind: "channel_inbound", ConversationID: conversation.ID, CreatedAt: now})
 		return nil
 	}
@@ -285,8 +285,16 @@ func (m *ChannelManager) ingest(store core.Writer, tenant, channel, account stri
 		store.PutRecord(result)
 	}
 	store.PutRecord(core.Record{ID: delivery, TenantID: tenant, Kind: "channel_inbound", ConversationID: conversation.ID, CreatedAt: now})
+	if m.handleCampaignMessage(store, conversation, result, account) {
+		result.AutomationID = "lead_campaign_command"
+		store.PutRecord(result)
+		return nil
+	}
 	if msg.attachment == "" && confirmBotResolution(store, conversation, previous, result) {
 		m.queueChannelSurvey(store, conversation)
+		return nil
+	}
+	if msg.attachment == "" && resolveOnCustomerConfirmation(store, conversation, previous, result) {
 		return nil
 	}
 	return m.conversations.automations.Run(store, user, conversation, result)

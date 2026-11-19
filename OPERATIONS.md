@@ -40,7 +40,7 @@
 - Cổng khách dùng `/portal/{tenant}`. Mã email chỉ dùng một lần. Cổng cho gửi PNG, JPEG hoặc PDF tối đa 32 KiB khi tạo phiếu. Email đăng nhập và khảo sát CSAT cần cấu hình Resend và `APP_ORIGIN`.
 - Webhook hỗ trợ `ticket.created`, `message.new`, `sla.breached` và `csat.submitted`. Đích phải là máy chủ công khai. Xác thực HMAC-SHA256 qua `X-Nexa-Signature`, dùng `X-Nexa-Delivery` để khử trùng lặp. Phản hồi ngoài 2xx được thử lại với giãn cách.
 - API công khai có quyền đọc khách hàng, phiếu và hội thoại. Dùng `Authorization: Bearer nexa_…`. Mở Swagger UI tại `/api-docs` trên frontend để thử API. Tài liệu OpenAPI trực tiếp nằm ở `/api/public/openapi.json` trên backend.
-- Zalo, Messenger, WhatsApp, SMS và Instagram hiện chỉ có màn hình lưu cấu hình. Chưa có adapter nhà cung cấp. Hồ sơ 360° hiển thị lịch sử hỗ trợ và các kênh đã có dữ liệu. LTV theo doanh thu cần nguồn dữ liệu giao dịch.
+- Zalo OA và WhatsApp có adapter nhận tin qua webhook và gửi qua hàng đợi. Messenger, SMS và Instagram có màn hình lưu cấu hình. Hồ sơ 360° hiển thị lịch sử hỗ trợ và các kênh đã có dữ liệu. LTV theo doanh thu cần nguồn dữ liệu giao dịch.
 
 ## Chat trên website
 
@@ -100,6 +100,24 @@ Gửi email trong hội thoại trả HTTP `202` và trạng thái `pending` sau
 - SLA ước lượng p50/p90 cho phản hồi đầu tiên và xử lý bằng hồi quy phân vị riêng theo tenant. Biến dự báo gồm kênh, ưu tiên, giờ tạo phiếu theo ICT và tải hàng chờ của người phụ trách. Tải quá khứ được dựng từ vòng đời ticket và người phụ trách hiện lưu. Dùng tối đa 2.000 mẫu hoàn tất gần nhất trong 60 ngày cho mỗi mốc. Dưới 20 mẫu, backend dùng mốc mặc định. `AI_SLA_AUTO_ESCALATE=true` chuyển phiếu có nguy cơ trễ cho owner.
 - Ghi âm tối đa 45 giây hoặc tải tệp tối đa 4 MiB. `gpt-transcribe` hoặc `OPENAI_TRANSCRIPTION_MODEL=whisper-1` tạo bản chép lời. Backend xác định ý định và cảm xúc từ nội dung chép lời, sau đó cho phép chỉnh văn bản trước khi gửi. `AI_CHAT_WIDGET_VOICE=true` bật ghi âm cho khách đã có phiên chat.
 - Báo cáo phân tích theo khoảng ngày hiển thị số và tỷ lệ hội thoại bot tự giải quyết đã có xác nhận của khách, tỷ lệ yêu cầu giải quyết trước khi tạo phiếu, CSAT trung bình theo kênh, thời gian phản hồi trung bình theo ưu tiên và chi phí AI ước tính cho mỗi phiếu mới. Đặt `AI_USD_RATES` dạng JSON theo tên model. Dùng `input_per_million` và `output_per_million` cho token, hoặc `per_minute` cho âm thanh tính theo thời lượng. Báo cáo chia tổng chi phí AI có đơn giá trong kỳ cho số phiếu mới cùng kỳ và hiển thị số lượt chưa định giá.
+
+### Kiểm tra chất lượng, trích xuất và agent
+
+- Bật từng tính năng trong **Quản trị → Truy cập và thương hiệu**. Kiểm tra chất lượng xếp hàng cho các lần giải quyết phiếu sau khi bật. Phiếu thiếu phản hồi của nhân viên có thể có nhãn và ghi nhận về khách hàng mà không có điểm. Xem kết quả ở chi tiết phiếu và ghi nhận gần nhất trong hồ sơ khách hàng 360°.
+- Dashboard tính tỷ lệ chấm điểm trên các lượt đã xếp hàng trong kỳ. Số gợi ý chuyển duyệt, được chấp nhận và tự áp dụng dùng ngày phát sinh của từng sự kiện. Gợi ý được chấp nhận ở kỳ sau xuất hiện trong kỳ sau.
+- **Quản trị → Trích xuất hàng loạt** hỗ trợ tối đa 50 phiếu và 10 trường mỗi đợt. AI đọc tiêu đề và mô tả để điền trường trống. Tiến độ phân biệt phiếu đã điền, bỏ qua, lỗi và đang chờ.
+- Bản nháp FAQ dùng các trường hợp bot đã bàn giao vì tìm kho kiến thức công khai không có kết quả. Khi nhân viên trả lời và giải quyết phiếu, worker soạn bài riêng tư và để tắt. Chủ doanh nghiệp duyệt trong **Kho kiến thức** trước khi bật dùng hoặc công khai.
+- Agent chỉ tra số liệu hỗ trợ của khách gắn với phiếu. Đề xuất giải quyết và gửi CSAT cần người tạo đề xuất duyệt trong 15 phút. Nếu bật chế độ tự giải quyết, khách phải gửi đúng «Đã giải quyết» sau phản hồi của nhân viên và hội thoại phải có đúng một phiếu đang mở, cùng khách hàng, với mức ưu tiên dưới Khẩn. Nhật ký ghi công cụ và phiếu liên quan.
+- **AI teammate** có preset cảnh báo SLA và xử lý inbox. Preset inbox dùng thống kê hiệu chuẩn và kho kiến thức công khai của chatbot. Biến `AI_CHATBOT_AUTO_REPLY` vẫn điều khiển cấu hình chung của tiến trình.
+- Quota theo lượt gọi OpenAI được đặt theo từng doanh nghiệp và đặt lại vào 00:00 giờ Việt Nam. Giá trị 0 cho phép không giới hạn. Quota đếm lượt gọi, kể cả lượt đã gửi mà nhà cung cấp trả lỗi. Job kiểm tra, trích xuất và soạn bài chuyển sang ngày tiếp theo khi hết quota. Một tác vụ có thể dùng nhiều lượt nếu vừa tạo vector vừa gọi mô hình.
+- Owner có thể xuất **Câu trả lời mẫu** bằng mật khẩu và nhập mã ở doanh nghiệp khác. Mã chứa tiêu đề và nội dung đã mã hóa. Nhập lại cùng mã trong cùng doanh nghiệp dùng lại bản đã nhập.
+
+### Ghi âm cuộc gọi và QR chiến dịch
+
+- Khi bật **Nhập ghi âm và chép lời cuộc gọi**, owner chọn hồ sơ khách hàng và xác nhận quyền xử lý trước khi gửi tệp tối đa 4 MiB tới OpenAI. Bản chép lời nằm dưới dạng ghi chú nội bộ trong hội thoại Điện thoại. Nexa lưu bản chép lời và không lưu tệp âm thanh.
+- Với dữ liệu ghi âm và hội thoại gửi tới nhà cung cấp, xác định căn cứ xử lý, thông báo cho người liên quan, thời hạn lưu, quyền tiếp cận và nghĩa vụ chuyển dữ liệu cá nhân ra nước ngoài nếu áp dụng. Đối chiếu [Luật Bảo vệ dữ liệu cá nhân](https://vanban.chinhphu.vn/?classid=1&docid=214590&pageid=27160&typegroupid=) và [Nghị định 356/2025/NĐ-CP](https://vanban.chinhphu.vn/?classid=1&docid=216387&pageid=27160).
+- Tạo mã tại **Tích hợp → QR thu hút khách hàng** sau khi cấu hình kênh và `APP_ORIGIN`. Trang đích mở tài khoản kênh đã kết nối. Với Zalo, khách sao chép và gửi mã trong chat. Với WhatsApp, nội dung mã được điền sẵn. Lượt mở trang có thể bao gồm truy cập lặp. Lead được ghi khi Nexa nhận mã qua webhook.
+- Lời nhắc tư vấn ở mốc 1 và 8 giờ cần sự đồng ý của khách, dừng khi khách nhắn thêm hoặc gửi STOP và chỉ được gửi trong tối đa 23 giờ từ lúc ghi nhận lead. Đối chiếu quyền gửi và nội dung với [chính sách Zalo OA](https://oa.zalo.me/home/documents/vie/policy/tuong-tac-cua-oa-voi-nguoi-dung) và [chính sách WhatsApp Business](https://business.whatsapp.com/policy). Với cuộc gọi, SMS hoặc email quảng cáo, đối chiếu thêm [Nghị định 91/2020/NĐ-CP](https://vanban.chinhphu.vn/?docid=200773&pageid=27160).
 
 ## Zalo OA, WhatsApp và Resend inbound
 

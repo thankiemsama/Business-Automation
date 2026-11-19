@@ -170,6 +170,64 @@ export function AITicketSuggestion({
   );
 }
 
+const reviewStatus: Record<string, string> = {
+  pending: "Đang chờ kiểm tra",
+  running: "Đang kiểm tra",
+  insufficient_evidence: "Thiếu dữ liệu để chấm điểm",
+  failed: "Kiểm tra thất bại",
+  disabled: "AI đã tắt cho doanh nghiệp",
+  superseded: "Phiếu đã thay đổi trạng thái",
+};
+
+export function AITicketReview({ id }: { id: string }) {
+  const load = useCallback(
+    (signal: AbortSignal) =>
+      api.request<{
+        status: string;
+        score?: number;
+        findings?: string[];
+        customer_impression?: string;
+      } | null>(`ai/review/${encodeURIComponent(id)}`, { signal }),
+    [id],
+  );
+  const result = useQuery(load, "workspace-refresh");
+  const review = result.data;
+  if (!review && !result.error) return null;
+  return (
+    <details className="subtle-note">
+      <summary>Kiểm tra chất lượng bằng AI</summary>
+      {review && (
+        <>
+          <p>
+            {review.score != null
+              ? `Điểm chất lượng ${review.score}/100`
+              : reviewStatus[review.status]}
+          </p>
+          {review.customer_impression && (
+            <p>Ghi nhận về khách hàng · {review.customer_impression}</p>
+          )}
+          {!!review.findings?.length && (
+            <ul>
+              {review.findings.map((finding, index) => (
+                <li key={index}>{finding}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      {result.error && <p role="alert">{result.error}</p>}
+      <button
+        type="button"
+        className="text-link"
+        onClick={result.reload}
+        disabled={result.loading}
+      >
+        Cập nhật kết quả
+      </button>
+    </details>
+  );
+}
+
 export function VoiceInput({
   disabled,
   onText,

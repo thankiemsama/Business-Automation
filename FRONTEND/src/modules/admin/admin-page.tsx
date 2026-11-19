@@ -10,6 +10,7 @@ import {
   AuditPanel,
 } from "./admin-panels";
 import { FieldsAdmin } from "./custom-values";
+import { FieldExtractionPanel } from "./field-extraction";
 
 export function AdminPage() {
   const user = useUser();
@@ -37,6 +38,11 @@ export function AdminPage() {
           { id: "billing", label: "Gói dịch vụ", content: <BillingPanel /> },
           { id: "crm", label: "CRM", content: <CRMPanel /> },
           { id: "fields", label: "Trường tùy chỉnh", content: <FieldsAdmin /> },
+          {
+            id: "field-extraction",
+            label: "Trích xuất hàng loạt",
+            content: <FieldExtractionPanel />,
+          },
           { id: "audit", label: "Nhật ký thay đổi", content: <AuditPanel /> },
         ]}
       />

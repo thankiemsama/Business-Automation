@@ -24,6 +24,13 @@ type Session struct {
 
 const CustomerMerged = "merged"
 const KindWorkflowJobs = "workflow_jobs"
+const WorkflowAIReview = "ai_resolved_review"
+const WorkflowAIKnowledgeDraft = "ai_knowledge_draft"
+const WorkflowAIExtractFields = "ai_extract_fields"
+
+func IsAIWorkflowJob(subject string) bool {
+	return subject == WorkflowAIReview || subject == WorkflowAIKnowledgeDraft || subject == WorkflowAIExtractFields
+}
 
 type Record struct {
 	// Record is a kind-dependent, shared MVP storage shape: the meaning of most
@@ -109,6 +116,7 @@ type Reader interface {
 	IdleTickets(tenantID string, cutoff time.Time) []Record
 	DueEmailReplies(now time.Time, limit int) []Record
 	PendingWorkflowJobs(limit int) []Record
+	PendingAIWorkflowJobs(limit int, now time.Time) []Record
 }
 
 func VersionedResource(kind string) bool {

@@ -54,6 +54,25 @@ func (c client) account(email string) client {
 	return c
 }
 
+func TestWorkspaceSettingsRoutesAndNotFoundMessage(t *testing.T) {
+	repo, err := repository.Open(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := (client{t: t, h: app.NewHandler(repo)}).account("settings@example.test")
+	for _, path := range []string{
+		"/api/v1/admin/settings",
+		"/api/v1/operations/field-extraction",
+		"/api/v1/lead-campaigns",
+	} {
+		owner.call(http.MethodGet, path, nil, http.StatusOK)
+	}
+	response := owner.call(http.MethodGet, "/api/v1/unknown", nil, http.StatusNotFound)
+	if response["message"] != "Endpoint không tồn tại" {
+		t.Fatalf("unexpected error message: %q", response["message"])
+	}
+}
+
 func TestWorkflowIsolationAndPersistence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
 	repo, err := repository.Open(path)

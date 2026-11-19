@@ -5,6 +5,16 @@ type MetricAverage = { name: string; samples: number; value: number | null };
 
 export type AnalyticsReport = {
   ai: {
+    agent_proposed: number;
+    agent_applied: number;
+    agent_auto_resolved: number;
+    reviews_queued: number;
+    reviews_scored: number;
+    reviews_pending: number;
+    reviews_failed: number;
+    triage_offered: number;
+    triage_accepted: number;
+    triage_auto_applied: number;
     bot_cases: number;
     auto_resolved: number;
     avoided_tickets: number;

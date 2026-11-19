@@ -14,19 +14,20 @@ import (
 )
 
 type TenantSettings struct {
-	Allowlist   []string        `json:"allowlist"`
-	Flags       map[string]bool `json:"flags"`
-	DisplayName string          `json:"display_name"`
-	LogoURL     string          `json:"logo_url"`
-	Accent      string          `json:"accent"`
-	Host        string          `json:"host"`
+	Allowlist       []string        `json:"allowlist"`
+	Flags           map[string]bool `json:"flags"`
+	DailyAIRequests int             `json:"daily_ai_requests,omitempty"`
+	DisplayName     string          `json:"display_name"`
+	LogoURL         string          `json:"logo_url"`
+	Accent          string          `json:"accent"`
+	Host            string          `json:"host"`
 }
 type Admin struct {
 	repo     *Workspace
 	clock    Clock
 	mu       sync.Mutex
 	crmMu    sync.Mutex
- flushMu sync.Mutex
+	flushMu  sync.Mutex
 	requests map[string]uint64
 }
 
@@ -72,11 +73,19 @@ func (a *Admin) Allowed(tenant string, ip netip.Addr) bool {
 
 var hexAccent = regexp.MustCompile("^#[a-fA-F0-9]{6}$")
 var tenantHostname = regexp.MustCompile("^[a-z0-9](?:[a-z0-9-]{0,62})(?:\\.[a-z0-9](?:[a-z0-9-]{0,62}))+\\z")
-var tenantFlags = map[string]bool{"ai": true, "workflows": true, "public_api": true}
+var tenantFlags = map[string]bool{
+	"ai": true, "ai_quality_review": true, "ai_knowledge_drafts": true, "ai_voice_import": true,
+	"ai_ticket_agent": true, "ai_ticket_agent_auto_resolve": true,
+	"ai_teammate": true, "ai_teammate_sla": true, "ai_teammate_inbox": true,
+	"workflows": true, "public_api": true,
+}
 
 func (a *Admin) SaveSettings(user core.User, value TenantSettings, ip netip.Addr) (TenantSettings, error) {
 	if user.Role != core.RoleOwner {
 		return value, core.Fail(403, "Chỉ owner được đổi cấu hình")
+	}
+	if value.DailyAIRequests < 0 || value.DailyAIRequests > 100000 {
+		return value, core.Fail(400, "Quota AI theo ngày phải từ 0 đến 100.000 lượt")
 	}
 	if len(value.Allowlist) > 30 || len([]rune(value.DisplayName)) > 80 || len(value.LogoURL) > 1000 || value.Accent != "" && !hexAccent.MatchString(value.Accent) {
 		return value, core.Fail(400, "Cấu hình không hợp lệ")
@@ -178,8 +187,8 @@ func (a *Admin) Run(ctx context.Context) {
 	}
 }
 func (a *Admin) flush() {
- a.flushMu.Lock()
- defer a.flushMu.Unlock()
+	a.flushMu.Lock()
+	defer a.flushMu.Unlock()
 	a.mu.Lock()
 	current := a.requests
 	a.requests = map[string]uint64{}
@@ -206,8 +215,8 @@ func (a *Admin) flush() {
 	}
 }
 func (a *Admin) Usage(tenant string) (map[string]any, error) {
- a.flushMu.Lock()
- defer a.flushMu.Unlock()
+	a.flushMu.Lock()
+	defer a.flushMu.Unlock()
 	now := a.clock.Now().In(ReportZone)
 	month := now.Format("2006-01")
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, ReportZone)

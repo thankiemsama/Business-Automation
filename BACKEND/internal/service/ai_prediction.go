@@ -130,7 +130,11 @@ func (s *AIService) predict() {
 			current.ResolutionP50, current.ResolutionP90 = slaMinutes(item.resolution.p50), slaMinutes(item.resolution.p90)
 			store.PutRecord(current)
 			if riskChanged && current.RiskReason != "" {
-				store.(*workspaceWriter).notify(current, "sla_risk", "Phiếu có nguy cơ trễ SLA")
+				category, title := "sla_risk", "Phiếu có nguy cơ trễ SLA"
+				if agentPresetEnabled(store, current.TenantID, "sla_watch") {
+					category, title = "ai_sla_watch", current.RiskReason
+				}
+				store.(*workspaceWriter).notify(current, category, title)
 			}
 		}
 		return nil

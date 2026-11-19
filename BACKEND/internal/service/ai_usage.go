@@ -9,6 +9,10 @@ import (
 	"businessautomation/internal/core"
 )
 
+const aiQuotaKind = "ai_daily_quota"
+
+var errAIQuota = core.Fail(429, "Doanh nghiệp đã hết quota AI hôm nay")
+
 type providerUsage struct {
 	PromptTokens     int     `json:"prompt_tokens"`
 	CompletionTokens int     `json:"completion_tokens"`
@@ -24,6 +28,28 @@ type aiRate struct {
 }
 
 func (p *OpenAIKnowledge) ConfigureUsage(repo core.Repository, clock Clock, ids IDGenerator) {
+	p.reserve = func(tenant string) error {
+		now := clock.Now().UTC()
+		day := reportDay(now).Format("2006-01-02")
+		return updateTenant(repo, tenant, func(store core.Writer) error {
+			settings, err := tenantSettings(store, tenant)
+			if err != nil || settings.DailyAIRequests <= 0 {
+				return err
+			}
+			id := tokenHash("ai-quota:" + day)
+			record, found := store.Record(tenant, id, aiQuotaKind)
+			if !found {
+				record = core.Record{ID: id, TenantID: tenant, Kind: aiQuotaKind, CreatedAt: now}
+			}
+			if record.Sequence >= uint64(settings.DailyAIRequests) {
+				return errAIQuota
+			}
+			record.Sequence++
+			record.UpdatedAt = now
+			store.PutRecord(record)
+			return nil
+		})
+	}
 	rates := map[string]aiRate{}
 	if err := json.Unmarshal([]byte(os.Getenv("AI_USD_RATES")), &rates); err != nil && os.Getenv("AI_USD_RATES") != "" {
 		slog.Warn("AI_USD_RATES không đúng định dạng")
@@ -55,6 +81,13 @@ func (p *OpenAIKnowledge) ConfigureUsage(repo core.Repository, clock Clock, ids 
 			slog.Warn("Không ghi được chi phí AI", "tenant", tenant, "model", model, "error", err)
 		}
 	}
+}
+
+func (p *OpenAIKnowledge) reserveRequest(tenant string) error {
+	if p.reserve != nil && tenant != "" {
+		return p.reserve(tenant)
+	}
+	return nil
 }
 
 func (p *OpenAIKnowledge) recordUsage(tenant, model string, usage providerUsage) {

@@ -21,6 +21,16 @@ services:
     environment:
       DATABASE_URL: postgres://nexa:nexa-local-only@postgres:5432/nexa?sslmode=disable
       APP_ORIGIN: http://127.0.0.1:${NEXA_PORT:-3000}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      SUPPORT_REPLY_TO: ${SUPPORT_REPLY_TO:-}
+      INBOUND_EMAIL_TENANT: ${INBOUND_EMAIL_TENANT:-}
+      RESEND_INBOUND_ADDRESS: ${RESEND_INBOUND_ADDRESS:-}
+      RESEND_INBOUND_WEBHOOK_SECRET: ${RESEND_INBOUND_WEBHOOK_SECRET:-}
+      RESEND_INBOUND_API_KEY: ${RESEND_INBOUND_API_KEY:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/readyz"]
       interval: 5s

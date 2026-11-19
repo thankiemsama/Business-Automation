@@ -208,6 +208,7 @@ func (s *AIService) Suggest(user core.User, id string, apply bool) (*Suggestion,
 		}
 		record.Enabled = false
 		store.PutRecord(record)
+		recordTriageEvent(store, user.TenantID, id, "accepted", s.clock.Now().UTC())
 		return nil
 	})
 	return result, err
@@ -239,9 +240,7 @@ func suggestionKey(ticket core.Record) string {
 func (s *AIService) Run(ctx context.Context) {
 	if s.Enabled() {
 		go runAIWork(ctx, s.analyzeOne)
-		if s.autoChat {
-			go runAIWork(ctx, s.runChatbot)
-		}
+		go runAIWork(ctx, s.runChatbot)
 	}
 	runAIWork(ctx, s.predict)
 }
@@ -356,7 +355,20 @@ func (s *AIService) categorize(job core.Record) {
 			review = s.applyTriage(store, fresh, result) != nil
 		}
 		store.PutRecord(core.Record{ID: key, TenantID: job.TenantID, Kind: "ai_suggestions", Subject: suggestionKey(fresh), Content: string(data), Enabled: review})
-
+		outcome := "offered"
+		if !review {
+			outcome = "auto_applied"
+		}
+		recordTriageEvent(store, job.TenantID, job.ID, outcome, s.clock.Now().UTC())
 		return nil
+	})
+}
+
+const aiTriageEventsKind = "ai_triage_events"
+
+func recordTriageEvent(store core.Writer, tenant, ticket, outcome string, now time.Time) {
+	store.PutRecord(core.Record{
+		ID: (RandomIDs{}).NewID(), TenantID: tenant, Kind: aiTriageEventsKind,
+		ConversationID: ticket, Status: outcome, CreatedAt: now, UpdatedAt: now,
 	})
 }

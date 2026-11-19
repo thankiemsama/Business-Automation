@@ -19,6 +19,7 @@ type OpenAIKnowledge struct {
 	vectors     map[string][]float64
 	vectorIndex core.KnowledgeVectors
 	meter       func(string, string, providerUsage)
+	reserve     func(string) error
 }
 
 func NewOpenAIKnowledge(key, model string) *OpenAIKnowledge {

@@ -51,6 +51,7 @@ export interface Ticket extends Entity {
   priority: "low" | "normal" | "high" | "urgent";
 }
 export interface Knowledge extends Entity {
+  status?: "draft";
   public?: boolean;
   subject: string;
   content: string;

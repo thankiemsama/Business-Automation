@@ -12,7 +12,7 @@ type Field = {
   type: "text" | "number" | "checkbox";
   enabled: boolean;
 };
-const loadFields = (signal: AbortSignal) =>
+export const loadFields = (signal: AbortSignal) =>
   api.request<Field[]>("admin/fields", { signal });
 const kinds = {
   customers: "Khách hàng",

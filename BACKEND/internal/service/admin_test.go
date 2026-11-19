@@ -137,6 +137,10 @@ func TestAdminCustomAuditAndBackupIsolation(t *testing.T) {
 	if !found {
 		t.Fatal("no attributed audit")
 	}
+	foreignRecords, err := admin.Audit(outsider)
+	if err != nil || len(foreignRecords) != 0 {
+		t.Fatalf("audit for another tenant returned %d records, error: %v", len(foreignRecords), err)
+	}
 	data, err := admin.Export(user, customer.ID)
 	if err != nil {
 		t.Fatal(err)

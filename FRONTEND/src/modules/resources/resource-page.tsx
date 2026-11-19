@@ -28,6 +28,7 @@ import { BulkToolbar, ExportLinks, ViewControls } from "./workspace-controls";
 import { AIKnowledgeSearch } from "../ai/assist";
 import { Assignment, AssignmentFilter } from "../team/assignment";
 import { ticketStatuses } from "./module-definition";
+import styles from "./tickets-page.module.css";
 
 export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
   kind,
@@ -65,6 +66,15 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
   );
   const result = useQuery(loader, "workspace-refresh");
   const canWrite = !definition.ownerOnly || user.role === "owner";
+  const isTickets = kind === "tickets";
+  const hasFilters = Boolean(
+    q ||
+    status ||
+    assignment ||
+    filters.priority ||
+    filters.assignee ||
+    filters.tags.length,
+  );
   return (
     <>
       <PageHeading
@@ -133,10 +143,13 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
           này.
         </div>
       )}
-      <section className="panel resource-panel">
+      <section
+        className={`panel resource-panel ${isTickets ? styles.tickets : ""}`}
+      >
         <div className="panel-toolbar">
           <div className="tab-label">
-            Tất cả {definition.singular}
+            {isTickets && <Icon name="ticket" size={18} />}
+            {isTickets ? "Danh sách phiếu" : `Tất cả ${definition.singular}`}
             <span className="count-pill">{result.data?.total ?? "—"}</span>
           </div>
           <div className="toolbar-controls">
@@ -223,17 +236,17 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
           <EmptyState
             icon={definition.icon}
             title={
-              q || status
+              hasFilters
                 ? "Không tìm thấy kết quả"
                 : `Chưa có ${definition.singular}`
             }
             description={
-              q || status
+              hasFilters
                 ? "Thử thay đổi từ khóa hoặc bộ lọc của bạn."
                 : `Thêm ${definition.singular} đầu tiên để bắt đầu.`
             }
           >
-            {canWrite && !q && !status && (
+            {canWrite && !hasFilters && (
               <button
                 className="button secondary"
                 onClick={() => setEditor({})}
@@ -244,7 +257,12 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
             )}
           </EmptyState>
         ) : (
-          <div className="table-scroll">
+          <div
+            className="table-scroll"
+            tabIndex={isTickets ? 0 : undefined}
+            role={isTickets ? "region" : undefined}
+            aria-label={isTickets ? "Danh sách phiếu hỗ trợ" : undefined}
+          >
             <table>
               <thead>
                 <tr>
@@ -290,15 +308,28 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                   <th>
                     {kind === "customers" ? "Ngày tham gia" : "Trạng thái"}
                   </th>
-                  <th>{kind === "customers" ? "" : "Cập nhật"}</th>
                   <th>
-                    <span className="sr-only">Thao tác</span>
+                    {kind === "customers"
+                      ? ""
+                      : isTickets
+                        ? "Cập nhật và SLA"
+                        : "Cập nhật"}
+                  </th>
+                  <th>
+                    <span className={isTickets ? undefined : "sr-only"}>
+                      {isTickets ? "Phụ trách và thao tác" : "Thao tác"}
+                    </span>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {result.data.items.map((item) => (
-                  <tr key={item.id}>
+                  <tr
+                    key={item.id}
+                    data-selected={
+                      isTickets && checked.includes(item.id) ? "" : undefined
+                    }
+                  >
                     {kind === "tickets" && (
                       <td>
                         <input
@@ -360,7 +391,7 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                           </small>
                         </div>
                       ) : "priority" in item ? (
-                        <>
+                        <div className={styles.priority}>
                           <Badge value={item.priority} />{" "}
                           {"overdue" in item && item.overdue && (
                             <strong role="status">Quá hạn SLA</strong>
@@ -377,7 +408,7 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                           {"due_soon" in item && item.due_soon && (
                             <strong role="status">Sắp đến hạn SLA</strong>
                           )}
-                        </>
+                        </div>
                       ) : "keywords" in item ? (
                         <div className="keywords">
                           {item.keywords.map((keyword) => (
@@ -393,7 +424,9 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                     <td>
                       {kind === "customers" ? (
                         dateLabel(item.created_at)
-                      ) : "status" in item ? (
+                      ) : "status" in item && item.status === "draft" ? (
+                        <span className="badge badge-closed">Bản nháp</span>
+                      ) : "status" in item && item.status ? (
                         <Badge value={item.status} />
                       ) : "enabled" in item ? (
                         <span
@@ -407,27 +440,39 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                       )}
                     </td>
                     <td>
-                      {kind !== "customers" && dateLabel(item.updated_at)}
+                      {kind !== "customers" && (
+                        <time dateTime={item.updated_at}>
+                          {dateLabel(item.updated_at)}
+                        </time>
+                      )}
+                      {"response_due_at" in item && item.response_due_at && (
+                        <div className={styles.deadlines}>
+                          <small>
+                            Phản hồi{" "}
+                            <time dateTime={item.response_due_at}>
+                              {new Date(item.response_due_at).toLocaleString(
+                                "vi-VN",
+                              )}
+                            </time>
+                          </small>
+                          {item.resolution_due_at && (
+                            <small>
+                              Xử lý{" "}
+                              <time dateTime={item.resolution_due_at}>
+                                {new Date(
+                                  item.resolution_due_at,
+                                ).toLocaleString("vi-VN")}
+                              </time>
+                            </small>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td>
                       {"priority" in item &&
                         "response_due_at" in item &&
                         item.response_due_at && (
-                          <div>
-                            <small>
-                              Phản hồi{" "}
-                              {new Date(item.response_due_at).toLocaleString(
-                                "vi-VN",
-                              )}
-                            </small>
-                            <br />
-                            <small>
-                              Xử lý{" "}
-                              {item.resolution_due_at &&
-                                new Date(item.resolution_due_at).toLocaleString(
-                                  "vi-VN",
-                                )}
-                            </small>
+                          <div className={styles.actions}>
                             {!item.conversation_id &&
                               !item.first_response_at &&
                               item.status !== "resolved" && (

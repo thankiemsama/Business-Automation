@@ -67,14 +67,17 @@ export function WorkspaceTools({
   return (
     <>
       <button
-        className="button secondary compact"
+        className="button secondary toolbar-control toolbar-search"
         onClick={() => setPalette(true)}
         aria-label="Tìm nhanh, Ctrl hoặc Cmd K"
       >
-        <Icon name="search" size={16} />{" "}
-        <span className="palette-shortcut">Tìm nhanh</span>
+        <Icon name="search" size={16} />
+        <span>Tìm nhanh</span>
       </button>
-      <ThemeControl />
+      <div className="toolbar-select">
+        <Icon name="sun" size={16} />
+        <ThemeControl />
+      </div>
       <Notifications />
       {palette && (
         <CommandPalette
@@ -169,6 +172,7 @@ function Notifications() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [pushEnabled, setPushEnabled] = useState<boolean | null>(null);
+  const [pushKey, setPushKey] = useState("");
   const [details, setDetails] = useState<HTMLDetailsElement | null>(null);
   useEffect(() => {
     if (!details) return;
@@ -196,22 +200,24 @@ function Notifications() {
         !("Notification" in window)
       )
         throw new Error("Trình duyệt này chưa hỗ trợ Web Push.");
-      const registration =
-        await navigator.serviceWorker.register("/nexa-push.js");
-      await navigator.serviceWorker.ready;
-      const current = await registration.pushManager.getSubscription();
-      if (current && pushEnabled !== false) {
-        await workspace.push(current.toJSON(), true);
-        await current.unsubscribe();
+      if (pushEnabled) {
+        const registration = await navigator.serviceWorker.getRegistration("/");
+        const current = await registration?.pushManager.getSubscription();
+        if (current) {
+          await workspace.push(current.toJSON(), true);
+          await current.unsubscribe();
+        }
         setPushEnabled(false);
         return;
       }
-      const { key } = await workspace.pushKey();
-      if (!key) throw new Error("Web Push chưa được cấu hình.");
+      if (!pushKey) throw new Error("Web Push chưa được cấu hình.");
       if ((await Notification.requestPermission()) !== "granted")
         throw new Error("Cần cho phép thông báo trong trình duyệt.");
+      await navigator.serviceWorker.register("/nexa-push.js");
+      const registration = await navigator.serviceWorker.ready;
+      const current = await registration.pushManager.getSubscription();
       const bytes = Uint8Array.from(
-        atob(key.replace(/-/g, "+").replace(/_/g, "/")),
+        atob(pushKey.replace(/-/g, "+").replace(/_/g, "/")),
         (character) => character.charCodeAt(0),
       );
       const subscription =
@@ -246,20 +252,33 @@ function Notifications() {
       ref={setDetails}
       className="notification-menu"
       onToggle={(event) => {
-        if (event.currentTarget.open && "serviceWorker" in navigator)
-          void navigator.serviceWorker
-            .getRegistration()
-            .then((registration) =>
-              registration?.pushManager?.getSubscription(),
-            )
-            .then((sub) => setPushEnabled(Boolean(sub)))
-            .catch(() => {});
+        if (!event.currentTarget.open || busy) return;
+        setPushEnabled(null);
+        const subscription =
+          "serviceWorker" in navigator
+            ? navigator.serviceWorker
+                .getRegistration("/")
+                .then((registration) =>
+                  registration?.pushManager?.getSubscription(),
+                )
+            : Promise.resolve(undefined);
+        void Promise.allSettled([subscription, workspace.pushKey()]).then(
+          ([current, config]) => {
+            setPushEnabled(
+              current.status === "fulfilled" && Boolean(current.value),
+            );
+            setPushKey(config.status === "fulfilled" ? config.value.key : "");
+            if (config.status === "rejected")
+              setError(errorMessage(config.reason));
+          },
+        );
       }}
     >
       <summary
-        className="button secondary compact"
+        className="button secondary toolbar-control"
         aria-label={`Thông báo, ${notices.data?.unread ?? 0} chưa đọc`}
       >
+        <Icon name="bell" size={16} />
         Thông báo
         {Boolean(notices.data?.unread) && (
           <span className="count-pill">{notices.data?.unread}</span>
@@ -276,7 +295,7 @@ function Notifications() {
           </button>
           <button
             className="text-link"
-            disabled={busy}
+            disabled={busy || pushEnabled === null}
             onClick={() => void changePush()}
           >
             {pushEnabled ? "Tắt Web Push" : "Bật Web Push"}

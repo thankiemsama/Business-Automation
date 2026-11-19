@@ -13,6 +13,7 @@ var auditedKinds = map[string]bool{
 	"customers": true, "tickets": true, "conversations": true, "messages": true, "knowledge": true, "automations": true,
 	"workflow_rules": true, "report_schedules": true, "tenant_settings": true, "webhooks": true, "api_keys": true, "channel_config": true,
 	"custom_fields": true, "crm_sync": true, "billing_plan": true,
+	ticketAgentPlansKind: true, leadCampaignKind: true, qaReviewsKind: true,
 }
 
 type auditChange struct {
@@ -24,12 +25,16 @@ func auditUser(u core.User) map[string]any {
 	return map[string]any{"name": u.Name, "role": u.Role, "disabled": u.Disabled, "email_fingerprint": tokenHash(u.Email), "mfa_enabled": u.TOTPSecret != ""}
 }
 func auditRecord(r core.Record) map[string]any {
-	return map[string]any{"status": r.Status, "enabled": r.Enabled, "priority": r.Priority, "channel": r.Channel, "assignee": r.AssigneeID,
+	result := map[string]any{"status": r.Status, "enabled": r.Enabled, "priority": r.Priority, "channel": r.Channel, "assignee": r.AssigneeID,
 		"public": r.Public, "title_fingerprint": tokenHash(r.Name + "\x00" + r.Subject), "content_fingerprint": tokenHash(r.Content),
 		"pii_fingerprint": tokenHash(r.Email + "\x00" + r.Phone), "tags": append([]string{}, r.Tags...), "keywords_fingerprint": tokenHash(joinForAudit(r.Keywords)),
 		"attachment_changed": tokenHash(r.AttachmentName + "\x00" + r.AttachmentData), "custom_fields_fingerprint": tokenHash(r.CustomValues),
 		"rating": r.Rating,
 	}
+	if r.Kind == ticketAgentPlansKind {
+		result["tool"], result["ticket_id"], result["crm_lookup"] = r.Name, r.ConversationID, r.Enabled
+	}
+	return result
 }
 func joinForAudit(v []string) string {
 	raw, _ := json.Marshal(v)

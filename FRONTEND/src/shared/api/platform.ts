@@ -18,6 +18,7 @@ export interface CustomerProfile {
   conversations: number;
   channels: string[];
   tags: string[];
+  ai_impressions?: { ticket_id: string; text: string; created_at: string }[];
   notes: { id: string; content: string; author: string; created_at: string }[];
   ltv: {
     tickets: number;

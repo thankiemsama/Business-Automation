@@ -1,6 +1,7 @@
 "use client";
 import { FeatureSections } from "@/shared/ui/feature-sections";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useUser } from "@/shared/providers/workspace-provider";
 import { useCallback, useState } from "react";
 import { useServices } from "@/shared/providers/services-provider";
@@ -146,6 +147,24 @@ export function CustomerProfilePanel({ id }: { id: string }) {
                     </div>
                   ) : (
                     <p className="muted">Chưa có nhãn nào.</p>
+                  )}
+                  {!!data.ai_impressions?.length && (
+                    <>
+                      <h4>Ghi nhận về khách hàng từ các phiếu gần đây</h4>
+                      <ul>
+                        {data.ai_impressions.map((impression) => (
+                          <li
+                            key={`${impression.ticket_id}:${impression.created_at}`}
+                          >
+                            <Link
+                              href={`/tickets/${encodeURIComponent(impression.ticket_id)}`}
+                            >
+                              {impression.text}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   )}
                 </section>
               </div>

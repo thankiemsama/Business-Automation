@@ -22,6 +22,12 @@ func validAdminNumber(value string) bool {
 	n, err := strconv.ParseFloat(value, 64)
 	return err == nil && !math.IsNaN(n) && !math.IsInf(n, 0)
 }
+
+func validCustomValue(field CustomField, input string) bool {
+	return len([]rune(input)) <= 1000 &&
+		(field.Type != "checkbox" || input == "true" || input == "false") &&
+		(field.Type != "number" || validAdminNumber(input))
+}
 func customKind(kind string) bool {
 	return kind == core.KindCustomers || kind == core.KindTickets || kind == core.KindConversations
 }
@@ -102,7 +108,7 @@ func (a *Admin) Custom(user core.User, kind, id string, patch map[string]string)
 				delete(current, id)
 				continue
 			}
-			if len([]rune(input)) > 1000 || field.Type == "checkbox" && input != "true" && input != "false" || field.Type == "number" && !validAdminNumber(input) {
+			if !validCustomValue(field, input) {
 				return core.Fail(400, "Giá trị trường không hợp lệ")
 			}
 			current[id] = input

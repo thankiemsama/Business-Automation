@@ -7,17 +7,18 @@ import (
 	"businessautomation/internal/core"
 )
 
-func (m *ChannelManager) queueChannelSurvey(store core.Writer, conversation core.Record) {
+func (m *ChannelManager) queueChannelSurvey(store core.Writer, conversation core.Record) error {
 	now := m.conversations.clock.Now().UTC()
 	message := core.Record{ID: m.conversations.ids.NewID(), TenantID: conversation.TenantID, Kind: core.KindMessages, ConversationID: conversation.ID,
 		Sender: core.SenderAssistant, Content: "Bạn hài lòng với hỗ trợ ở mức nào? Hãy trả lời CSAT 1 đến CSAT 5, với 5 là rất hài lòng.",
 		Status: "pending", Sequence: nextSequence(store, core.User{TenantID: conversation.TenantID}, conversation.ID), CreatedAt: now, UpdatedAt: now}
 	if err := m.enqueueReply(store, conversation, message); err != nil {
-		return
+		return err
 	}
 	store.PutRecord(message)
 	store.PutRecord(core.Record{ID: tokenHash("channel-survey:" + conversation.ID), TenantID: conversation.TenantID, Kind: "channel_surveys",
 		MessageID: message.ID, ConversationID: conversation.ID, CreatedAt: now})
+	return nil
 }
 
 func (m *ChannelManager) acceptChannelRating(store core.Writer, conversation core.Record, inbound inboundChannelMessage, now time.Time) bool {

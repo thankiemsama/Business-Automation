@@ -14,6 +14,36 @@ func (h *Handler) liveChannelRoutes(mux *http.ServeMux) {
 	if !ok {
 		return
 	}
+	mux.HandleFunc("GET /api/v1/lead-campaigns", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		campaigns, err := channels.LeadCampaigns(user)
+		respond(w, 200, campaigns, err)
+	}))
+	mux.HandleFunc("POST /api/v1/lead-campaigns", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		var input service.LeadCampaign
+		if err := decode(w, r, &input); err != nil {
+			respond(w, 400, nil, err)
+			return
+		}
+		campaign, err := channels.SaveLeadCampaign(user, input)
+		respond(w, 200, campaign, err)
+	}))
+	mux.HandleFunc("GET /api/v1/lead-campaigns/{id}/qr", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		code, err := channels.LeadQRCode(user, r.PathValue("id"))
+		respond(w, 200, map[string]string{"image": code}, err)
+	}))
+	mux.HandleFunc("GET /api/v1/lead-campaigns/{id}/leads", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		leads, err := channels.CampaignLeads(user, r.PathValue("id"))
+		respond(w, 200, leads, err)
+	}))
+	mux.HandleFunc("GET /api/v1/lead/{tenant}/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !h.allowAI(w, "lead-landing:"+requestIP(r).String(), 200, time.Minute) || !h.acquireAuthSlot(w) {
+			return
+		}
+		defer h.releaseAuthSlot()
+		landing, err := channels.OpenLeadCampaign(r.PathValue("tenant"), r.PathValue("id"))
+		w.Header().Set("Cache-Control", "no-store")
+		respond(w, 200, landing, err)
+	})
 	mux.HandleFunc("GET /api/v1/channel-webhooks/{tenant}/{channel}", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		challenge := query.Get("hub.challenge")

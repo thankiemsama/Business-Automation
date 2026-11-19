@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/subtle"
+	"encoding/json"
 	"net/mail"
 	"sort"
 	"strings"
@@ -33,16 +34,23 @@ func (s *PlatformService) ConfigureEmail(mailer *EmailMailer, origin string) {
 
 // CustomerProfile is the cross-channel, cross-record view of one customer.
 type CustomerProfile struct {
-	Customer          core.Record     `json:"customer"`
-	Tickets           int             `json:"total_tickets"`
-	Open              int             `json:"open_tickets"`
-	Rating            float64         `json:"average_rating"`
-	ConversationCount int             `json:"conversations"`
-	Channels          []string        `json:"channels"`
-	Tags              []string        `json:"tags"`
-	Notes             []Note          `json:"notes"`
-	LTV               LTV             `json:"ltv"`
-	Timeline          []TimelineEvent `json:"timeline"`
+	Customer          core.Record          `json:"customer"`
+	Tickets           int                  `json:"total_tickets"`
+	Open              int                  `json:"open_tickets"`
+	Rating            float64              `json:"average_rating"`
+	ConversationCount int                  `json:"conversations"`
+	Channels          []string             `json:"channels"`
+	Tags              []string             `json:"tags"`
+	Notes             []Note               `json:"notes"`
+	LTV               LTV                  `json:"ltv"`
+	Timeline          []TimelineEvent      `json:"timeline"`
+	AIImpressions     []CustomerImpression `json:"ai_impressions,omitempty"`
+}
+
+type CustomerImpression struct {
+	TicketID  string    `json:"ticket_id"`
+	Text      string    `json:"text"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Note is a customer annotation (agent or system).
@@ -100,10 +108,12 @@ func (s *PlatformService) Profile(user core.User, customerID string) (CustomerPr
 			})
 		}
 		ratingSum, ratingCount, open := 0, 0, 0
+		ticketIDs := map[string]bool{}
 		for _, record := range store.Records(user.TenantID, core.KindTickets) {
 			if record.CustomerID != customerID {
 				continue
 			}
+			ticketIDs[record.ID] = true
 			ltv.Tickets++
 			ltv.last(record.CreatedAt, &ltv)
 			if record.Status == core.StatusResolved {
@@ -120,6 +130,21 @@ func (s *PlatformService) Profile(user core.User, customerID string) (CustomerPr
 				Content: record.Content, CreatedAt: record.CreatedAt.UTC().Format(time.RFC3339),
 			})
 		}
+		for _, review := range store.Records(user.TenantID, qaReviewsKind) {
+			if !ticketIDs[review.ConversationID] {
+				continue
+			}
+			var parsed QAReview
+			if json.Unmarshal([]byte(review.Content), &parsed) == nil && parsed.Impression != "" {
+				profile.AIImpressions = append(profile.AIImpressions, CustomerImpression{
+					TicketID: review.ConversationID, Text: parsed.Impression, CreatedAt: review.CreatedAt,
+				})
+			}
+		}
+		sort.Slice(profile.AIImpressions, func(i, j int) bool {
+			return profile.AIImpressions[i].CreatedAt.After(profile.AIImpressions[j].CreatedAt)
+		})
+		profile.AIImpressions = profile.AIImpressions[:min(5, len(profile.AIImpressions))]
 		for _, record := range store.Records(user.TenantID, core.KindMessages) {
 			conversation, _ := store.Record(user.TenantID, record.ConversationID, core.KindConversations)
 			if conversation.CustomerID != customerID {

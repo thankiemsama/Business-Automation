@@ -28,6 +28,7 @@ async function success(path, method, body) {
 }
 test("BFF: session, CRUD, knowledge reply, automation, roles, isolation and logout", async (t) => {
   let customer, conversation, ticket, knowledge, automation;
+  let sharedTemplate;
   const owner = {
     name: "Nexa QA",
     email: `owner-${suffix}@example.test`,
@@ -192,6 +193,29 @@ test("BFF: session, CRUD, knowledge reply, automation, roles, isolation and logo
       assert.equal(dashboard.customers, 1);
     },
   );
+  await t.test(
+    "AI workspace routes and password-protected template export",
+    async () => {
+      assert.deepEqual(await success("operations/field-extraction"), []);
+      assert.deepEqual(await success("lead-campaigns"), []);
+      assert.equal((await success("ai/ticket-agent/status")).enabled, false);
+      assert.equal((await success("ai/voice-inbox/status")).enabled, false);
+      assert.equal(await success(`ai/review/${ticket.id}`), null);
+      const template = await success("templates", "POST", {
+        subject: "Hướng dẫn đổi hàng",
+        content: "Vui lòng giữ lại biên nhận.",
+        enabled: true,
+      });
+      sharedTemplate = await success(
+        `templates/${template.id}/export`,
+        "POST",
+        {
+          password,
+        },
+      );
+      assert.match(sharedTemplate.code, /^nexa-template-v1\./);
+    },
+  );
   await t.test("agent can read but cannot modify owner resources", async () => {
     const agent = {
       name: "QA Agent",
@@ -237,6 +261,29 @@ test("BFF: session, CRUD, knowledge reply, automation, roles, isolation and logo
       });
       cookie = login.response.headers.get("set-cookie").split(";")[0];
       assert.equal((await success("customers")).total, 0);
+      assert.equal(
+        (
+          await api("templates/import", "POST", {
+            code: sharedTemplate.code,
+            password: "incorrect-password",
+          })
+        ).response.status,
+        400,
+      );
+      const imported = await success("templates/import", "POST", {
+        code: sharedTemplate.code,
+        password,
+      });
+      assert.equal(imported.subject, "Hướng dẫn đổi hàng");
+      assert.equal(
+        (
+          await success("templates/import", "POST", {
+            code: sharedTemplate.code,
+            password,
+          })
+        ).id,
+        imported.id,
+      );
       assert.equal(
         (await api(`customers/${customer.id}`)).response.status,
         404,

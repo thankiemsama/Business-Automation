@@ -70,9 +70,67 @@ func (h *Handler) aiRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/ai/summary/{kind}/{id}", h.protected(h.aiSummary))
 	mux.HandleFunc("GET /api/v1/ai/suggestion/{id}", h.protected(h.aiSuggestion))
 	mux.HandleFunc("POST /api/v1/ai/suggestion/{id}", h.protected(h.aiSuggestion))
+	mux.HandleFunc("GET /api/v1/ai/review/{id}", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		result, err := h.ai.TicketReview(user, r.PathValue("id"))
+		respond(w, 200, result, err)
+	}))
 	mux.HandleFunc("POST /api/v1/ai/transcribe", h.protected(h.aiTranscribe))
+	mux.HandleFunc("GET /api/v1/ai/voice-inbox/status", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		respond(w, 200, map[string]bool{"enabled": h.ai.VoiceImportEnabled(user)}, nil)
+	}))
+	mux.HandleFunc("GET /api/v1/ai/ticket-agent/status", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		respond(w, 200, map[string]bool{"enabled": h.ai.TicketAgentEnabled(user)}, nil)
+	}))
+	mux.HandleFunc("POST /api/v1/ai/ticket-agent/{id}/plan", h.protected(h.planTicketAction))
+	mux.HandleFunc("POST /api/v1/ai/ticket-agent/{id}/apply", h.protected(h.applyTicketAction))
+	mux.HandleFunc("POST /api/v1/ai/voice-inbox/transcribe", h.protected(h.importVoiceRecording))
 	mux.HandleFunc("GET /api/v1/chat/{tenant}/voice-status", h.guestVoice)
 	mux.HandleFunc("POST /api/v1/chat/{tenant}/transcribe", h.guestVoice)
+}
+
+func (h *Handler) planTicketAction(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	if !h.allowAI(w, user.ID, 10, time.Minute) || !h.acquireAuthSlot(w) {
+		return
+	}
+	defer h.releaseAuthSlot()
+	result, err := h.ai.PlanTicketAction(user, r.PathValue("id"))
+	respond(w, 200, result, err)
+}
+
+func (h *Handler) applyTicketAction(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	var input struct {
+		PlanID string `json:"plan_id"`
+	}
+	if err := decode(w, r, &input); err != nil {
+		respond(w, 400, nil, err)
+		return
+	}
+	result, err := h.ai.ApplyTicketAction(user, r.PathValue("id"), input.PlanID)
+	respond(w, 200, result, err)
+}
+
+func (h *Handler) importVoiceRecording(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	query := r.URL.Query()
+	if query.Get("authorized") != "true" || query.Get("customer_id") == "" {
+		respond(w, 400, nil, core.Fail(400, "Chọn khách hàng và xác nhận quyền xử lý bản ghi âm"))
+		return
+	}
+	if !h.ai.VoiceImportEnabled(user) {
+		respond(w, 403, nil, core.Fail(403, "Nhập ghi âm chưa được bật hoặc bạn không có quyền"))
+		return
+	}
+	if !h.allowAI(w, user.ID, 10, time.Minute) || !h.acquireAuthSlot(w) {
+		return
+	}
+	defer h.releaseAuthSlot()
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(45 * time.Second))
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, service.MaxAudioBytes))
+	if err != nil {
+		respond(w, 413, nil, core.Fail(413, "Tệp vượt 4 MiB hoặc không đọc được"))
+		return
+	}
+	conversation, err := h.ai.ImportVoice(user, query.Get("customer_id"), data)
+	respond(w, 200, conversation, err)
 }
 
 func (h *Handler) aiSearch(w http.ResponseWriter, r *http.Request, user core.User, _ string) {

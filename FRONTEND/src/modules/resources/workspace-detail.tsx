@@ -11,7 +11,8 @@ import {
 } from "@/shared/ui/primitives";
 import { ConversationThread } from "../conversations/conversation-thread";
 import { ResourceEditor } from "./resource-editor";
-import { AISummary, AITicketSuggestion } from "../ai/assist";
+import { AISummary, AITicketReview, AITicketSuggestion } from "../ai/assist";
+import { TicketAgent } from "../ai/ticket-agent";
 import { CustomValues } from "../admin/custom-values";
 import { Assignment } from "../team/assignment";
 import type { ResourceMap } from "@/shared/domain/models";
@@ -128,7 +129,16 @@ export function WorkspaceDetail<K extends "customers" | "tickets">({
               id={ticket.id}
               saved={ticket.ai_summary}
             />
-            <AITicketSuggestion id={ticket.id} onApplied={result.reload} />
+            {ticket.status === "resolved" ? (
+              <AITicketReview id={ticket.id} />
+            ) : (
+              <AITicketSuggestion id={ticket.id} onApplied={result.reload} />
+            )}
+            <TicketAgent
+              key={ticket.id}
+              id={ticket.id}
+              onApplied={result.reload}
+            />
             {Boolean(ticket.tags?.length) && (
               <div className="keywords">
                 {ticket.tags?.map((tag) => (

@@ -7,6 +7,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Webhooks } from "./webhooks-panel";
 import { ApiKeys } from "./api-keys-panel";
 import { Channels } from "./channels-panel";
+import { LeadCampaigns } from "./lead-campaigns";
 
 // Integrations hub: outgoing webhooks, public API keys, multi-channel
 // configuration, and the public OpenAPI document. Owner-only.
@@ -67,6 +68,11 @@ export function IntegrationsPage() {
                 <Webhooks />
               </section>
             ),
+          },
+          {
+            id: "lead-campaigns",
+            label: "QR thu hút khách hàng",
+            content: <LeadCampaigns />,
           },
           {
             id: "channels",

@@ -240,8 +240,31 @@
   font-size: 1rem;
 }
 
+.inbox :global(.thread) {
+  overflow-y: auto;
+}
+
+.inbox :global(.thread-header) > div > span,
+.inbox :global(.thread-start) {
+  color: var(--inbox-muted);
+  font-size: 0.75rem;
+}
+
 .inbox :global(.thread-messages) {
   background: color-mix(in srgb, var(--bg) 65%, var(--surface));
+  min-height: 120px;
+}
+
+.inbox :global(.message-author),
+.inbox :global(.message) time {
+  color: var(--inbox-muted);
+  font-size: 0.6875rem;
+}
+
+.inbox :global(.message) p {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--ink);
 }
 
 @media (max-width: 760px) {

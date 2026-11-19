@@ -1,0 +1,207 @@
+.tickets {
+  --ticket-accent: light-dark(#116f64, #8eddd0);
+  --ticket-tint: color-mix(in srgb, var(--ticket-accent) 8%, var(--surface));
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.tickets :global(.panel-toolbar) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.tickets :global(.tab-label) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+
+.tickets :global(.tab-label) svg {
+  color: var(--ticket-accent);
+}
+
+.tickets :global(.count-pill) {
+  background: var(--ticket-tint);
+  color: var(--ticket-accent);
+  font-size: 0.75rem;
+}
+
+.tickets :global(.toolbar-controls) {
+  flex-wrap: wrap;
+}
+
+.tickets :is(select, input:not([type="checkbox"])) {
+  min-height: 38px;
+  max-width: 100%;
+  font-size: 0.8125rem;
+}
+
+.tickets :global(.search-field) {
+  min-width: 0;
+  background: var(--bg);
+  color: var(--secondary-ink);
+}
+
+.tickets :global(.search-field) input {
+  width: min(230px, 100%);
+}
+
+.tickets :global(.workspace-filter-bar) {
+  padding: 10px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.tickets :global(.workspace-filters) summary {
+  width: fit-content;
+  padding: 7px 0;
+  color: var(--ticket-accent);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.tickets :global(.workspace-filters) summary :global(.count-pill) {
+  margin-inline-start: 8px;
+}
+
+.tickets :global(.workspace-filters) form,
+.tickets :global(.saved-view-controls) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  align-items: end;
+  gap: 8px;
+}
+
+.tickets :global(.saved-view-controls) {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.tickets :global(.workspace-filters) label {
+  color: var(--secondary-ink);
+  font-size: 0.75rem;
+}
+
+.tickets :global(.workspace-filters) :global(.button) {
+  min-height: 38px;
+}
+
+.tickets :global(.table-scroll) {
+  border-top: 1px solid var(--line);
+}
+
+.tickets :global(.table-scroll):focus-visible {
+  outline: 2px solid var(--ticket-accent);
+  outline-offset: -2px;
+}
+
+.tickets table {
+  min-width: 760px;
+}
+
+.tickets :is(th, td) {
+  padding: 12px 14px;
+  vertical-align: top;
+  font-size: 0.8125rem;
+}
+
+.tickets th {
+  background: var(--bg);
+  color: var(--secondary-ink);
+  font-weight: 650;
+}
+
+.tickets td:first-child,
+.tickets th:first-child {
+  width: 42px;
+  padding-inline: 12px 3px;
+}
+
+.tickets :is(th, td):nth-child(2) {
+  width: 30%;
+}
+
+.tickets td:last-child {
+  min-width: 164px;
+}
+
+.tickets input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ticket-accent);
+}
+
+.tickets tbody tr[data-selected],
+.tickets tbody tr:hover {
+  background: var(--ticket-tint);
+}
+
+.tickets :global(.entity-cell) {
+  align-items: flex-start;
+}
+
+.tickets :global(.entity-cell) a {
+  color: var(--ticket-accent);
+  font-size: 0.875rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.tickets :global(.entity-cell) small,
+.deadlines {
+  color: var(--secondary-ink);
+}
+
+.tickets td :global(.badge) {
+  font-size: 0.75rem;
+}
+
+.priority,
+.deadlines,
+.actions {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.priority strong,
+.actions p,
+.deadlines small {
+  font-size: 0.75rem;
+}
+
+.priority strong {
+  color: light-dark(#8c5315, #f5cb82);
+}
+
+.deadlines {
+  margin-top: 6px;
+}
+
+.actions:not(:empty) {
+  margin-bottom: 6px;
+}
+
+.tickets :global(.pagination) {
+  padding: 12px 18px;
+  color: var(--secondary-ink);
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 680px) {
+  .tickets :global(.panel-toolbar) > :global(.toolbar-controls),
+  .tickets :global(.search-field) {
+    width: 100%;
+  }
+
+  .tickets :global(.search-field) input {
+    width: 100%;
+  }
+}

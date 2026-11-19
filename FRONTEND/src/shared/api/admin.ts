@@ -3,6 +3,7 @@ import type { HttpClient } from "./http-client";
 export type Settings = {
   allowlist?: string[];
   flags?: Record<string, boolean>;
+  daily_ai_requests?: number;
   display_name: string;
   logo_url: string;
   accent: string;

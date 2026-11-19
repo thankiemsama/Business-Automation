@@ -215,14 +215,24 @@ func (s *sqlStore) IdleTickets(tenantID string, cutoff time.Time) []core.Record 
 }
 
 func (s *sqlStore) PendingWorkflowJobs(limit int) []core.Record {
+	return s.pendingWorkflowJobs(limit, nil)
+}
+
+func (s *sqlStore) PendingAIWorkflowJobs(limit int, now time.Time) []core.Record {
+	return s.pendingWorkflowJobs(limit, &now)
+}
+
+func (s *sqlStore) pendingWorkflowJobs(limit int, due *time.Time) []core.Record {
 	if limit <= 0 {
 		return nil
 	}
 	return readList[core.Record](s, `SELECT job.data FROM platform_records AS job
 		WHERE job.pending_workflow_at IS NOT NULL
+		  AND (COALESCE(job.data->>'subject', '') IN ($2, $3, $4)) = ($5::timestamptz IS NOT NULL)
+		  AND ($5::timestamptz IS NULL OR job.pending_workflow_at <= $5::timestamptz)
 		  AND EXISTS (SELECT 1 FROM platform_users WHERE tenant_id = job.tenant_id)
 		ORDER BY job.pending_workflow_at, job.id, job.tenant_id
-		LIMIT $1`, limit)
+		LIMIT $1`, limit, core.WorkflowAIReview, core.WorkflowAIKnowledgeDraft, core.WorkflowAIExtractFields, due)
 }
 
 func (s *sqlStore) LockWorkflowJob(tenantID, id string) (core.Record, bool) {

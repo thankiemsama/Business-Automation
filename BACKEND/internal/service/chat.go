@@ -81,8 +81,10 @@ func (s *ConversationService) PublicChat(token, content, fileName, fileData stri
 			}
 			if fileData == "" && confirmBotResolution(writer, conversation, previous, message) {
 				conversation.Status = core.StatusClosed
-			} else if err := s.automations.Run(writer, user, conversation, message); err != nil {
-				return err
+			} else if fileData != "" || !resolveOnCustomerConfirmation(writer, conversation, previous, message) {
+				if err := s.automations.Run(writer, user, conversation, message); err != nil {
+					return err
+				}
 			}
 		}
 		if rating > 0 {

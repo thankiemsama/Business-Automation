@@ -3,11 +3,12 @@ module businessautomation
 go 1.24.0
 
 require (
-	github.com/testcontainers/testcontainers-go v0.38.0
-	github.com/testcontainers/testcontainers-go/modules/postgres v0.38.0
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/coreos/go-oidc/v3 v3.15.0
 	github.com/lib/pq v1.10.9
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
+	github.com/testcontainers/testcontainers-go v0.38.0
+	github.com/testcontainers/testcontainers-go/modules/postgres v0.38.0
 	golang.org/x/oauth2 v0.28.0
 )
 

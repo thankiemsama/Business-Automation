@@ -174,6 +174,11 @@ func (m *ChannelManager) processDelivery(ctx context.Context, candidate core.Rec
 		if job.Status != "pending" {
 			return nil
 		}
+		if leadID, campaign := strings.CutPrefix(job.AutomationID, leadDeliveryPrefix); campaign {
+			if !m.prepareCampaignDelivery(store, &job, leadID, now) {
+				return nil
+			}
+		}
 		var err error
 		provider, account, credentials, err = m.providerAccount(store, job.TenantID, job.Channel)
 		if err != nil || account.AccountID != job.Subject {

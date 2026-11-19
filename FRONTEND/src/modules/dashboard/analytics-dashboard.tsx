@@ -100,72 +100,6 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
     <div className="analytics-content">
       <div className="analytics-grid">
         <section className="panel analytics-card">
-          <h3>Hiệu quả AI</h3>
-          <dl>
-            <dt>Hội thoại bot tự giải quyết</dt>
-            <dd>
-              {ai.bot_cases
-                ? `${rate(ai.auto_resolved, ai.bot_cases)} (${ai.auto_resolved}/${ai.bot_cases})`
-                : "Chưa có dữ liệu"}
-            </dd>
-            <dt>Yêu cầu được giải quyết trước khi tạo phiếu</dt>
-            <dd>
-              {ai.avoided_tickets + ai.tickets
-                ? `${rate(ai.avoided_tickets, ai.avoided_tickets + ai.tickets)} (${ai.avoided_tickets} yêu cầu)`
-                : "Chưa có dữ liệu"}
-            </dd>
-            <dt>Chi phí AI ước tính mỗi phiếu</dt>
-            <dd>
-              {ai.cost_per_ticket_usd == null
-                ? "Chưa có dữ liệu"
-                : new Intl.NumberFormat("vi-VN", {
-                    style: "currency",
-                    currency: "USD",
-                    maximumFractionDigits: 6,
-                  }).format(ai.cost_per_ticket_usd)}
-            </dd>
-          </dl>
-          {ai.unpriced_requests > 0 && (
-            <p>
-              {ai.unpriced_requests} lượt AI chưa có đủ dữ liệu để tính giá.
-            </p>
-          )}
-        </section>
-        <section className="panel analytics-card">
-          <h3>CSAT theo kênh</h3>
-          {csat_by_channel.length === 0 ? (
-            <p>Chưa có đánh giá</p>
-          ) : (
-            <ul>
-              {csat_by_channel.map(({ name, value, samples }) => (
-                <li key={name}>
-                  {display[name] || name} ·{" "}
-                  {value == null ? "—" : vn.format(value) + "/5"} ({samples}{" "}
-                  đánh giá)
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        <section className="panel analytics-card">
-          <h3>Phản hồi đầu tiên theo độ ưu tiên</h3>
-          {response_minutes_by_priority.length === 0 ? (
-            <p>Chưa có phản hồi ghi nhận</p>
-          ) : (
-            <ul>
-              {response_minutes_by_priority.map(({ name, value, samples }) => (
-                <li key={name}>
-                  {display[name] || name || "Chưa rõ"} ·{" "}
-                  {value == null ? "—" : vn.format(value) + " phút"} ({samples}{" "}
-                  phiếu)
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-      <div className="analytics-grid">
-        <section className="panel analytics-card">
           <h3>Phiếu mới theo ngày</h3>
           <div className="analytics-chart">
             <ResponsiveContainer width="100%" height="100%">
@@ -267,6 +201,92 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
           )}
         </section>
       </div>
+      <div className="analytics-grid">
+        <section className="panel analytics-card">
+          <h3>CSAT theo kênh</h3>
+          {csat_by_channel.length === 0 ? (
+            <p>Chưa có đánh giá</p>
+          ) : (
+            <ul>
+              {csat_by_channel.map(({ name, value, samples }) => (
+                <li key={name}>
+                  {display[name] || name} ·{" "}
+                  {value == null ? "—" : vn.format(value) + "/5"} ({samples}{" "}
+                  đánh giá)
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="panel analytics-card">
+          <h3>Phản hồi đầu tiên theo độ ưu tiên</h3>
+          {response_minutes_by_priority.length === 0 ? (
+            <p>Chưa có phản hồi ghi nhận</p>
+          ) : (
+            <ul>
+              {response_minutes_by_priority.map(({ name, value, samples }) => (
+                <li key={name}>
+                  {display[name] || name || "Chưa rõ"} ·{" "}
+                  {value == null ? "—" : vn.format(value) + " phút"} ({samples}{" "}
+                  phiếu)
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+      <details className="panel analytics-card">
+        <summary>Hiệu quả AI</summary>
+        <dl>
+          <dt>Phiếu được chấm điểm trong nhóm đã xếp hàng kiểm tra</dt>
+          <dd>
+            {ai.reviews_queued
+              ? `${rate(ai.reviews_scored, ai.reviews_queued)} (${ai.reviews_scored}/${ai.reviews_queued})`
+              : "Chưa có dữ liệu"}
+          </dd>
+          <dt>Lượt kiểm tra đang chờ hoặc đang chạy</dt>
+          <dd>{vn.format(ai.reviews_pending ?? 0)}</dd>
+          <dt>Lượt kiểm tra thất bại</dt>
+          <dd>{vn.format(ai.reviews_failed ?? 0)}</dd>
+          <dt>Gợi ý phân loại chuyển duyệt</dt>
+          <dd>{vn.format(ai.triage_offered ?? 0)}</dd>
+          <dt>Gợi ý được nhân viên áp dụng</dt>
+          <dd>{vn.format(ai.triage_accepted ?? 0)}</dd>
+          <dt>Lượt AI tự áp dụng phân loại</dt>
+          <dd>{vn.format(ai.triage_auto_applied ?? 0)}</dd>
+          <dt>Hành động agent đề xuất</dt>
+          <dd>{vn.format(ai.agent_proposed ?? 0)}</dd>
+          <dt>Hành động được duyệt và thực hiện</dt>
+          <dd>{vn.format(ai.agent_applied ?? 0)}</dd>
+          <dt>Phiếu tự giải quyết sau xác nhận của khách</dt>
+          <dd>{vn.format(ai.agent_auto_resolved ?? 0)}</dd>
+          <dt>Hội thoại bot tự giải quyết</dt>
+          <dd>
+            {ai.bot_cases
+              ? `${rate(ai.auto_resolved, ai.bot_cases)} (${ai.auto_resolved}/${ai.bot_cases})`
+              : "Chưa có dữ liệu"}
+          </dd>
+          <dt>Yêu cầu được giải quyết trước khi tạo phiếu</dt>
+          <dd>
+            {ai.avoided_tickets + ai.tickets
+              ? `${rate(ai.avoided_tickets, ai.avoided_tickets + ai.tickets)} (${ai.avoided_tickets} yêu cầu)`
+              : "Chưa có dữ liệu"}
+          </dd>
+          <dt>Chi phí AI ước tính mỗi phiếu</dt>
+          <dd>
+            {ai.cost_per_ticket_usd == null
+              ? "Chưa có dữ liệu"
+              : new Intl.NumberFormat("vi-VN", {
+                  style: "currency",
+                  currency: "USD",
+                  maximumFractionDigits: 6,
+                }).format(ai.cost_per_ticket_usd)}
+          </dd>
+        </dl>
+        {ai.unpriced_requests > 0 && (
+          <p>{ai.unpriced_requests} lượt AI chưa có đủ dữ liệu để tính giá.</p>
+        )}
+      </details>
       <section className="panel analytics-card">
         <h3>Tuân thủ SLA theo tuần và nhân viên</h3>
         <p className="muted">
@@ -274,7 +294,12 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
           mốc.
         </p>
         {sla.length ? (
-          <div className="table-scroll">
+          <div
+            className="table-scroll"
+            role="region"
+            tabIndex={0}
+            aria-label="Tuân thủ SLA theo tuần và nhân viên"
+          >
             <table>
               <thead>
                 <tr>
@@ -317,7 +342,12 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
             <option value="csat">CSAT cao</option>
           </select>
         </div>
-        <div className="table-scroll">
+        <div
+          className="table-scroll"
+          role="region"
+          tabIndex={0}
+          aria-label="Xếp hạng nhân viên"
+        >
           <table>
             <thead>
               <tr>
@@ -355,7 +385,12 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
           tuần tương ứng. Dấu gạch là tuần chưa kết thúc.
         </p>
         {cohorts.length ? (
-          <div className="table-scroll">
+          <div
+            className="table-scroll"
+            role="region"
+            tabIndex={0}
+            aria-label="Khách quay lại mở phiếu"
+          >
             <table>
               <thead>
                 <tr>

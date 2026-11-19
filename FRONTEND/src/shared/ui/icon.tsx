@@ -24,6 +24,11 @@ const paths = {
   globe:
     "M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M3 12h18 M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18",
   info: "M12 11v6 M12 7h.01 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",
+  bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4",
+  download: "M12 3v12 M7 10l5 5 5-5 M4 16v4h16v-4",
+  attachment: "m8 13 6-6a2.8 2.8 0 0 1 4 4l-8 8a4.2 4.2 0 0 1-6-6l8-8",
+  help: "M9 9a3 3 0 1 1 4 2.8c-1 .4-1 1.2-1 2.2 M12 17h.01 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",
+  sun: "M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1.5 1.5 M17.5 17.5 19 19 M5 19l1.5-1.5 M17.5 6.5 19 5 M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
 } as const;
 export type IconName = keyof typeof paths;
 export function Icon({

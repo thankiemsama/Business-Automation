@@ -198,7 +198,7 @@ func New(d Dependencies) http.Handler {
 	h.liveChannelRoutes(mux)
 	h.publicRoutes(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		respond(w, http.StatusNotFound, nil, core.Fail(http.StatusNotFound, "Endpoint khÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“n tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡i"))
+		respond(w, http.StatusNotFound, nil, core.Fail(http.StatusNotFound, "Endpoint không tồn tại"))
 	})
 	return securityHeaders(recoverPanics(mux))
 }

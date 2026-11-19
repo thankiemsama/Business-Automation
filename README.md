@@ -75,6 +75,16 @@ Mở [http://localhost:3000](http://localhost:3000).
 
 Với cả hai cách chạy, chọn **Tạo tài khoản** để tạo doanh nghiệp và tài khoản chủ doanh nghiệp. Sau khi đăng nhập, vào **Đội ngũ** để thêm nhân viên.
 
+## Bật email và thông báo đẩy
+
+| Tính năng | Cấu hình backend |
+| --- | --- |
+| Gửi email, báo cáo định kỳ và thư khảo sát CSAT | Đặt `RESEND_API_KEY` và `EMAIL_FROM` đã xác minh trên Resend. Đặt `APP_ORIGIN` theo URL frontend để liên kết CSAT mở đúng địa chỉ. Docker Compose đã đặt origin local. |
+| Nhận email qua Resend | Cấu hình biến môi trường dành cho thư đến và webhook `email.received` theo [hướng dẫn vận hành](OPERATIONS.md#zalo-oa-whatsapp-và-resend-inbound). Resend cần một endpoint HTTPS có thể truy cập từ bên ngoài. |
+| Web Push | Đặt `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` và `VAPID_SUBJECT`. Trên trình duyệt hỗ trợ Web Push, mở **Thông báo → Bật Web Push** rồi cấp quyền. |
+
+Với Docker Compose, đặt các biến trên trong tệp `.env` ở thư mục gốc rồi chạy lại `docker compose up -d`. Khi chạy trực tiếp, đặt biến bằng `$env:TÊN_BIẾN = 'giá-trị'` trong terminal chạy Go rồi khởi động lại API. Với cấu hình local mặc định, dùng `http://localhost:3000` làm `APP_ORIGIN` khi chạy trực tiếp. Giữ khóa thật trong môi trường local hoặc kho bí mật.
+
 ## Tài liệu
 
 - [Backend](BACKEND/README.md) — cấu hình lưu trữ, API và kiểm thử.

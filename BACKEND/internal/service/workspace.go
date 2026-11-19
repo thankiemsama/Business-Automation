@@ -15,13 +15,14 @@ const notificationKind = "notifications"
 
 type Workspace struct {
 	core.Repository
-	Clock      Clock
-	IDs        IDGenerator
-	mu         sync.Mutex
-	epoch      string
-	revision   uint64
-	onResolved func(core.Record)
-	watchers   map[string]map[chan string]struct{}
+	Clock         Clock
+	IDs           IDGenerator
+	mu            sync.Mutex
+	epoch         string
+	revision      uint64
+	onResolved    func(core.Record)
+	aiJobsEnabled bool
+	watchers      map[string]map[chan string]struct{}
 }
 
 func NewWorkspace(repo core.Repository, clock Clock, ids IDGenerator) *Workspace {
@@ -30,6 +31,8 @@ func NewWorkspace(repo core.Repository, clock Clock, ids IDGenerator) *Workspace
 
 // SetOnResolved registers a callback fired when a ticket transitions to resolved.
 func (s *Workspace) SetOnResolved(fn func(core.Record)) { s.onResolved = fn }
+
+func (s *Workspace) enableAIJobs() { s.aiJobsEnabled = true }
 func (s *Workspace) Watch(tenant string) (string, <-chan string, func()) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -158,6 +161,12 @@ func (w *workspaceWriter) PutUser(user core.User) {
 
 func (w *workspaceWriter) PutRecord(record core.Record) {
 	previous, exists := w.Writer.Record(record.TenantID, record.ID, record.Kind)
+	reviewResolution := record.Kind == core.KindTickets && record.Status == core.StatusResolved &&
+		previous.Status != core.StatusResolved && w.workspace.aiJobsEnabled && reviewEnabled(w, record.TenantID)
+	if reviewResolution && record.ResolvedAt == nil {
+		now := w.workspace.Clock.Now().UTC()
+		record.ResolvedAt = &now
+	}
 	w.Writer.PutRecord(record)
 	if auditedKinds[record.Kind] {
 		w.audit(record.TenantID, w.actor, record.Kind, record.ID, exists, auditRecord(previous), auditRecord(record))
@@ -175,7 +184,7 @@ func (w *workspaceWriter) PutRecord(record core.Record) {
 		w.changed[guestScope(record.TenantID, record.ConversationID)] = true
 	}
 	switch record.Kind {
-	case "ai_suggestions", core.KindCustomers, core.KindTickets, core.KindConversations, core.KindKnowledge, core.KindAutomations, core.KindMessages, notificationKind, "read_markers", "templates", "views":
+	case "ai_suggestions", qaReviewsKind, core.KindCustomers, core.KindTickets, core.KindConversations, core.KindKnowledge, core.KindAutomations, core.KindMessages, notificationKind, "read_markers", "templates", "views":
 		w.changed[record.TenantID] = true
 	}
 	if record.Kind == core.KindMessages && !exists && record.Sender == core.SenderCustomer {
@@ -200,8 +209,16 @@ func (w *workspaceWriter) PutRecord(record core.Record) {
 	if (record.Kind == core.KindTickets || record.Kind == core.KindConversations) && record.AssigneeID != "" && record.AssigneeID != previous.AssigneeID {
 		w.notify(record, "assigned", "Bạn được phân công")
 	}
-	if record.Kind == core.KindTickets && record.Status == core.StatusResolved && previous.Kind == core.KindTickets && previous.Status != core.StatusResolved {
-		w.pendingResolved = append(w.pendingResolved, record)
+	if record.Kind == core.KindTickets && record.Status == core.StatusResolved && previous.Status != core.StatusResolved {
+		if exists {
+			w.pendingResolved = append(w.pendingResolved, record)
+		}
+		if reviewResolution {
+			w.queueResolvedReview(record)
+		}
+		if w.workspace.aiJobsEnabled && record.ConversationID != "" && knowledgeDraftEnabled(w, record.TenantID) {
+			w.queueKnowledgeDraft(record)
+		}
 	}
 }
 

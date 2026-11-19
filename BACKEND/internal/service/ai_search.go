@@ -21,6 +21,9 @@ func clipped(value string, limit int) string {
 }
 
 func (p *OpenAIKnowledge) embed(tenant string, input []string) ([][]float64, error) {
+	if err := p.reserveRequest(tenant); err != nil {
+		return nil, err
+	}
 	var result struct {
 		Usage providerUsage
 		Data  []struct {
@@ -161,6 +164,9 @@ func (p *OpenAIKnowledge) complete(tenant, rule string, data any, tokens int, ou
 	if err != nil {
 		return err
 	}
+	if err := p.reserveRequest(tenant); err != nil {
+		return err
+	}
 	var response struct {
 		Usage   providerUsage
 		Choices []struct {
@@ -195,7 +201,7 @@ func (p *OpenAIKnowledge) answer(tenant, question string, articles []core.Record
 	if err != nil {
 		return Answer{}, err
 	}
-	handoff := Answer{Provider: "openai", NeedsHuman: true, Content: humanHandoffMessage}
+	handoff := Answer{Provider: "openai", NeedsHuman: true, Content: humanHandoffMessage, knowledgeGap: len(matches) == 0}
 	evidence := map[string]string{}
 	for _, match := range matches {
 		evidence[match.ID] = match.text
@@ -220,7 +226,7 @@ func (p *OpenAIKnowledge) answer(tenant, question string, articles []core.Record
 		return Answer{Content: content, SourceID: result.Source, Provider: "openai", Confidence: result.Confidence, Sentiment: result.Sentiment}, nil
 	}
 	if result.Mode == "general" && result.Source == "" && result.Confidence >= 0.92 {
-		return Answer{Content: content, Provider: "openai-general", Confidence: result.Confidence, Sentiment: result.Sentiment}, nil
+		return Answer{Content: content, Provider: "openai-general", Confidence: result.Confidence, Sentiment: result.Sentiment, knowledgeGap: handoff.knowledgeGap}, nil
 	}
 	return handoff, nil
 }

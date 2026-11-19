@@ -14,11 +14,27 @@ func (h *Handler) operationsRoutes(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("GET /api/v1/reports/analytics", h.protected(h.analytics))
 	mux.HandleFunc("POST /api/v1/operations/workflows/migrate", h.protected(h.migrateWorkflow))
+	mux.HandleFunc("GET /api/v1/operations/field-extraction", h.protected(h.fieldExtraction))
+	mux.HandleFunc("POST /api/v1/operations/field-extraction", h.protected(h.fieldExtraction))
 	for _, endpoint := range []string{"workflows", "schedules"} {
 		mux.HandleFunc("GET /api/v1/operations/"+endpoint, h.protected(h.operationsConfig(endpoint)))
 		mux.HandleFunc("POST /api/v1/operations/"+endpoint, h.protected(h.operationsConfig(endpoint)))
 		mux.HandleFunc("POST /api/v1/operations/"+endpoint+"/remove", h.protected(h.removeConfig(endpoint)))
 	}
+}
+
+func (h *Handler) fieldExtraction(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	if r.Method == http.MethodGet {
+		batches, err := h.operations.FieldExtractionBatches(user)
+		respond(w, 200, batches, err)
+		return
+	}
+	var input service.FieldExtractionRequest
+	if err := decode(w, r, &input); err != nil {
+		respond(w, 400, nil, err)
+		return
+	}
+	respond(w, 202, nil, h.operations.QueueFieldExtraction(user, input))
 }
 
 func (h *Handler) migrateWorkflow(w http.ResponseWriter, r *http.Request, user core.User, _ string) {

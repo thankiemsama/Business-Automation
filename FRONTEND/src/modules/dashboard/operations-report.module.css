@@ -1,0 +1,256 @@
+.report {
+  --report-accent: light-dark(#116d63, #95e0d5);
+  --report-tint: color-mix(in srgb, var(--report-accent) 9%, var(--surface));
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.controls,
+.card,
+.metric,
+.report :global(.analytics-card) {
+  min-width: 0;
+  border-radius: 14px;
+}
+
+.controls,
+.card,
+.report :global(.analytics-card) {
+  padding: clamp(12px, 2vw, 20px);
+}
+
+.heading,
+.dates,
+.exports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.heading {
+  justify-content: space-between;
+}
+
+.heading h2 {
+  color: var(--ink);
+  font-size: clamp(1.125rem, 2vw, 1.45rem);
+  font-weight: 750;
+}
+
+.exports {
+  gap: 6px;
+}
+
+.exports :global(.toolbar-controls) {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.exports :global(.button) {
+  min-height: 36px;
+  font-size: 0.75rem;
+}
+
+.dates {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.dates label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--secondary-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.dates input {
+  width: auto;
+  min-width: 0;
+  min-height: 38px;
+  padding: 5px 8px;
+  font: inherit;
+}
+
+.presets {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.presets button {
+  min-height: 32px;
+  padding-inline: 9px;
+  border-radius: 7px;
+  color: var(--secondary-ink);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.presets button:hover,
+.presets button[aria-pressed="true"] {
+  background: var(--report-tint);
+  color: var(--report-accent);
+}
+
+.presets button[aria-pressed="true"] {
+  font-weight: 700;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric {
+  position: relative;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 13px;
+  padding-inline-start: 61px;
+}
+
+.metricIcon {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 13px;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--report-tint);
+  color: var(--report-accent);
+}
+
+.metric dt {
+  color: var(--secondary-ink);
+  font-size: 0.75rem;
+}
+
+.metric dd {
+  color: var(--ink);
+  font-size: clamp(1.15rem, 2.2vw, 1.65rem);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.report :global(.analytics-content) {
+  gap: 14px;
+  padding: 0;
+}
+
+.report :global(.analytics-grid) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.report :global(.analytics-chart) {
+  height: clamp(210px, 26vw, 300px);
+}
+
+.report :global(.recharts-cartesian-axis-tick-value) {
+  fill: var(--secondary-ink);
+}
+
+.report h3,
+.report summary {
+  margin-block-end: 10px;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.report summary {
+  margin: 0;
+  cursor: pointer;
+}
+
+.report details dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.report details dd {
+  color: var(--report-accent);
+  font-weight: 650;
+}
+
+.report :global(.analytics-card) li {
+  padding-block: 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.report :global(.analytics-card) :is(p, li, dt) {
+  color: var(--secondary-ink);
+  font-size: 0.8125rem;
+}
+
+.report :global(.table-scroll) {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.report :global(.table-scroll):focus-visible {
+  outline: 2px solid var(--report-accent);
+  outline-offset: -2px;
+}
+
+.report table {
+  min-width: 480px;
+}
+
+.report :is(th, td) {
+  padding: 9px 12px;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report thead th {
+  background: var(--bg);
+  color: var(--secondary-ink);
+  white-space: normal;
+}
+
+.report tbody tr[data-total] {
+  background: var(--report-tint);
+  color: var(--report-accent);
+  font-weight: 700;
+}
+
+@media (max-width: 940px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .report :global(.analytics-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metric {
+    padding: 9px;
+    padding-inline-start: 43px;
+  }
+
+  .metricIcon {
+    inset-inline-start: 9px;
+    width: 28px;
+    height: 28px;
+  }
+}

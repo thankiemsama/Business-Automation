@@ -127,6 +127,11 @@ func (w *tenantReader) PendingWorkflowJobs(int) []core.Record {
 	return nil
 }
 
+func (w *tenantReader) PendingAIWorkflowJobs(int, time.Time) []core.Record {
+	w.err = errTenantScope
+	return nil
+}
+
 func (w *tenantReader) DueEmailReplies(time.Time, int) []core.Record {
 	w.err = errTenantScope
 	return nil

@@ -38,14 +38,24 @@ type MetricAverage struct {
 }
 
 type AIMetrics struct {
-	BotCases       int      `json:"bot_cases"`
-	AvoidedTickets int      `json:"avoided_tickets"`
-	AutoResolved   int      `json:"auto_resolved"`
-	Tickets        int      `json:"tickets"`
-	Metered        int      `json:"metered_requests"`
-	Unpriced       int      `json:"unpriced_requests"`
-	CostUSD        *float64 `json:"cost_usd"`
-	CostPerTicket  *float64 `json:"cost_per_ticket_usd"`
+	AgentProposed     int      `json:"agent_proposed"`
+	AgentApplied      int      `json:"agent_applied"`
+	AgentAutoResolved int      `json:"agent_auto_resolved"`
+	ReviewsQueued     int      `json:"reviews_queued"`
+	ReviewsScored     int      `json:"reviews_scored"`
+	ReviewsPending    int      `json:"reviews_pending"`
+	ReviewsFailed     int      `json:"reviews_failed"`
+	TriageOffered     int      `json:"triage_offered"`
+	TriageAccepted    int      `json:"triage_accepted"`
+	TriageAutoApplied int      `json:"triage_auto_applied"`
+	BotCases          int      `json:"bot_cases"`
+	AvoidedTickets    int      `json:"avoided_tickets"`
+	AutoResolved      int      `json:"auto_resolved"`
+	Tickets           int      `json:"tickets"`
+	Metered           int      `json:"metered_requests"`
+	Unpriced          int      `json:"unpriced_requests"`
+	CostUSD           *float64 `json:"cost_usd"`
+	CostPerTicket     *float64 `json:"cost_per_ticket_usd"`
 }
 
 type averageAccumulator struct {
@@ -151,6 +161,44 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 			} else {
 				result.AI.Metered++
 				aiCost += *sample.AICostUSD
+			}
+		}
+		for _, event := range store.Records(user.TenantID, aiTriageEventsKind) {
+			if !inRange(event.CreatedAt) {
+				continue
+			}
+			switch event.Status {
+			case "offered":
+				result.AI.TriageOffered++
+			case "accepted":
+				result.AI.TriageAccepted++
+			case "auto_applied":
+				result.AI.TriageAutoApplied++
+			}
+		}
+		for _, job := range store.Records(user.TenantID, workflowJobsKind) {
+			if job.Subject != core.WorkflowAIReview || !inRange(job.CreatedAt) {
+				continue
+			}
+			result.AI.ReviewsQueued++
+			switch job.Status {
+			case "completed":
+				result.AI.ReviewsScored++
+			case "running", "pending":
+				result.AI.ReviewsPending++
+			case "failed":
+				result.AI.ReviewsFailed++
+			}
+		}
+		for _, plan := range store.Records(user.TenantID, ticketAgentPlansKind) {
+			if (plan.Status == "proposed" || plan.Status == "applied") && inRange(plan.CreatedAt) {
+				result.AI.AgentProposed++
+			}
+			if plan.Status == "applied" && inRange(plan.UpdatedAt) {
+				result.AI.AgentApplied++
+			}
+			if plan.Status == "auto_applied" && inRange(plan.UpdatedAt) {
+				result.AI.AgentAutoResolved++
 			}
 		}
 		names := map[string]string{"": "Chưa phân công"}

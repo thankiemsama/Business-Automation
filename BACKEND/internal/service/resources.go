@@ -186,6 +186,9 @@ func (s *ResourceService) prepareRecord(store core.Reader, user core.User, kind,
 		input.Rating, input.RatedAt, input.RatingComment = existing.Rating, existing.RatedAt, existing.RatingComment
 		if kind == core.KindKnowledge {
 			input.Slug = existing.Slug
+			if existing.Status == "draft" && !input.Enabled && !input.Public {
+				input.Status = "draft"
+			}
 		}
 		input.ID = recordID
 		input.CreatedAt = existing.CreatedAt

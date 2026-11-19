@@ -209,10 +209,21 @@ func pendingWorkflowAt(record core.Record) *time.Time {
 	if record.Kind != core.KindWorkflowJobs || !record.Enabled {
 		return nil
 	}
+	if core.IsAIWorkflowJob(record.Subject) && record.EmailRetryAt != nil {
+		return record.EmailRetryAt
+	}
 	return &record.CreatedAt
 }
 
 func (s snapshot) PendingWorkflowJobs(limit int) []core.Record {
+	return s.pendingWorkflowJobs(limit, time.Time{}, false)
+}
+
+func (s snapshot) PendingAIWorkflowJobs(limit int, now time.Time) []core.Record {
+	return s.pendingWorkflowJobs(limit, now, true)
+}
+
+func (s snapshot) pendingWorkflowJobs(limit int, now time.Time, ai bool) []core.Record {
 	if limit <= 0 {
 		return nil
 	}
@@ -222,12 +233,13 @@ func (s snapshot) PendingWorkflowJobs(limit int) []core.Record {
 	}
 	jobs := []core.Record{}
 	for _, job := range s.state.Records {
-		if tenants[job.TenantID] && pendingWorkflowAt(job) != nil {
+		due := pendingWorkflowAt(job)
+		if tenants[job.TenantID] && due != nil && core.IsAIWorkflowJob(job.Subject) == ai && (!ai || !due.After(now)) {
 			jobs = append(jobs, job)
 		}
 	}
 	slices.SortFunc(jobs, func(a, b core.Record) int {
-		if order := a.CreatedAt.Compare(b.CreatedAt); order != 0 {
+		if order := pendingWorkflowAt(a).Compare(*pendingWorkflowAt(b)); order != 0 {
 			return order
 		}
 		if order := cmp.Compare(a.ID, b.ID); order != 0 {

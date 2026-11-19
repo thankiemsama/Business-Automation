@@ -11,13 +11,17 @@ const allowedPath = new RegExp(
     `branding|oidc/providers|account/(?:sessions(?:/revoke)?|mfa)|admin/(?:settings|brand|audit|usage|export|backup|fields|billing|crm|custom/(?:customers|tickets|conversations)/${id})|` +
     `chat/${token}(?:/(?:events|voice-status|transcribe))?|` +
     `team(?:/${id})?|` +
-    `ai/(?:status|search|transcribe|summary/(?:conversations|tickets)/${id}|suggestion/${id})|` +
+    `ai/(?:status|search|transcribe|voice-inbox/(?:status|transcribe)|summary/(?:conversations|tickets)/${id}|(?:suggestion|review)/${id})|` +
+    `ai/ticket-agent/(?:status|${id}/(?:plan|apply))|` +
     `dashboard|reports(?:/export|/analytics)?|operations/(?:workflows|schedules)(?:/remove|/migrate)?|events|push|search|` +
+    `operations/field-extraction|` +
     `notifications(?:/read)?|views(?:/remove)?|` +
+    `lead-campaigns(?:/${id}/(?:qr|leads))?|lead/${token}/${id}|` +
     `kb/${token}(?:/${token})?|` +
     `sat/${token}|` +
     `portal/${token}/(?:code|login|tickets)(?:/${id})?|` +
     `${resource}(?:/${id})?|` +
+    `templates/${id}/export|` +
     `customers/${id}/(?:profile|notes|merge)|` +
     `conversations/${id}/(?:messages|reply|draft|assignment|read)|` +
     `conversations/${id}/messages/${id}/deliver|` +
@@ -42,6 +46,7 @@ function isPublicEndpoint(path: string) {
       "oidc/providers",
     ].includes(path) ||
     path.startsWith("chat/") ||
+    path.startsWith("lead/") ||
     path.startsWith("kb/") ||
     path.startsWith("sat/") ||
     path.startsWith("portal/") ||

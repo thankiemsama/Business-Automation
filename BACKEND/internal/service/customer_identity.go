@@ -27,6 +27,8 @@ var customerMergeKinds = []string{
 	core.KindSurveyEmailJobs,
 	"portal_codes",
 	"portal_sessions",
+	"channel_contacts",
+	campaignLeadKind,
 }
 
 // MergeCustomers consolidates the source profile into the target profile.
@@ -64,6 +66,16 @@ func (s *PlatformService) MergeCustomers(user core.User, sourceID, targetID stri
 				}
 				records[i].CustomerID = targetID
 				store.PutRecord(records[i])
+			}
+		}
+		for _, channel := range []string{core.ChannelZalo, core.ChannelWhatsApp} {
+			previousID := campaignOptOutID(core.Record{Channel: channel, CustomerID: sourceID})
+			if optedOut, exists := store.Record(user.TenantID, previousID, "campaign_opt_outs"); exists {
+				replacementID := campaignOptOutID(core.Record{Channel: channel, CustomerID: targetID})
+				if _, exists := store.Record(user.TenantID, replacementID, "campaign_opt_outs"); !exists {
+					optedOut.ID = replacementID
+					store.PutRecord(optedOut)
+				}
 			}
 		}
 

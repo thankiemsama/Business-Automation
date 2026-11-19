@@ -12,6 +12,7 @@ import {
 } from "react";
 import { FetchHttpClient } from "../api/http-client";
 import { useQuery } from "../hooks/use-query";
+import { Icon } from "./icon";
 
 const api = new FetchHttpClient();
 type InstallEvent = Event & {
@@ -129,19 +130,23 @@ export function PlatformTools({ user }: { user: string }) {
   };
   return (
     <>
-      <LanguageSelect />
+      <div className="toolbar-select">
+        <Icon name="globe" size={16} />
+        <LanguageSelect />
+      </div>
       <button
         ref={initial}
         type="button"
-        className="button secondary compact"
+        className="button secondary toolbar-control toolbar-icon"
         aria-label={t("shortcuts")}
+        title={t("shortcuts")}
         onClick={() => setDialog("shortcuts")}
       >
-        ?
+        <Icon name="help" size={17} />
       </button>
       {install && (
         <button
-          className="button secondary compact"
+          className="button secondary toolbar-control"
           onClick={async () => {
             try {
               await install.prompt();
@@ -151,6 +156,7 @@ export function PlatformTools({ user }: { user: string }) {
             }
           }}
         >
+          <Icon name="download" size={16} />
           {t("install")}
         </button>
       )}
@@ -245,7 +251,13 @@ export function TenantBrand({
   return (
     <span className="toolbar-controls">
       {brand.data.logo_url && (
-        <span className="tenant-logo" aria-hidden="true" style={{ backgroundImage: `url(${JSON.stringify(brand.data.logo_url)})` }} />
+        <span
+          className="tenant-logo"
+          aria-hidden="true"
+          style={{
+            backgroundImage: `url(${JSON.stringify(brand.data.logo_url)})`,
+          }}
+        />
       )}
       <strong>{brand.data.name || "Nexa"}</strong>
     </span>

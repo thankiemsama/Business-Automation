@@ -7,6 +7,16 @@ import { ErrorState, Loading } from "@/shared/ui/primitives";
 import { RelationSelect } from "../resources/relation-select";
 const flags = {
   ai: "OpenAI",
+  ai_quality_review: "AI kiểm tra chất lượng phiếu đã giải quyết",
+  ai_knowledge_drafts: "AI soạn bản nháp từ khoảng trống kho kiến thức",
+  ai_voice_import: "Nhập ghi âm và chép lời cuộc gọi",
+  ai_ticket_agent: "Agent xử lý phiếu có bước duyệt",
+  ai_ticket_agent_auto_resolve:
+    "Agent tự giải quyết phiếu khi khách xác nhận «Đã giải quyết»",
+  ai_teammate: "AI teammate",
+  ai_teammate_sla: "AI teammate · Cảnh báo rủi ro SLA",
+  ai_teammate_inbox:
+    "AI teammate · Tự trả lời từ kho kiến thức hoặc chuyển cho nhân viên",
   workflows: "Workflow nhiều bước",
   public_api: "API công khai",
 };
@@ -58,6 +68,7 @@ export function AccessPanel() {
         logo_url: string("logo_url"),
         accent: string("accent"),
         host: string("host"),
+        daily_ai_requests: Number(string("daily_ai_requests")),
         allowlist: string("allowlist")
           .split(/[\n,]+/)
           .map((value) => value.trim())
@@ -122,6 +133,21 @@ export function AccessPanel() {
               placeholder="203.0.113.0/24"
             />
           </label>
+          <label>
+            Quota AI theo ngày (giờ Việt Nam)
+            <input
+              type="number"
+              name="daily_ai_requests"
+              min={0}
+              max={100000}
+              step={1}
+              defaultValue={settings.data.daily_ai_requests ?? 0}
+            />
+          </label>
+          <p>
+            Nhập 0 để không đặt giới hạn. Mỗi lượt gọi mô hình, tìm vector hoặc
+            chép lời dùng một lượt.
+          </p>
           <fieldset>
             <legend>Tính năng</legend>
             {Object.entries(flags).map(([key, name]) => (
@@ -129,7 +155,9 @@ export function AccessPanel() {
                 <input
                   type="checkbox"
                   name={key}
-                  defaultChecked={settings.data?.flags?.[key] !== false}
+                  defaultChecked={
+                    settings.data?.flags?.[key] ?? !key.startsWith("ai_")
+                  }
                 />{" "}
                 {name}
               </label>

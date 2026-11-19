@@ -13,6 +13,14 @@ type Operations struct {
 	dashboard *DashboardService
 	mailer    *EmailMailer
 	clock     Clock
+	aiModel   *OpenAIKnowledge
+}
+
+func (o *Operations) ConfigureAIJobs(model *OpenAIKnowledge) {
+	o.aiModel = model
+	if model != nil {
+		o.repo.enableAIJobs()
+	}
 }
 
 func NewOperations(repo *Workspace, dashboard *DashboardService, mailer *EmailMailer, clock Clock) *Operations {
@@ -20,6 +28,9 @@ func NewOperations(repo *Workspace, dashboard *DashboardService, mailer *EmailMa
 }
 
 func (o *Operations) Run(ctx context.Context) {
+	if o.aiModel != nil {
+		go runAIWork(ctx, o.runAIJobs)
+	}
 	if o.mailer != nil {
 		go runAIWork(ctx, func() { o.deliverMail(ctx) })
 	}

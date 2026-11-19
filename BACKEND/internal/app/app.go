@@ -21,14 +21,8 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 	storage := repo
 	clock := service.SystemClock{}
 	workspace := service.NewWorkspace(repo, clock, service.RandomIDs{})
-	if ctx.Done() != nil {
-		go workspace.Run(ctx)
-	}
 	repo = workspace
 	admin := service.NewAdmin(workspace, clock)
-	if ctx.Done() != nil {
-		go admin.Run(ctx)
-	}
 	ids := service.RandomIDs{}
 	auth := service.NewAuth(repo, clock, ids, service.PBKDF2Hasher{})
 	mailer := service.EmailFromEnvironment()
@@ -71,10 +65,14 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 	webhooks := service.NewWebhooks(repo, clock, ids)
 	channels := service.NewChannels(repo)
 	channels.ConfigureConversations(conversations)
+	channels.ConfigureCampaignOrigin(os.Getenv("APP_ORIGIN"))
 	ai.ConfigureChannels(channels)
 	dashboard := service.NewDashboard(repo)
 	operations := service.NewOperations(workspace, dashboard, mailer, clock)
+	operations.ConfigureAIJobs(model)
 	if ctx.Done() != nil {
+		go workspace.Run(ctx)
+		go admin.Run(ctx)
 		go ai.Run(ctx)
 		go channels.Run(ctx)
 		go webhooks.Run(ctx)

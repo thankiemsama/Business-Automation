@@ -21,6 +21,7 @@ import { ResourceEditor } from "../resources/resource-editor";
 import { BulkToolbar, ViewControls } from "../resources/workspace-controls";
 import { AssignmentFilter } from "../team/assignment";
 import { ConversationThread } from "./conversation-thread";
+import { VoiceImport } from "./voice-import";
 import styles from "./conversations-page.module.css";
 
 const channelLabels = { web: "Website", email: "Email", phone: "Điện thoại" };
@@ -95,6 +96,14 @@ export function ConversationsPage() {
           Tạo hội thoại
         </button>
       </PageHeading>
+      {user.role === "owner" && (
+        <VoiceImport
+          onImported={(conversation) => {
+            setSelected(conversation);
+            result.reload();
+          }}
+        />
+      )}
       <section
         aria-label="Không gian hội thoại"
         className={`inbox panel ${styles.inbox} ${active ? "has-selection" : ""}`}
