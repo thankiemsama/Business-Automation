@@ -37,6 +37,7 @@ export function ConversationThread({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [source, setSource] = useState<Knowledge | null>(null);
+  const [draftSourceMsg, setDraftSourceMsg] = useState("");
   const [notice, setNotice] = useState("");
   const load = useCallback(
     (signal: AbortSignal) =>
@@ -47,7 +48,20 @@ export function ConversationThread({
     (signal: AbortSignal) => customers.get(conversation.customer_id, signal),
     [customers, conversation.customer_id],
   );
-  const messages = useQuery(load, "workspace-refresh");
+  const messages = useQuery(
+    load,
+    "workspace-refresh",
+    conversation.channel === "email" ? 10_000 : undefined,
+  );
+  const visibleMessages = messages.data?.items ?? [];
+  const draftSourceIndex = draftSourceMsg
+    ? visibleMessages.findIndex((message) => message.id === draftSourceMsg)
+    : -1;
+  const draftContextChanged =
+    draftSourceIndex >= 0 &&
+    visibleMessages
+      .slice(draftSourceIndex + 1)
+      .some((message) => message.sender !== "note");
   const seen = Math.max(
     0,
     ...(messages.data?.items ?? []).map((message) =>
@@ -86,10 +100,19 @@ export function ConversationThread({
             ),
           }
         : undefined;
-      await conversations.send(conversation.id, content, sender, attachment);
+      const message = await conversations.send(
+        conversation.id,
+        content,
+        sender,
+        attachment,
+        sender === "agent" ? draftSourceMsg || undefined : undefined,
+      );
+      if (message.status === "pending")
+        setNotice("Tin nhắn đã được xếp hàng gửi.");
       setFile(null);
       setFileVersion((version) => version + 1);
       setContent("");
+      setDraftSourceMsg("");
       const total = (messages.data?.total || 0) + 1;
       setPage(Math.ceil(total / 30));
     });
@@ -100,13 +123,17 @@ export function ConversationThread({
       if (!reply.needs_human) {
         setContent(reply.message.content);
         setSender("agent");
+        setDraftSourceMsg(reply.source_message_id ?? "");
         if (reply.source_id) setSource(await knowledge.get(reply.source_id));
       }
       setNotice(
         reply.needs_human
           ? "Đã tạo phiếu để nhân viên tiếp tục hỗ trợ."
           : reply.source_id
-            ? `Đã soạn bản nháp từ bài #${reply.source_id.slice(0, 8)}. Kiểm tra trước khi gửi.`
+            ? `Đã soạn bản nháp từ bài #${reply.source_id.slice(0, 8)}` +
+              (reply.source_message_id
+                ? ` · Tin nguồn #${reply.source_message_id.slice(0, 8)}. Nếu khách gửi thêm tin, hãy soạn lại trước khi gửi.`
+                : ". Kiểm tra trước khi gửi.")
             : "Gợi ý AI tổng quát, chưa có nguồn nội bộ. Kiểm tra trước khi gửi.",
       );
     });
@@ -142,7 +169,12 @@ export function ConversationThread({
             <Icon name="edit" size={17} />
           </button>
         </div>
-        <Link className="text-link" href={`/conversations/${encodeURIComponent(conversation.id)}`}>Chi tiết và trường tùy chỉnh</Link>
+        <Link
+          className="text-link"
+          href={`/conversations/${encodeURIComponent(conversation.id)}`}
+        >
+          Chi tiết và trường tùy chỉnh
+        </Link>
         <AISummary
           kind="conversations"
           id={conversation.id}
@@ -193,19 +225,36 @@ export function ConversationThread({
                       {message.attachment_name}
                     </a>
                   )}
-                  {message.status === "pending" && (
-                    <button
-                      type="button"
-                      className="text-link"
-                      disabled={busy}
-                      onClick={() =>
-                        void mutate(() =>
-                          conversations.deliver(conversation.id, message.id),
-                        )
-                      }
-                    >
-                      Email chưa gửi · Thử lại
-                    </button>
+                  {message.status === "pending" &&
+                    conversation.channel === "email" && (
+                      <button
+                        type="button"
+                        className="text-link"
+                        disabled={busy}
+                        onClick={() =>
+                          void mutate(() =>
+                            conversations.deliver(conversation.id, message.id),
+                          )
+                        }
+                      >
+                        Email đang chờ gửi · Kiểm tra lại
+                      </button>
+                    )}
+                  {(message.status === "pending" ||
+                    message.status === "sending") &&
+                    conversation.channel !== "email" && (
+                      <small>Đang chờ nhà cung cấp tiếp nhận</small>
+                    )}
+                  {message.status === "sent" && (
+                    <small>Nhà cung cấp đã tiếp nhận tin nhắn</small>
+                  )}
+                  {message.status === "failed" && (
+                    <small role="status">
+                      Cần đối soát · Đã dừng gửi tự động
+                    </small>
+                  )}
+                  {message.attachment_name && !message.attachment_data && (
+                    <small>{message.attachment_name}</small>
                   )}
                   <time>
                     {new Intl.DateTimeFormat("vi-VN", {
@@ -249,6 +298,14 @@ export function ConversationThread({
             <p>{source.content}</p>
           </details>
         )}
+        {draftSourceMsg && (
+          <div className="subtle-note" role="status">
+            <Icon name="info" size={17} />
+            {draftContextChanged
+              ? "Hội thoại có tin mới. Hãy soạn lại bản nháp trước khi gửi."
+              : `Tin nguồn #${draftSourceMsg.slice(0, 8)}`}
+          </div>
+        )}
         {error && <ErrorState message={error} />}
         {closed ? (
           <div className="closed-notice">
@@ -262,6 +319,7 @@ export function ConversationThread({
           <form className="composer" onSubmit={send}>
             <ReplyTemplates
               onSelect={(content) => {
+                setDraftSourceMsg("");
                 setContent(content);
                 setSender("agent");
               }}

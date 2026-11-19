@@ -13,6 +13,7 @@ type SystemClock struct{}
 func (SystemClock) Now() time.Time { return time.Now() }
 
 type Credentials struct {
+	Industry string `json:"industry,omitempty"`
 	Code     string `json:"code,omitempty"`
 	Token    string `json:"token,omitempty"`
 	Name     string `json:"name"`

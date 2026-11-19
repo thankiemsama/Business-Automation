@@ -18,11 +18,11 @@ const allowedPath = new RegExp(
     `sat/${token}|` +
     `portal/${token}/(?:code|login|tickets)(?:/${id})?|` +
     `${resource}(?:/${id})?|` +
-    `customers/${id}/(?:profile|notes)|` +
+    `customers/${id}/(?:profile|notes|merge)|` +
     `conversations/${id}/(?:messages|reply|draft|assignment|read)|` +
     `conversations/${id}/messages/${id}/deliver|` +
     `tickets/${id}/(?:assignment|escalate|response)|` +
-    `channels(?:/${id})?|` +
+    `channels(?:/${id}(?:/test|/deliveries(?:/${id}/retry)?)?)?|` +
     `webhooks(?:/${id}(?:/remove)?)?|` +
     `api-keys(?:/${id}/revoke)?|` +
     `public/(?:openapi\\.json|v1/(?:customers|tickets|conversations)(?:/${id})?))$`,
@@ -151,9 +151,11 @@ async function forward(
         signal: stream
           ? request.signal
           : AbortSignal.timeout(
-              path.endsWith("/draft") || path.startsWith("ai/") || audio
-                ? 30000
-                : 15000,
+              audio
+                ? 45000
+                : path.endsWith("/draft") || path.startsWith("ai/")
+                  ? 30000
+                  : 15000,
             ),
         redirect: "error",
       },

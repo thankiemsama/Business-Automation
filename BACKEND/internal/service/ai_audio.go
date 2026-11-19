@@ -15,6 +15,10 @@ import (
 const MaxAudioBytes = 4 << 20
 
 func (s *AIService) Transcribe(data []byte) (string, error) {
+	return s.transcribe("", data)
+}
+
+func (s *AIService) transcribe(tenant string, data []byte) (string, error) {
 	if !s.Enabled() {
 		return "", core.Fail(503, "Chưa cấu hình OpenAI")
 	}
@@ -46,6 +50,11 @@ func (s *AIService) Transcribe(data []byte) (string, error) {
 	if err := writer.WriteField("model", model); err != nil {
 		return "", err
 	}
+	if model == "whisper-1" {
+		if err := writer.WriteField("response_format", "verbose_json"); err != nil {
+			return "", err
+		}
+	}
 	part, err := writer.CreateFormFile("file", file)
 	if err != nil {
 		return "", err
@@ -69,9 +78,41 @@ func (s *AIService) Transcribe(data []byte) (string, error) {
 		return "", core.Fail(502, "Không kết nối được dịch vụ chuyển giọng nói")
 	}
 	defer response.Body.Close()
-	var result struct{ Text string }
+	var result struct {
+		Text     string
+		Usage    providerUsage
+		Duration float64
+	}
 	if response.StatusCode != 200 || json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&result) != nil || result.Text == "" {
 		return "", core.Fail(502, "Không chuyển được giọng nói thành văn bản")
 	}
+	if result.Usage.Seconds == 0 {
+		result.Usage.Seconds = result.Duration
+	}
+	s.model.recordUsage(tenant, model, result.Usage)
 	return clipped(result.Text, 4000), nil
+}
+
+func validSentiment(sentiment string) bool {
+	return sentiment == "neutral" || sentiment == "negative" || sentiment == "angry"
+}
+
+type VoiceAnalysis struct {
+	Text      string `json:"text"`
+	Intent    string `json:"intent,omitempty"`
+	Sentiment string `json:"sentiment,omitempty"`
+}
+
+func (s *AIService) AnalyzeVoice(tenant string, data []byte) (VoiceAnalysis, error) {
+	text, err := s.transcribe(tenant, data)
+	if err != nil {
+		return VoiceAnalysis{}, err
+	}
+	result := VoiceAnalysis{Text: text}
+	var analysis VoiceAnalysis
+	if err := s.model.complete(tenant, "Từ bản ghi giọng nói của khách, trả JSON intent (ý định ngắn bằng tiếng Việt) và sentiment (neutral, negative hoặc angry). Chỉ dùng angry khi lời nói có dấu hiệu tức giận rõ.", text, 120, &analysis); err == nil && validSentiment(analysis.Sentiment) {
+		result.Intent = clipped(analysis.Intent, 120)
+		result.Sentiment = analysis.Sentiment
+	}
+	return result, nil
 }

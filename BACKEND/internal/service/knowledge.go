@@ -17,6 +17,8 @@ type Answer struct {
 	SourceID   string
 	Provider   string
 	NeedsHuman bool
+	Confidence float64
+	Sentiment  string
 }
 
 // ReplyProvider selects the content to persist as an assistant message.

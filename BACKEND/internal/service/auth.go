@@ -46,7 +46,15 @@ func (s *AuthService) createUser(credentials Credentials, tenantID, role string)
 	if err != nil {
 		return core.User{}, err
 	}
+	var starter industryStarter
 	if tenantID == "" {
+		if credentials.Industry != "" {
+			var ok bool
+			starter, ok = industryStarters[credentials.Industry]
+			if !ok {
+				return core.User{}, core.Fail(400, "Mẫu ngành không hợp lệ")
+			}
+		}
 		tenantID = s.ids.NewID()
 	}
 	user := core.User{
@@ -63,6 +71,9 @@ func (s *AuthService) createUser(credentials Credentials, tenantID, role string)
 			return core.Fail(409, "Email đã tồn tại")
 		}
 		store.PutUser(user)
+		if starter.subject != "" {
+			return s.seedIndustryStarter(store, user, starter)
+		}
 		return nil
 	})
 	return user, err

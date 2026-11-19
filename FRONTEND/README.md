@@ -31,7 +31,7 @@ Backend mặc định `http://127.0.0.1:8080`. Để đổi, sao chép `.env.exa
 - Hội thoại: lọc trạng thái, tạo/sửa/đóng/mở lại; lịch sử phân trang; gửi tin nhân viên hoặc ghi nhận tin khách hàng; phản hồi từ kiến thức và cảnh báo cần người hỗ trợ.
 - Ticket: tạo/sửa, tìm kiếm, lọc trạng thái, độ ưu tiên và giải quyết.
 - Kiến thức/automation: tạo, cập nhật, bật/tắt; agent chỉ xem.
-- Owner tạo agent. Backend không có API liệt kê đội ngũ nên không dựng danh sách giả.
+- Owner xem thành viên, mời nhân viên và tạo tài khoản agent.
 - Responsive desktop/mobile, modal native hỗ trợ focus/Escape, loading, empty state, lỗi và thử lại.
 
 Không có DELETE theo hợp đồng backend: đóng hội thoại, resolve ticket hoặc tắt bài/quy tắc.
@@ -61,6 +61,8 @@ src/
     ui/                    Shell, icons và primitives
 scripts/integration.test.mjs
 ```
+
+Các màn hình nhiều chức năng dùng tham số URL `section` để mở trực tiếp từng mục. Composition root trong `shared/providers` cấp repository qua cổng `HttpClient`. Module sở hữu state nhập liệu và gọi `useQuery` cho dữ liệu server; component điều hướng chỉ chọn và gắn nội dung đang mở.
 
 Xem `ARCHITECTURE.md` về OOP, SOLID, patterns, state và giới hạn.
 

@@ -1,4 +1,5 @@
 "use client";
+import { FeatureSections } from "@/shared/ui/feature-sections";
 import { useCallback, useState, type FormEvent } from "react";
 import { useUser } from "@/shared/providers/workspace-provider";
 import { useServices } from "@/shared/providers/services-provider";
@@ -10,6 +11,14 @@ import { useQuery } from "@/shared/hooks/use-query";
 import type { User } from "@/shared/domain/models";
 export function TeamPage() {
   const user = useUser();
+  return user.role === "owner" ? (
+    <TeamSettings user={user} />
+  ) : (
+    <AccountForm action="auth/password" />
+  );
+}
+
+function TeamSettings({ user }: { user: User }) {
   const { auth } = useServices();
   const load = useCallback(
     (signal: AbortSignal) => auth.members(signal),
@@ -41,7 +50,6 @@ export function TeamPage() {
       setBusy(false);
     }
   }
-  if (user.role !== "owner") return <AccountForm action="auth/password" />;
   return (
     <>
       <PageHeading
@@ -49,164 +57,192 @@ export function TeamPage() {
         title="Đội ngũ"
         description="Thêm những người đồng hành vào không gian chăm sóc khách hàng."
       />
-      <AccountForm action="auth/password" />
-      <AccountForm action="team/invite" />
-      {error && <ErrorState message={error} />}
-      <section className="panel team-form">
-        <h2>Thành viên</h2>
-        {members.error && (
-          <ErrorState message={members.error} retry={members.reload} />
-        )}
-        {members.data?.map((member) =>
-          member.role === "agent" ? (
-            <form
-              key={member.id + member.name + member.email + member.disabled}
-              className="form-stack"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                const values = new FormData(event.currentTarget);
-                setBusy(true);
-                setError("");
-                try {
-                  await auth.updateMember(member.id, {
-                    name: String(values.get("name")),
-                    email: String(values.get("email")),
-                    disabled: values.has("disabled"),
-                  });
-                  members.reload();
-                } catch (error) {
-                  setError(errorMessage(error));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <label>
-                Họ và tên{" "}
-                <input
-                  name="name"
-                  defaultValue={member.name}
-                  required
-                  maxLength={200}
-                />
-              </label>
-              <label>
-                Email{" "}
-                <input
-                  name="email"
-                  type="email"
-                  defaultValue={member.email}
-                  required
-                  maxLength={254}
-                />
-              </label>
-              <label>
-                <input
-                  name="disabled"
-                  type="checkbox"
-                  defaultChecked={member.disabled}
-                />{" "}
-                Vô hiệu hóa
-              </label>
-              <button className="button secondary" disabled={busy}>
-                Lưu thông tin
-              </button>
-            </form>
-          ) : (
-            <p key={member.id}>
-              {member.name} · {member.email} · Chủ doanh nghiệp
-            </p>
-          ),
-        )}
-      </section>
-      <div className="team-grid">
-        <section className="panel team-form">
-          <div className="panel-header">
-            <div>
-              <h2>Tạo tài khoản nhân viên</h2>
-              <p>Nhân viên sẽ đăng nhập bằng thông tin được cấp.</p>
-            </div>
-            <Icon name="users" />
-          </div>
-          <form className="form-stack" onSubmit={submit}>
-            <label>
-              Họ và tên
-              <input
-                name="name"
-                required
-                maxLength={200}
-                placeholder="Tên nhân viên"
-                autoComplete="name"
-              />
-            </label>
-            <label>
-              Email
-              <input
-                name="email"
-                type="email"
-                required
-                maxLength={254}
-                placeholder="nhanvien@congty.vn"
-                autoComplete="email"
-              />
-            </label>
-            <label>
-              Mật khẩu ban đầu
-              <input
-                name="password"
-                type="password"
-                required
-                minLength={12}
-                maxLength={128}
-                placeholder="Từ 12 đến 128 ký tự"
-                autoComplete="new-password"
-              />
-            </label>
 
-            {created && (
-              <div className="notice" role="status">
-                <Icon name="check" size={18} />
-                Đã tạo tài khoản cho {created.name} ({created.email}).
+      {error && <ErrorState message={error} />}
+      <FeatureSections
+        label="Quản lý đội ngũ"
+        sections={[
+          {
+            id: "members",
+            label: "Thành viên",
+            content: (
+              <section className="panel team-form">
+                <h2>Thành viên</h2>
+                {members.error && (
+                  <ErrorState message={members.error} retry={members.reload} />
+                )}
+                {members.data?.map((member) =>
+                  member.role === "agent" ? (
+                    <form
+                      key={
+                        member.id + member.name + member.email + member.disabled
+                      }
+                      className="form-stack"
+                      onSubmit={async (event) => {
+                        event.preventDefault();
+                        const values = new FormData(event.currentTarget);
+                        setBusy(true);
+                        setError("");
+                        try {
+                          await auth.updateMember(member.id, {
+                            name: String(values.get("name")),
+                            email: String(values.get("email")),
+                            disabled: values.has("disabled"),
+                          });
+                          members.reload();
+                        } catch (error) {
+                          setError(errorMessage(error));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      <label>
+                        Họ và tên{" "}
+                        <input
+                          name="name"
+                          defaultValue={member.name}
+                          required
+                          maxLength={200}
+                        />
+                      </label>
+                      <label>
+                        Email{" "}
+                        <input
+                          name="email"
+                          type="email"
+                          defaultValue={member.email}
+                          required
+                          maxLength={254}
+                        />
+                      </label>
+                      <label>
+                        <input
+                          name="disabled"
+                          type="checkbox"
+                          defaultChecked={member.disabled}
+                        />{" "}
+                        Vô hiệu hóa
+                      </label>
+                      <button className="button secondary" disabled={busy}>
+                        Lưu thông tin
+                      </button>
+                    </form>
+                  ) : (
+                    <p key={member.id}>
+                      {member.name} · {member.email} · Chủ doanh nghiệp
+                    </p>
+                  ),
+                )}
+              </section>
+            ),
+          },
+          {
+            id: "invite",
+            label: "Mời nhân viên",
+            content: <AccountForm action="team/invite" />,
+          },
+          {
+            id: "create",
+            label: "Tạo tài khoản",
+            content: (
+              <div className="team-grid">
+                <section className="panel team-form">
+                  <div className="panel-header">
+                    <div>
+                      <h2>Tạo tài khoản nhân viên</h2>
+                      <p>Nhân viên sẽ đăng nhập bằng thông tin được cấp.</p>
+                    </div>
+                    <Icon name="users" />
+                  </div>
+                  <form className="form-stack" onSubmit={submit}>
+                    <label>
+                      Họ và tên
+                      <input
+                        name="name"
+                        required
+                        maxLength={200}
+                        placeholder="Tên nhân viên"
+                        autoComplete="name"
+                      />
+                    </label>
+                    <label>
+                      Email
+                      <input
+                        name="email"
+                        type="email"
+                        required
+                        maxLength={254}
+                        placeholder="nhanvien@congty.vn"
+                        autoComplete="email"
+                      />
+                    </label>
+                    <label>
+                      Mật khẩu ban đầu
+                      <input
+                        name="password"
+                        type="password"
+                        required
+                        minLength={12}
+                        maxLength={128}
+                        placeholder="Từ 12 đến 128 ký tự"
+                        autoComplete="new-password"
+                      />
+                    </label>
+
+                    {created && (
+                      <div className="notice" role="status">
+                        <Icon name="check" size={18} />
+                        Đã tạo tài khoản cho {created.name} ({created.email}).
+                      </div>
+                    )}
+                    <button className="button primary" disabled={busy}>
+                      <Icon name="plus" size={17} />
+                      {busy ? "Đang tạo…" : "Tạo nhân viên"}
+                    </button>
+                  </form>
+                </section>
+                <aside className="panel team-permissions">
+                  <span className="permission-symbol">
+                    <Icon name="shield" size={27} />
+                  </span>
+                  <h2>Đúng người. Đúng quyền.</h2>
+                  <p>Nhân viên trong cùng doanh nghiệp có thể:</p>
+                  <ul>
+                    {[
+                      "Quản lý thông tin khách hàng",
+                      "Tiếp nhận và phản hồi hội thoại",
+                      "Tạo và xử lý phiếu hỗ trợ",
+                      "Xem tổng quan, kiến thức và quy tắc",
+                    ].map((item) => (
+                      <li key={item}>
+                        <Icon name="check" size={17} />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="subtle-note">
+                    Kho kiến thức, quy tắc tự động và tài khoản nhân viên được
+                    quản lý bởi owner.
+                  </div>
+                  <div className="owner-card">
+                    <Avatar name={user.name} />
+                    <div>
+                      <strong>{user.name}</strong>
+                      <span>Chủ doanh nghiệp · Bạn</span>
+                    </div>
+                  </div>
+                </aside>
               </div>
-            )}
-            <button className="button primary" disabled={busy}>
-              <Icon name="plus" size={17} />
-              {busy ? "Đang tạo…" : "Tạo nhân viên"}
-            </button>
-          </form>
-        </section>
-        <aside className="panel team-permissions">
-          <span className="permission-symbol">
-            <Icon name="shield" size={27} />
-          </span>
-          <h2>Đúng người. Đúng quyền.</h2>
-          <p>Nhân viên trong cùng doanh nghiệp có thể:</p>
-          <ul>
-            {[
-              "Quản lý thông tin khách hàng",
-              "Tiếp nhận và phản hồi hội thoại",
-              "Tạo và xử lý phiếu hỗ trợ",
-              "Xem tổng quan, kiến thức và quy tắc",
-            ].map((item) => (
-              <li key={item}>
-                <Icon name="check" size={17} />
-                {item}
-              </li>
-            ))}
-          </ul>
-          <div className="subtle-note">
-            Kho kiến thức, quy tắc tự động và tài khoản nhân viên được quản lý
-            bởi owner.
-          </div>
-          <div className="owner-card">
-            <Avatar name={user.name} />
-            <div>
-              <strong>{user.name}</strong>
-              <span>Chủ doanh nghiệp · Bạn</span>
-            </div>
-          </div>
-        </aside>
-      </div>
+            ),
+          },
+          {
+            id: "account",
+            label: "Tài khoản của tôi",
+            content: <AccountForm action="auth/password" />,
+          },
+        ]}
+      />
     </>
   );
 }

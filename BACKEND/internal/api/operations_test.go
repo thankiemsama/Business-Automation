@@ -50,7 +50,8 @@ func TestChatAssignmentAndReadState(t *testing.T) {
 		t.Fatal("invalid guest transcript", response.Body.String())
 	}
 	guest.call("POST", path, map[string]any{"rating": 5}, 409)
-	owner.call("PUT", base, map[string]any{"customer_id": conversation["customer_id"], "status": "closed"}, 200)
+	latest := owner.call("GET", base, nil, 200)
+	owner.call("PUT", base, map[string]any{"customer_id": conversation["customer_id"], "status": "closed", "version": latest["version"]}, 200)
 	guest.call("POST", path, map[string]any{"rating": 5}, 200)
 	guest.call("POST", path, map[string]any{"rating": 5}, 409)
 }

@@ -1,4 +1,5 @@
 "use client";
+import { FeatureSections } from "@/shared/ui/feature-sections";
 import { useState, type FormEvent } from "react";
 import { FetchHttpClient, errorMessage } from "@/shared/api/http-client";
 import { useQuery } from "@/shared/hooks/use-query";
@@ -68,99 +69,122 @@ export function SecurityPage() {
       {(error || mfa.error || sessions.error) && (
         <ErrorState message={error || mfa.error || sessions.error || ""} />
       )}
-      <section className="panel team-form form-stack">
-        <h2>Xác thực hai lớp (TOTP)</h2>
-        {recovery.length > 0 && (
-          <div className="subtle-note">
-            <strong>Lưu mã khôi phục dùng một lần</strong>
-            <ul>
-              {recovery.map((code) => (
-                <li key={code}>
-                  <code>{code}</code>
-                </li>
-              ))}
-            </ul>
-            <button className="text-link" onClick={() => setRecovery([])}>
-              Đã lưu
-            </button>
-          </div>
-        )}
-        {mfa.data && (
-          <form onSubmit={submit} className="form-stack">
-            {secret ? (
-              <p>
-                Thêm khóa vào ứng dụng xác thực (6 số, 30 giây):{" "}
-                <code>{secret}</code>
-              </p>
-            ) : (
-              <label>
-                Mật khẩu hiện tại
-                <input
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                />
-              </label>
-            )}
-            {(secret || mfa.data.enabled) && (
-              <label>
-                Mã từ ứng dụng hoặc mã khôi phục
-                <input
-                  name="code"
-                  autoComplete="one-time-code"
-                  maxLength={20}
-                  required
-                />
-              </label>
-            )}
-            <button className="button primary" disabled={busy}>
-              {secret
-                ? "Xác nhận bật TOTP"
-                : mfa.data.enabled
-                  ? "Tắt TOTP"
-                  : "Tạo khóa TOTP"}
-            </button>
-            {secret && (
-              <button
-                type="button"
-                className="button secondary"
-                onClick={() => setSecret("")}
-              >
-                Hủy thiết lập
-              </button>
-            )}
-          </form>
-        )}
-      </section>
-      <section className="panel team-form form-stack">
-        <h2>Phiên đang hoạt động</h2>
-        {sessions.data?.map((session) => (
-          <div className="integration-item" key={session.id}>
-            <strong>{session.current ? "Phiên hiện tại" : "Phiên khác"}</strong>
-            <span>
-              Hết hạn {new Date(session.expires_at).toLocaleString("vi-VN")}
-            </span>
-            {!session.current && (
-              <button
-                className="text-link"
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await api.request("account/sessions/revoke", {
-                      method: "POST",
-                      body: JSON.stringify({ id: session.id }),
-                    });
-                    sessions.reload();
-                  })
-                }
-              >
-                Thu hồi
-              </button>
-            )}
-          </div>
-        ))}
-      </section>
+      <FeatureSections
+        label="Cài đặt bảo mật"
+        sections={[
+          {
+            id: "mfa",
+            label: "Xác thực hai lớp",
+            content: (
+              <section className="panel team-form form-stack">
+                <h2>Xác thực hai lớp (TOTP)</h2>
+                {recovery.length > 0 && (
+                  <div className="subtle-note">
+                    <strong>Lưu mã khôi phục dùng một lần</strong>
+                    <ul>
+                      {recovery.map((code) => (
+                        <li key={code}>
+                          <code>{code}</code>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      className="text-link"
+                      onClick={() => setRecovery([])}
+                    >
+                      Đã lưu
+                    </button>
+                  </div>
+                )}
+                {mfa.data && (
+                  <form onSubmit={submit} className="form-stack">
+                    {secret ? (
+                      <p>
+                        Thêm khóa vào ứng dụng xác thực (6 số, 30 giây):{" "}
+                        <code>{secret}</code>
+                      </p>
+                    ) : (
+                      <label>
+                        Mật khẩu hiện tại
+                        <input
+                          name="password"
+                          type="password"
+                          autoComplete="current-password"
+                          required
+                        />
+                      </label>
+                    )}
+                    {(secret || mfa.data.enabled) && (
+                      <label>
+                        Mã từ ứng dụng hoặc mã khôi phục
+                        <input
+                          name="code"
+                          autoComplete="one-time-code"
+                          maxLength={20}
+                          required
+                        />
+                      </label>
+                    )}
+                    <button className="button primary" disabled={busy}>
+                      {secret
+                        ? "Xác nhận bật TOTP"
+                        : mfa.data.enabled
+                          ? "Tắt TOTP"
+                          : "Tạo khóa TOTP"}
+                    </button>
+                    {secret && (
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => setSecret("")}
+                      >
+                        Hủy thiết lập
+                      </button>
+                    )}
+                  </form>
+                )}
+              </section>
+            ),
+          },
+          {
+            id: "sessions",
+            label: "Phiên đăng nhập",
+            content: (
+              <section className="panel team-form form-stack">
+                <h2>Phiên đang hoạt động</h2>
+                {sessions.data?.map((session) => (
+                  <div className="integration-item" key={session.id}>
+                    <strong>
+                      {session.current ? "Phiên hiện tại" : "Phiên khác"}
+                    </strong>
+                    <span>
+                      Hết hạn{" "}
+                      {new Date(session.expires_at).toLocaleString("vi-VN")}
+                    </span>
+                    {!session.current && (
+                      <button
+                        className="text-link"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await api.request("account/sessions/revoke", {
+                              method: "POST",
+                              body: JSON.stringify({ id: session.id }),
+                            });
+                            sessions.reload();
+                          })
+                        }
+                      >
+                        Thu hồi
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </section>
+            ),
+          },
+        ]}
+      />
     </>
   );
 }

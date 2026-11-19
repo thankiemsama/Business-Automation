@@ -10,7 +10,7 @@ import (
 
 func (s *ResourceService) Assign(user core.User, kind, id, assignee string, claim bool) (core.Record, error) {
 	var result core.Record
-	err := updateAs(s.repo, user.ID, func(store core.Writer) error {
+	err := updateAsTenant(s.repo, user, func(store core.Writer) error {
 		record, err := findOwnedRecord(store, user, id, kind)
 		if err != nil {
 			return err
@@ -33,7 +33,7 @@ func (s *ResourceService) Assign(user core.User, kind, id, assignee string, clai
 		record.AssigneeID = assignee
 		record.UpdatedAt = s.clock.Now().UTC()
 		store.PutRecord(record)
-		result = record
+		result, _ = store.Record(user.TenantID, id, kind)
 		return nil
 	})
 	return result, err
@@ -41,8 +41,8 @@ func (s *ResourceService) Assign(user core.User, kind, id, assignee string, clai
 
 func latestInbound(store core.Reader, user core.User, id string) uint64 {
 	var sequence uint64
-	for _, message := range store.Records(user.TenantID, core.KindMessages) {
-		if message.ConversationID == id && message.Sender == core.SenderCustomer {
+	for _, message := range store.ConversationMessages(user.TenantID, id) {
+		if message.Sender == core.SenderCustomer {
 			sequence = max(sequence, message.Sequence)
 		}
 	}
@@ -50,7 +50,7 @@ func latestInbound(store core.Reader, user core.User, id string) uint64 {
 }
 
 func (s *ResourceService) ReadConversation(user core.User, id string, seen uint64) error {
-	return s.repo.Update(func(store core.Writer) error {
+	return updateTenant(s.repo, user.TenantID, func(store core.Writer) error {
 		if _, err := findOwnedRecord(store, user, id, core.KindConversations); err != nil {
 			return err
 		}
@@ -87,7 +87,7 @@ func ticketOverdue(ticket core.Record, now time.Time) bool {
 
 func (s *ResourceService) RecordResponse(user core.User, id string) (core.Record, error) {
 	var ticket core.Record
-	err := s.repo.Update(func(store core.Writer) error {
+	err := updateTenant(s.repo, user.TenantID, func(store core.Writer) error {
 		current, err := findOwnedRecord(store, user, id, core.KindTickets)
 		if err != nil {
 			return err
@@ -97,6 +97,7 @@ func (s *ResourceService) RecordResponse(user core.User, id string) (core.Record
 		}
 		if current.FirstResponseAt == nil {
 			recordTicketResponse(store, &current, user.ID, s.clock.Now().UTC())
+			current, _ = store.Record(user.TenantID, id, core.KindTickets)
 		}
 		ticket = current
 		return nil
@@ -111,7 +112,7 @@ func recordTicketResponse(store core.Writer, ticket *core.Record, author string,
 
 func (s *ResourceService) Escalate(user core.User, id string) (core.Record, error) {
 	var result core.Record
-	err := s.repo.Update(func(store core.Writer) error {
+	err := updateTenant(s.repo, user.TenantID, func(store core.Writer) error {
 		ticket, err := findOwnedRecord(store, user, id, core.KindTickets)
 		if err != nil {
 			return err
@@ -132,7 +133,7 @@ func (s *ResourceService) Escalate(user core.User, id string) (core.Record, erro
 		}
 		ticket.EscalatedAt, ticket.UpdatedAt = &now, now
 		store.PutRecord(ticket)
-		result = ticket
+		result, _ = store.Record(user.TenantID, id, core.KindTickets)
 		return nil
 	})
 	return result, err

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -51,5 +52,53 @@ func TestSLAWarningAndNotification(t *testing.T) {
 	items, err := workspace.Notifications(user)
 	if err != nil || len(items) != 1 || items[0].Status != "sla" {
 		t.Fatal(items, err)
+	}
+}
+
+func TestWorkspaceSavepointDiscardsFailedHooks(t *testing.T) {
+	repo, err := repository.Open(filepath.Join(t.TempDir(), "workspace.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := NewWorkspace(repo, SystemClock{}, RandomIDs{})
+	const tenant = "savepoint-tenant"
+	ticket := core.Record{ID: "ticket", TenantID: tenant, Kind: core.KindTickets, Status: core.StatusOpen}
+	if err := workspace.Update(func(w core.Writer) error {
+		w.PutRecord(ticket)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	workspace.SetOnResolved(func(core.Record) { calls++ })
+	_, events, release := workspace.Watch(tenant)
+	defer release()
+	cancel := errors.New("cancel")
+	ticket.Status = core.StatusResolved
+	if err := workspace.Update(func(w core.Writer) error {
+		err := w.Savepoint(func(inner core.Writer) error {
+			inner.PutRecord(ticket)
+			return cancel
+		})
+		if !errors.Is(err, cancel) {
+			t.Errorf("want sub-operation error, got %v", err)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 0 || len(events) != 0 {
+		t.Fatal("failed savepoint published workspace effects")
+	}
+	if err := workspace.Update(func(w core.Writer) error {
+		return w.Savepoint(func(inner core.Writer) error {
+			inner.PutRecord(ticket)
+			return nil
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || len(events) != 1 {
+		t.Fatal("committed savepoint did not publish workspace effects")
 	}
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -34,11 +35,11 @@ type ResourceUseCases interface {
 
 type ConversationUseCases interface {
 	IngestEmail(string, service.InboundEmail) (core.Record, error)
-	DeliverEmail(core.User, string, string) (core.Record, error)
+	DeliverEmail(context.Context, core.User, string, string) (core.Record, error)
 	Draft(core.User, string) (service.Reply, error)
 	StartChat(string, string, string, string, string) (string, error)
 	PublicChat(string, string, string, string, int) ([]service.ChatMessage, error)
-	MessageWithAttachment(core.User, string, string, string, string, string) (core.Record, error)
+	SendMessage(core.User, string, string, string, string, string, string) (core.Record, error)
 	Reply(core.User, string) (service.Reply, error)
 }
 
@@ -50,6 +51,7 @@ type DashboardUseCases interface {
 type PlatformUseCases interface {
 	Profile(core.User, string) (service.CustomerProfile, error)
 	AddNote(core.User, string, string) (core.Record, error)
+	MergeCustomers(core.User, string, string) (core.Record, error)
 	RequestCode(tenant, email string) error
 	Login(tenant, email, code string) (service.PortalCustomer, error)
 	PortalTickets(tenant, token string) ([]core.Record, error)
@@ -88,6 +90,7 @@ type Dependencies struct {
 	AI                                     *service.AIService
 	Workspace                              *service.Workspace
 	InboundEmailTenant, InboundEmailSecret string
+	ResendInbound                          *service.ResendInbound
 	Auth                                   AuthUseCases
 	Resources                              ResourceUseCases
 	Conversations                          ConversationUseCases
@@ -110,6 +113,7 @@ type Handler struct {
 	ai                                     *service.AIService
 	workspace                              *service.Workspace
 	inboundEmailTenant, inboundEmailSecret string
+	resendInbound                          *service.ResendInbound
 	auth                                   AuthUseCases
 	resources                              ResourceUseCases
 	conversations                          ConversationUseCases
@@ -134,6 +138,7 @@ func New(d Dependencies) http.Handler {
 		ai:                 d.AI,
 		workspace:          d.Workspace,
 		inboundEmailTenant: d.InboundEmailTenant, inboundEmailSecret: d.InboundEmailSecret,
+		resendInbound:   d.ResendInbound,
 		auth:            d.Auth,
 		resources:       d.Resources,
 		conversations:   d.Conversations,
@@ -161,6 +166,7 @@ func New(d Dependencies) http.Handler {
 	})
 	mux.HandleFunc("/api/v1/chat/{tenant}", h.chat)
 	mux.HandleFunc("POST /api/v1/email/inbound", h.inboundEmail)
+	mux.HandleFunc("POST /api/v1/email/resend", h.inboundResend)
 	mux.HandleFunc("POST /api/v1/conversations/{id}/messages/{message}/deliver", h.protected(h.deliverEmail))
 	mux.HandleFunc("/api/v1/auth/register", h.authEndpoint(h.register))
 	mux.HandleFunc("/api/v1/auth/login", h.authEndpoint(h.login))
@@ -189,6 +195,7 @@ func New(d Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/conversations/{id}/draft", h.protected(h.draft))
 	mux.HandleFunc("/api/v1/conversations/{id}/reply", h.protected(h.reply))
 	h.platformRoutes(mux)
+	h.liveChannelRoutes(mux)
 	h.publicRoutes(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusNotFound, nil, core.Fail(http.StatusNotFound, "Endpoint khÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“n tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡i"))

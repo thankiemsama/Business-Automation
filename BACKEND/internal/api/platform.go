@@ -33,6 +33,7 @@ func (h *Handler) platformRoutes(mux *http.ServeMux) {
 	// ---- Customer 360° profile (authenticated agent/owner) ----
 	mux.HandleFunc("GET /api/v1/customers/{id}/profile", h.protected(h.customerProfile))
 	mux.HandleFunc("POST /api/v1/customers/{id}/notes", h.protected(h.customerNote))
+	mux.HandleFunc("POST /api/v1/customers/{id}/merge", h.protected(h.customerMerge))
 
 	// ---- Multi-channel configuration (owner) ----
 	mux.HandleFunc("GET /api/v1/channels", h.protected(h.channelStatus))
@@ -227,6 +228,26 @@ func (h *Handler) customerNote(w http.ResponseWriter, r *http.Request, user core
 	}
 	result, err := h.platform.AddNote(user, r.PathValue("id"), input.Content)
 	respond(w, http.StatusCreated, result, err)
+}
+
+func (h *Handler) customerMerge(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	if r.Method != http.MethodPost {
+		method(w, http.MethodPost)
+		return
+	}
+	var input struct {
+		TargetID string `json:"target_id"`
+	}
+	if err := decode(w, r, &input); err != nil {
+		respond(w, http.StatusBadRequest, nil, err)
+		return
+	}
+	if input.TargetID == "" {
+		respond(w, http.StatusBadRequest, nil, core.Fail(http.StatusBadRequest, "Cần target_id"))
+		return
+	}
+	result, err := h.platform.MergeCustomers(user, r.PathValue("id"), input.TargetID)
+	respond(w, http.StatusOK, result, err)
 }
 
 // ---- Multi-channel ----

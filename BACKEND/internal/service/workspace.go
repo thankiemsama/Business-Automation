@@ -69,9 +69,30 @@ func (s *Workspace) cursor() string { return s.epoch + "-" + strconv.FormatUint(
 
 func (s *Workspace) Update(run func(core.Writer) error) error { return s.updateAs("system", run) }
 
+func (s *Workspace) ViewTenant(tenantID string, run func(core.Reader) error) error {
+	return viewTenant(s.Repository, tenantID, run)
+}
+
+func (s *Workspace) UpdateTenant(tenantID string, run func(core.Writer) error) error {
+	if tenantID == "" {
+		return core.Fail(400, "Thiếu phạm vi doanh nghiệp")
+	}
+	return s.updateAsTenant(tenantID, "system", run)
+}
+
 func (s *Workspace) updateAs(actor string, run func(core.Writer) error) error {
+	return s.updateAsTenant("", actor, run)
+}
+
+func (s *Workspace) updateAsTenant(tenantID, actor string, run func(core.Writer) error) error {
 	tracked := &workspaceWriter{workspace: s, actor: actor, changed: make(map[string]bool)}
-	err := s.Repository.Update(func(store core.Writer) error { tracked.Writer = store; return run(tracked) })
+	apply := func(store core.Writer) error { tracked.Writer = store; return run(tracked) }
+	var err error
+	if tenantID == "" {
+		err = s.Repository.Update(apply)
+	} else {
+		err = updateTenant(s.Repository, tenantID, apply)
+	}
 	if err != nil {
 		return err
 	}
@@ -107,6 +128,21 @@ type workspaceWriter struct {
 	// transaction. They are emitted after the commit so the hook can open its own
 	// nested transaction without deadlocking on the outer write lock.
 	pendingResolved []core.Record
+}
+
+func (w *workspaceWriter) Savepoint(run func(core.Writer) error) error {
+	sub := &workspaceWriter{workspace: w.workspace, actor: w.actor, changed: make(map[string]bool)}
+	if err := w.Writer.Savepoint(func(store core.Writer) error {
+		sub.Writer = store
+		return run(sub)
+	}); err != nil {
+		return err
+	}
+	for tenant := range sub.changed {
+		w.changed[tenant] = true
+	}
+	w.pendingResolved = append(w.pendingResolved, sub.pendingResolved...)
+	return nil
 }
 
 func (w *workspaceWriter) PutUser(user core.User) {
@@ -145,6 +181,11 @@ func (w *workspaceWriter) PutRecord(record core.Record) {
 	if record.Kind == core.KindMessages && !exists && record.Sender == core.SenderCustomer {
 		conversation, _ := w.Writer.Record(record.TenantID, record.ConversationID, core.KindConversations)
 		w.notify(conversation, "message", "Tin nhắn mới")
+	}
+	if record.Kind == core.KindMessages && record.Email != "" && record.Status == "failed" && previous.Status == "pending" {
+		if conversation, ok := w.Writer.Record(record.TenantID, record.ConversationID, core.KindConversations); ok {
+			w.notify(conversation, "email_failed", "Email cần đối soát")
+		}
 	}
 	if record.Kind == core.KindMessages && !exists && record.Sender != "note" {
 		enqueueWebhooks(w, record.TenantID, core.EventMessageNew, map[string]any{

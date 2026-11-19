@@ -6,6 +6,7 @@ import { errorMessage } from "../api/http-client";
 export function useQuery<T>(
   loader: (signal: AbortSignal) => Promise<T>,
   refreshEvent?: string,
+  refreshInterval?: number,
 ) {
   const [state, setState] = useState<{
     data?: T;
@@ -34,11 +35,15 @@ export function useQuery<T>(
     }
     fetchData();
     if (refreshEvent) window.addEventListener(refreshEvent, fetchData);
+    const timer = refreshInterval
+      ? window.setInterval(fetchData, refreshInterval)
+      : undefined;
     return () => {
       controller?.abort();
       if (refreshEvent) window.removeEventListener(refreshEvent, fetchData);
+      window.clearInterval(timer);
     };
-  }, [loader, version, refreshEvent]);
+  }, [loader, version, refreshEvent, refreshInterval]);
   function reload() {
     setState((previous) => ({ ...previous, error: undefined, loading: true }));
     setVersion((v) => v + 1);

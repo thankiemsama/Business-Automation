@@ -31,13 +31,55 @@ type Cohort struct {
 	Size   int    `json:"size"`
 	Active []*int `json:"active"`
 }
+type MetricAverage struct {
+	Name    string   `json:"name"`
+	Samples int      `json:"samples"`
+	Value   *float64 `json:"value"`
+}
+
+type AIMetrics struct {
+	BotCases       int      `json:"bot_cases"`
+	AvoidedTickets int      `json:"avoided_tickets"`
+	AutoResolved   int      `json:"auto_resolved"`
+	Tickets        int      `json:"tickets"`
+	Metered        int      `json:"metered_requests"`
+	Unpriced       int      `json:"unpriced_requests"`
+	CostUSD        *float64 `json:"cost_usd"`
+	CostPerTicket  *float64 `json:"cost_per_ticket_usd"`
+}
+
+type averageAccumulator struct {
+	total float64
+	count int
+}
+
+func addAverage(groups map[string]averageAccumulator, key string, value float64) {
+	item := groups[key]
+	item.total += value
+	item.count++
+	groups[key] = item
+}
+
+func metricAverages(groups map[string]averageAccumulator) []MetricAverage {
+	rows := make([]MetricAverage, 0, len(groups))
+	for name, item := range groups {
+		value := item.total / float64(item.count)
+		rows = append(rows, MetricAverage{Name: name, Samples: item.count, Value: &value})
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Name < rows[j].Name })
+	return rows
+}
+
 type Analytics struct {
-	Daily       []AnalyticsPoint     `json:"daily"`
-	Channels    []AnalyticsBreakdown `json:"channels"`
-	Priorities  []AnalyticsBreakdown `json:"priorities"`
-	SLA         []SLAWeek            `json:"sla"`
-	Cohorts     []Cohort             `json:"cohorts"`
-	Leaderboard []ReportRow          `json:"leaderboard"`
+	AI               AIMetrics            `json:"ai"`
+	ChannelCSAT      []MetricAverage      `json:"csat_by_channel"`
+	PriorityResponse []MetricAverage      `json:"response_minutes_by_priority"`
+	Daily            []AnalyticsPoint     `json:"daily"`
+	Channels         []AnalyticsBreakdown `json:"channels"`
+	Priorities       []AnalyticsBreakdown `json:"priorities"`
+	SLA              []SLAWeek            `json:"sla"`
+	Cohorts          []Cohort             `json:"cohorts"`
+	Leaderboard      []ReportRow          `json:"leaderboard"`
 }
 
 func reportDay(at time.Time) time.Time {
@@ -68,35 +110,74 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 	}
 	cutoff := minTime(now, to)
 	ratingTotal := map[string]int{}
+	channelRatings, priorityResponse := map[string]averageAccumulator{}, map[string]averageAccumulator{}
+	botCases := map[string]bool{}
+	var aiCost float64
 	channels, priorities := map[string]int{}, map[string]int{}
 	weeks := map[[2]string]*SLAWeek{}
 	histories := map[string]map[time.Time]bool{}
 	inRange := func(at time.Time) bool { return !at.Before(from) && at.Before(to) }
-	err = s.repo.View(func(store core.Reader) error {
+	err = viewTenant(s.repo, user.TenantID, func(store core.Reader) error {
+		conversationChannels := map[string]string{}
+		for _, conversation := range store.Records(user.TenantID, core.KindConversations) {
+			conversationChannels[conversation.ID] = conversation.Channel
+		}
+		channelFor := func(id string) string {
+			if channel := conversationChannels[id]; channel != "" {
+				return channel
+			}
+			return "unknown"
+		}
+		for _, marker := range store.Records(user.TenantID, "ai_bot_markers") {
+			if marker.ConversationID != "" && inRange(marker.CreatedAt) {
+				botCases[marker.ConversationID] = true
+			}
+		}
+		for _, resolution := range store.Records(user.TenantID, "ai_bot_resolutions") {
+			if inRange(resolution.CreatedAt) {
+				botCases[resolution.ConversationID] = true
+				result.AI.AutoResolved++
+				if resolution.Enabled {
+					result.AI.AvoidedTickets++
+				}
+			}
+		}
+		for _, sample := range store.Records(user.TenantID, "ai_usage_samples") {
+			if !inRange(sample.CreatedAt) {
+				continue
+			}
+			if sample.AICostUSD == nil {
+				result.AI.Unpriced++
+			} else {
+				result.AI.Metered++
+				aiCost += *sample.AICostUSD
+			}
+		}
 		names := map[string]string{"": "Chưa phân công"}
 		for _, user := range store.Users(user.TenantID) {
 			names[user.ID] = user.Name
 		}
-		addRating := func(r core.Record) {
+		addRating := func(r core.Record, channel string) {
 			if r.RatedAt == nil || r.Rating < 1 || r.Rating > 5 || !inRange(*r.RatedAt) {
 				return
 			}
 			day := r.RatedAt.In(ReportZone).Format(time.DateOnly)
 			byDay[day].Ratings++
 			ratingTotal[day] += r.Rating
+			addAverage(channelRatings, channel, float64(r.Rating))
 		}
 		for _, conversation := range store.Records(user.TenantID, core.KindConversations) {
-			addRating(conversation)
+			addRating(conversation, channelFor(conversation.ID))
 		}
 		for _, ticket := range store.Records(user.TenantID, core.KindTickets) {
 			if inRange(ticket.CreatedAt) {
 				byDay[ticket.CreatedAt.In(ReportZone).Format(time.DateOnly)].Tickets++
 				priorities[ticket.Priority]++
-				channel := "unknown"
-				if conv, ok := store.Record(user.TenantID, ticket.ConversationID, core.KindConversations); ok && conv.Channel != "" {
-					channel = conv.Channel
+				channels[channelFor(ticket.ConversationID)]++
+				result.AI.Tickets++
+				if ticket.FirstResponseAt != nil && !ticket.FirstResponseAt.Before(ticket.CreatedAt) && !ticket.FirstResponseAt.After(cutoff) {
+					addAverage(priorityResponse, ticket.Priority, ticket.FirstResponseAt.Sub(ticket.CreatedAt).Minutes())
 				}
-				channels[channel]++
 			}
 			if ticket.CustomerID != "" && ticket.CreatedAt.Before(cutoff) {
 				if histories[ticket.CustomerID] == nil {
@@ -104,7 +185,7 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 				}
 				histories[ticket.CustomerID][reportWeek(ticket.CreatedAt)] = true
 			}
-			addRating(ticket)
+			addRating(ticket, channelFor(ticket.ConversationID))
 			response, resolution := ticketDeadlines(ticket)
 			stages := []struct {
 				deadline  time.Time
@@ -168,6 +249,16 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 		return a.AgentID < b.AgentID
 	})
 	result.Cohorts = buildCohorts(histories, from, cutoff)
+	result.AI.BotCases = len(botCases)
+	if result.AI.Metered > 0 {
+		result.AI.CostUSD = &aiCost
+		if result.AI.Tickets > 0 {
+			value := aiCost / float64(result.AI.Tickets)
+			result.AI.CostPerTicket = &value
+		}
+	}
+	result.ChannelCSAT = metricAverages(channelRatings)
+	result.PriorityResponse = metricAverages(priorityResponse)
 	return result, nil
 }
 func minTime(a, b time.Time) time.Time {

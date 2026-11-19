@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: nexa
+      POSTGRES_PASSWORD: nexa-local-only
+      POSTGRES_DB: nexa
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "nexa", "-d", "nexa"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backend:
+    build: ./BACKEND
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://nexa:nexa-local-only@postgres:5432/nexa?sslmode=disable
+      APP_ORIGIN: http://127.0.0.1:${NEXA_PORT:-3000}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  frontend:
+    build: ./FRONTEND
+    init: true
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:8080
+      APP_ORIGIN: http://127.0.0.1:${NEXA_PORT:-3000}
+    ports:
+      - "127.0.0.1:${NEXA_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  postgres-data:

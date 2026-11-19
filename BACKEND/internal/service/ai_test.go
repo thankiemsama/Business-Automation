@@ -229,3 +229,120 @@ func TestSummaryAndProposalDoNotOverwriteAgentDecisions(t *testing.T) {
 		t.Fatal("suggestion applied twice")
 	}
 }
+
+func TestQuantilesLearnFromTenantHistory(t *testing.T) {
+	var samples []slaSample
+	for i := range 200 {
+		f := slaFeatures{channel: "web", priority: "normal", hour: i % 24, workload: i % 3}
+		duration := 20 * time.Minute
+		if i%10 >= 7 {
+			duration = 55 * time.Minute
+		}
+		samples = append(samples, slaSample{f, duration})
+		f.channel, f.priority = "email", "low"
+		samples = append(samples, slaSample{f, duration * 3})
+	}
+	median, tail := fitSLAQuantile(samples, .5), fitSLAQuantile(samples, .9)
+	web := forecastSLA(median, tail, slaFeatures{"web", "normal", 12, 1})
+	email := forecastSLA(median, tail, slaFeatures{"email", "low", 12, 1})
+	if web.p50 >= web.p90 || email.p50 <= web.p50 || email.p90 <= web.p90 {
+		t.Fatalf("unexpected forecasts for web %+v and email %+v", web, email)
+	}
+}
+
+func TestConfidenceGateRequiresSupportedCalibration(t *testing.T) {
+	calibration := confidenceCalibration{}
+	calibration[8] = confidenceBin{Correct: 10, Total: 10}
+	if _, bound := calibration.probability(.89); bound != 0 {
+		t.Fatal("accepted insufficiently sampled bin")
+	}
+	calibration[9] = confidenceBin{Correct: 98, Total: 100}
+	probability, bound := calibration.probability(1)
+	if probability != .98 || bound < .85 || bound >= probability {
+		t.Fatal(probability, bound)
+	}
+}
+
+func TestCalibratedTriageAndBotResolution(t *testing.T) {
+	base, err := repository.Open(filepath.Join(t.TempDir(), "calibrated.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := &workspaceClock{now: time.Now().UTC()}
+	workspace := NewWorkspace(base, clock, RandomIDs{})
+	tenant := "calibrated-workspace"
+	owner := core.User{ID: "owner", TenantID: tenant, Role: core.RoleOwner}
+	ticket := core.Record{ID: "triage", TenantID: tenant, Kind: core.KindTickets, Status: core.StatusOpen, Priority: core.PriorityNormal,
+		Subject: "Sự cố phiếu phân loại", CreatedAt: clock.now, UpdatedAt: clock.now}
+	if err := workspace.Update(func(store core.Writer) error {
+		store.PutUser(owner)
+		store.PutRecord(ticket)
+		store.PutRecord(core.Record{ID: "public", TenantID: tenant, Kind: core.KindKnowledge, Subject: "Cập nhật địa chỉ",
+			Content: "Chọn Địa chỉ trong Hồ sơ.", Public: true, Enabled: true})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	model := NewOpenAIKnowledge("test", "test")
+	model.client.Transport = webhookTransport(func(request *http.Request) (*http.Response, error) {
+		requestBody, _ := io.ReadAll(request.Body)
+		var body []byte
+		if request.URL.Path == "/v1/embeddings" {
+			vector := make([]float64, 256)
+			vector[0] = 1
+			body, _ = json.Marshal(map[string]any{"data": []map[string]any{
+				{"index": 0, "embedding": vector}, {"index": 1, "embedding": vector},
+			}})
+		} else {
+			output := `{"content":"Chọn Địa chỉ trong Hồ sơ.","source":"public","mode":"grounded","confidence":0.98,"sentiment":"neutral"}`
+			if bytes.Contains(requestBody, []byte("priority")) {
+				output = `{"tags":["Kiểm tra"],"priority":"high","sentiment":"negative","confidence":0.98}`
+			}
+			body, _ = json.Marshal(map[string]any{"choices": []map[string]any{
+				{"finish_reason": "stop", "message": map[string]string{"content": output}},
+			}})
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(body))}, nil
+	})
+	ai := NewAI(workspace, clock, model, false, true)
+	ai.triageCalibration[9] = confidenceBin{Correct: 98, Total: 100}
+	ai.chatCalibration[9] = confidenceBin{Correct: 97, Total: 100}
+	ai.categorize(ticket)
+	conversations := NewConversations(workspace, clock, workspace.IDs, LocalKnowledgeProvider{}, NewKeywordAutomation(workspace.IDs, clock))
+	secret, err := conversations.StartChat(tenant, "Khách", "Cập nhật địa chỉ như thế nào?", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ai.runChatbot()
+	ai.runChatbot()
+	token := tenant + "." + secret
+	msgs, err := conversations.PublicChat(token, "", "", "", 0)
+	if err != nil || len(msgs) != 2 || !strings.Contains(msgs[1].Content, "Đã giải quyết") {
+		t.Fatal(msgs, err)
+	}
+	if _, err := conversations.PublicChat(token, "Đã giải quyết", "", "", 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversations.PublicChat(token, "", "", "", 5); err != nil {
+		t.Fatal(err)
+	}
+	err = workspace.View(func(store core.Reader) error {
+		current, _ := store.Record(tenant, ticket.ID, ticket.Kind)
+		if current.Priority != core.PriorityHigh || current.Sentiment != "negative" || len(current.Tags) != 1 || current.ResponseDueAt == nil {
+			t.Fatal(current)
+		}
+		resolutions := store.Records(tenant, "ai_bot_resolutions")
+		if len(resolutions) != 1 || len(store.Records(tenant, core.KindTickets)) != 1 {
+			t.Fatal(resolutions)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	from := clock.now.Add(-time.Hour)
+	analytics, err := NewDashboard(workspace).Analytics(owner, from, clock.now.Add(time.Hour), clock.now)
+	if err != nil || analytics.AI.AutoResolved != 1 || analytics.AI.BotCases != 1 || len(analytics.ChannelCSAT) != 1 || *analytics.ChannelCSAT[0].Value != 5 {
+		t.Fatal(analytics, err)
+	}
+}

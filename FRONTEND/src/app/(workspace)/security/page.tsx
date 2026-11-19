@@ -1,2 +1,10 @@
 import { SecurityPage } from "@/modules/admin/security-page";
-export default function Page(){return <SecurityPage />;}
+import { WorkspaceFeature } from "@/shared/ui/workspace-feature";
+
+export default function Page() {
+  return (
+    <WorkspaceFeature tone="security">
+      <SecurityPage />
+    </WorkspaceFeature>
+  );
+}

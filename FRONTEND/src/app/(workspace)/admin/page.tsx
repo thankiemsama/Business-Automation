@@ -1,2 +1,10 @@
 import { AdminPage } from "@/modules/admin/admin-page";
-export default function Page(){return <AdminPage />;}
+import { WorkspaceFeature } from "@/shared/ui/workspace-feature";
+
+export default function Page() {
+  return (
+    <WorkspaceFeature tone="admin">
+      <AdminPage />
+    </WorkspaceFeature>
+  );
+}

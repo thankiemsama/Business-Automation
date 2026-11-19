@@ -1,4 +1,5 @@
 "use client";
+import { AdminRepository } from "../api/admin";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { WorkspaceRepository } from "../api/workspace";
 import { PlatformRepository } from "../api/platform";
@@ -23,6 +24,7 @@ export function createServices(http: HttpClient) {
       automations: new ApiResourceRepository(http, "automations"),
     };
   return {
+    admin: new AdminRepository(http),
     auth: new AuthRepository(http),
     workspace: new WorkspaceRepository(http),
     platform: new PlatformRepository(http),

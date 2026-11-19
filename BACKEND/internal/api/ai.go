@@ -56,7 +56,7 @@ func (h *Handler) guestVoice(w http.ResponseWriter, r *http.Request) {
 	if !h.allowAI(w, scope, 5, time.Hour) {
 		return
 	}
-	h.transcribe(w, r)
+	h.transcribe(w, r, r.PathValue("tenant"))
 }
 
 func (h *Handler) aiRoutes(mux *http.ServeMux) {
@@ -113,19 +113,20 @@ func (h *Handler) aiTranscribe(w http.ResponseWriter, r *http.Request, user core
 	if !h.allowAI(w, user.ID, 30, time.Minute) {
 		return
 	}
-	h.transcribe(w, r)
+	h.transcribe(w, r, user.TenantID)
 }
 
-func (h *Handler) transcribe(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) transcribe(w http.ResponseWriter, r *http.Request, tenant string) {
 	if !h.acquireAuthSlot(w) {
 		return
 	}
 	defer h.releaseAuthSlot()
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(45 * time.Second))
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, service.MaxAudioBytes))
 	if err != nil {
 		respond(w, 413, nil, core.Fail(413, "Tệp vượt 4 MiB hoặc không đọc được"))
 		return
 	}
-	text, err := h.ai.Transcribe(data)
-	respond(w, 200, map[string]string{"text": text}, err)
+	result, err := h.ai.AnalyzeVoice(tenant, data)
+	respond(w, 200, result, err)
 }

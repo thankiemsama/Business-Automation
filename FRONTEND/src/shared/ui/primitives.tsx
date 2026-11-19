@@ -43,7 +43,7 @@ const labels: Record<string, string> = {
   phone: "Điện thoại",
 };
 export function Badge({ value }: { value: string }) {
-  const t=useTranslations("Common");
+  const t = useTranslations("Common");
   return (
     <span className={`badge badge-${value}`}>
       <span />
@@ -62,14 +62,14 @@ export function EmptyState({
   icon?: IconName;
   children?: ReactNode;
 }) {
-  const t=useTranslations("Common");
+  const t = useTranslations("Common");
   return (
     <div className="empty-state">
       <span className="empty-icon">
         <Icon name={icon} size={27} />
       </span>
-      <h3>{title??t("empty")}</h3>
-      <p>{description??t("start")}</p>
+      <h3>{title ?? t("empty")}</h3>
+      <p>{description ?? t("start")}</p>
       {children}
     </div>
   );
@@ -81,7 +81,7 @@ export function ErrorState({
   message: string;
   retry?: () => void;
 }) {
-  const t=useTranslations("Common");
+  const t = useTranslations("Common");
   return (
     <div className="error-state" role="alert">
       <Icon name="info" />
@@ -95,7 +95,7 @@ export function ErrorState({
   );
 }
 export function Loading() {
- const t=useTranslations("Common");
+  const t = useTranslations("Common");
   return (
     <div className="loading" role="status">
       <span className="spinner" />
@@ -109,7 +109,7 @@ export function PageHeading({
   description,
   children,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   description: string;
   children?: ReactNode;
@@ -117,11 +117,11 @@ export function PageHeading({
   return (
     <div className="page-heading">
       <div>
-        <span className="eyebrow">{eyebrow}</span>
+        {eyebrow && <span className="eyebrow">{eyebrow}</span>}
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
-      <div className="heading-actions">{children}</div>
+      {children && <div className="heading-actions">{children}</div>}
     </div>
   );
 }
@@ -136,7 +136,7 @@ export function Pagination({
   limit: number;
   onChange: (page: number) => void;
 }) {
-  const t=useTranslations("Common");
+  const t = useTranslations("Common");
   const last = Math.max(1, Math.ceil(total / limit));
   return (
     <div className="pagination">
@@ -144,7 +144,7 @@ export function Pagination({
         {total
           ? `${(page - 1) * limit + 1}–${Math.min(page * limit, total)}`
           : "0"}{" "}
-        {t("results",{total})}
+        {t("results", { total })}
       </span>
       <div>
         <button
@@ -154,9 +154,7 @@ export function Pagination({
         >
           ←
         </button>
-        <span>
-          {t("page",{page,last})}
-        </span>
+        <span>{t("page", { page, last })}</span>
         <button
           aria-label={t("next")}
           disabled={page >= last}
@@ -179,7 +177,7 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const t=useTranslations("Common");
+  const t = useTranslations("Common");
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {

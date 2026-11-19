@@ -6,9 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"sync"
-	"time"
 
 	"businessautomation/internal/core"
 )
@@ -21,6 +19,10 @@ type File struct {
 }
 
 func Open(path string) (*File, error) {
+	return openFile(path, true)
+}
+
+func openFile(path string, allowMissing bool) (*File, error) {
 	repository := &File{
 		path: path,
 		state: databaseState{
@@ -30,7 +32,7 @@ func Open(path string) (*File, error) {
 		},
 	}
 	contents, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
+	if allowMissing && errors.Is(err, os.ErrNotExist) {
 		return repository, nil
 	}
 	if err != nil {
@@ -42,35 +44,30 @@ func Open(path string) (*File, error) {
 	if repository.state.Users == nil || repository.state.Sessions == nil || repository.state.Records == nil {
 		return nil, errors.New("invalid database structure")
 	}
+	for id, record := range repository.state.Records {
+		if core.VersionedResource(record.Kind) && record.Version == 0 {
+			record.Version = 1
+			repository.state.Records[id] = record
+		}
+	}
 	return repository, nil
 }
 
-// clone copies every reference field so transaction and read snapshots remain detached.
+// Published maps are immutable. The adapter detaches each record at its boundary.
 func clone(state databaseState) databaseState {
 	copiedState := databaseState{
 		Users:    maps.Clone(state.Users),
 		Sessions: maps.Clone(state.Sessions),
 		Records:  maps.Clone(state.Records),
 	}
-	for recordID, record := range copiedState.Records {
-		record.Keywords = slices.Clone(record.Keywords)
-		record.Tags = slices.Clone(record.Tags)
-		for _, field := range []**time.Time{&record.FirstResponseAt, &record.ResolvedAt, &record.RatedAt, &record.ResponseDueAt, &record.ResolutionDueAt, &record.EscalatedAt, &record.ReadAt} {
-			if *field != nil {
-				value := **field
-				*field = &value
-			}
-		}
-		copiedState.Records[recordID] = record
-	}
 	return copiedState
 }
 
 func (repository *File) View(read func(core.Reader) error) error {
 	repository.mu.RLock()
-	copiedState := clone(repository.state)
+	published := repository.state
 	repository.mu.RUnlock()
-	return read(snapshot{state: &copiedState})
+	return read(struct{ core.Reader }{snapshot{state: &published}})
 }
 
 func (repository *File) Update(update func(core.Writer) error) error {
@@ -84,8 +81,24 @@ func (repository *File) Update(update func(core.Writer) error) error {
 	if err := repository.persist(nextState); err != nil {
 		return err
 	}
-	repository.state = clone(nextState)
+	repository.state = nextState
 	return nil
+}
+
+func (repository *File) ViewTenant(tenantID string, run func(core.Reader) error) error {
+	if tenantID == "" {
+		return errTenantScope
+	}
+	return repository.View(func(store core.Reader) error { return withTenantReader(store, tenantID, run) })
+}
+
+func (repository *File) UpdateTenant(tenantID string, run func(core.Writer) error) error {
+	if tenantID == "" {
+		return errTenantScope
+	}
+	return repository.Update(func(store core.Writer) error {
+		return withTenantWriter(store, tenantID, run)
+	})
 }
 
 func (repository *File) persist(state databaseState) error {

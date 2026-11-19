@@ -161,6 +161,9 @@ func (s *Workspace) Search(user core.User, query string) ([]SearchResult, error)
 			for _, record := range store.Records(user.TenantID, kind) {
 				title := record.Subject
 				if kind == core.KindCustomers {
+					if record.Status == core.CustomerMerged {
+						continue
+					}
 					title = record.Name
 				}
 				if title == "" {

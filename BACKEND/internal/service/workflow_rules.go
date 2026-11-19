@@ -9,7 +9,7 @@ import (
 )
 
 const workflowRulesKind = "workflow_rules"
-const workflowJobsKind = "workflow_jobs"
+const workflowJobsKind = core.KindWorkflowJobs
 
 type WorkflowConditions struct {
 	Channel  string   `json:"channel"`

@@ -3,6 +3,10 @@ import { useCallback, useState } from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useUser } from "@/shared/providers/workspace-provider";
 import { useQuery } from "@/shared/hooks/use-query";
+import {
+  toggleSelection,
+  useCollectionFilters,
+} from "../resources/use-collection-filters";
 import type { Conversation } from "@/shared/domain/models";
 import {
   Badge,
@@ -14,41 +18,40 @@ import {
 } from "@/shared/ui/primitives";
 import { Icon } from "@/shared/ui/icon";
 import { ResourceEditor } from "../resources/resource-editor";
-import {
-  BulkToolbar,
-  ViewControls,
-  emptyFilters,
-  toggleSelection,
-} from "../resources/workspace-controls";
+import { BulkToolbar, ViewControls } from "../resources/workspace-controls";
 import { AssignmentFilter } from "../team/assignment";
 import { ConversationThread } from "./conversation-thread";
+import styles from "./conversations-page.module.css";
+
+const channelLabels = { web: "Website", email: "Email", phone: "Điện thoại" };
+const shortDate = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+});
+
 export function ConversationsPage() {
   const user = useUser();
   const { conversations } = useServices();
-  const [filters, setFilters] = useState(emptyFilters);
-  const [checked, setChecked] = useState<string[]>([]);
-  const [page, setPage] = useState(1);
-  const [q, setQ] = useState("");
-  const [assignment, setAssignment] = useState("");
-  const [status, setStatus] = useState("");
+  const {
+    filters,
+    setFilters,
+    checked,
+    setChecked,
+    page,
+    setPage,
+    q,
+    setQ,
+    assignment,
+    setAssignment,
+    status,
+    setStatus,
+    query,
+  } = useCollectionFilters(10);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [editor, setEditor] = useState<{ entity?: Conversation } | null>(null);
   const load = useCallback(
-    (signal: AbortSignal) =>
-      conversations.list(
-        {
-          page,
-          limit: 10,
-          q,
-          status,
-          assignment,
-          priority: filters.priority,
-          tag: filters.tags,
-          assignee: filters.assignee,
-        },
-        signal,
-      ),
-    [conversations, page, q, status, assignment, filters],
+    (signal: AbortSignal) => conversations.list(query, signal),
+    [conversations, query],
   );
   const result = useQuery(load, "workspace-refresh");
   const selectedId = selected?.id;
@@ -61,15 +64,14 @@ export function ConversationsPage() {
   );
   const current = useQuery(loadActive, "workspace-refresh");
   const active =
-    current.data ??
+    (current.data?.id === selectedId ? current.data : null) ??
     result.data?.items.find((item) => item.id === selectedId) ??
     selected;
   return (
-    <>
+    <div className={styles.page}>
       <PageHeading
-        eyebrow="HỘP THƯ CHUNG"
         title="Hộp hội thoại"
-        description="Mỗi cuộc trò chuyện là cơ hội để thấu hiểu hơn."
+        description="Theo dõi và trả lời tin nhắn hỗ trợ khách hàng."
       >
         {user.role === "owner" && (
           <a
@@ -93,11 +95,14 @@ export function ConversationsPage() {
           Tạo hội thoại
         </button>
       </PageHeading>
-      <section className={`inbox panel ${selected ? "has-selection" : ""}`}>
+      <section
+        aria-label="Không gian hội thoại"
+        className={`inbox panel ${styles.inbox} ${active ? "has-selection" : ""}`}
+      >
         <div className="inbox-list">
           <div className="inbox-list-header">
             <h2>
-              Tất cả hội thoại{" "}
+              Hội thoại{" "}
               <span className="count-pill">{result.data?.total ?? "—"}</span>
             </h2>
             <label className="search-field">
@@ -112,13 +117,15 @@ export function ConversationsPage() {
                 }}
               />
             </label>
-            <AssignmentFilter
-              value={assignment}
-              onChange={(value) => {
-                setAssignment(value);
-                setPage(1);
-              }}
-            />
+            <div className={styles.assignment}>
+              <AssignmentFilter
+                value={assignment}
+                onChange={(value) => {
+                  setAssignment(value);
+                  setPage(1);
+                }}
+              />
+            </div>
             <ViewControls
               current={{
                 ...filters,
@@ -158,6 +165,8 @@ export function ConversationsPage() {
               ].map(([value, label]) => (
                 <button
                   key={value}
+                  type="button"
+                  aria-pressed={status === value}
                   className={status === value ? "active" : ""}
                   onClick={() => {
                     setStatus(value);
@@ -178,7 +187,11 @@ export function ConversationsPage() {
               <EmptyState
                 icon="chat"
                 title="Chưa có hội thoại"
-                description="Tạo hội thoại để bắt đầu hỗ trợ."
+                description={
+                  q || status || assignment
+                    ? "Thử thay đổi từ khóa hoặc bộ lọc."
+                    : "Tạo hội thoại để bắt đầu hỗ trợ."
+                }
               />
             ) : (
               result.data.items.map((item) => (
@@ -192,48 +205,52 @@ export function ConversationsPage() {
                     }
                   />
                   <button
-                    className={`conversation-item ${selected?.id === item.id ? "selected" : ""}`}
-                    key={item.id}
+                    type="button"
+                    aria-pressed={active?.id === item.id}
+                    className={`conversation-item ${styles.item} ${active?.id === item.id ? "selected" : ""}`}
                     onClick={() => setSelected(item)}
                   >
-                    <span className="conversation-top">
-                      <span className="channel-icon">
-                        <Icon
-                          name={item.channel === "web" ? "globe" : "chat"}
-                          size={16}
-                        />
+                    <span
+                      className={styles.channel}
+                      data-channel={item.channel}
+                    >
+                      <Icon
+                        name={item.channel === "web" ? "globe" : "chat"}
+                        size={17}
+                      />
+                    </span>
+                    <span className={styles.summary}>
+                      <span className={styles.subject}>
+                        <strong>
+                          {item.subject || "Hội thoại chưa có chủ đề"}
+                        </strong>
+                        {item.unread && (
+                          <span
+                            className={styles.unread}
+                            role="img"
+                            aria-label="Chưa đọc"
+                            title="Chưa đọc"
+                          />
+                        )}
                       </span>
-                      <span>
-                        {item.channel === "web"
-                          ? "Website"
-                          : item.channel === "email"
-                            ? "Email"
-                            : "Điện thoại"}
+                      <span className={styles.metadata}>
+                        {channelLabels[item.channel]}{" "}
+                        <span aria-hidden="true">·</span> #{item.id.slice(0, 8)}
                       </span>
+                      {Boolean(item.tags?.length) && (
+                        <span className="keywords">
+                          {item.tags?.map((tag) => (
+                            <span key={tag}>{tag}</span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.status}>
+                      <time dateTime={item.updated_at}>
+                        {shortDate.format(new Date(item.updated_at))}
+                      </time>
                       <Badge value={item.status} />
                     </span>
-                    <strong>
-                      {item.subject || "Hội thoại chưa có chủ đề"}{" "}
-                      {item.unread && (
-                        <span className="count-pill">Chưa đọc</span>
-                      )}
-                    </strong>
-                    <span className="conversation-meta">
-                      #{item.id.slice(0, 8)}
-                      <span>
-                        {new Intl.DateTimeFormat("vi-VN", {
-                          day: "2-digit",
-                          month: "2-digit",
-                        }).format(new Date(item.updated_at))}
-                      </span>
-                    </span>
-                    {Boolean(item.tags?.length) && (
-                      <span className="keywords">
-                        {item.tags?.map((tag) => (
-                          <span key={tag}>{tag}</span>
-                        ))}
-                      </span>
-                    )}
                   </button>
                 </div>
               ))
@@ -269,21 +286,11 @@ export function ConversationsPage() {
           </>
         ) : (
           <div className="thread-placeholder">
-            <div className="placeholder-art">
-              <Icon name="chat" size={46} />
-              <span>
-                <Icon name="check" size={19} />
-              </span>
+            <div className={styles.emptyMark} aria-hidden="true">
+              <Icon name="chat" size={38} />
             </div>
-            <h2>Một kết nối đang chờ bạn</h2>
-            <p>
-              Chọn một hội thoại để xem lịch sử,
-              <br />
-              gửi phản hồi và hỗ trợ khách hàng.
-            </p>
-            <span className="placeholder-label">
-              LẮNG NGHE TỐT HƠN. KẾT NỐI GẦN HƠN.
-            </span>
+            <h2>Chưa chọn hội thoại</h2>
+            <p>Chọn một hội thoại từ danh sách để xem tin nhắn và trả lời.</p>
           </div>
         )}
       </section>
@@ -301,6 +308,6 @@ export function ConversationsPage() {
           }}
         />
       )}
-    </>
+    </div>
   );
 }

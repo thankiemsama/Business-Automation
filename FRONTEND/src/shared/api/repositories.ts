@@ -19,7 +19,7 @@ export interface ResourceRepository<T extends Entity> {
   recordResponse(id: string): Promise<T>;
   list(query?: ListQuery, signal?: AbortSignal): Promise<Page<T>>;
   get(id: string, signal?: AbortSignal): Promise<T>;
-  save(input: Input<T>, id?: string): Promise<T>;
+  save(input: Input<T>, id?: string, version?: number): Promise<T>;
 }
 export class ApiResourceRepository<
   K extends ResourceKind,
@@ -68,10 +68,13 @@ export class ApiResourceRepository<
       { signal },
     );
   }
-  save(input: Input<ResourceMap[K]>, id?: string) {
+  save(input: Input<ResourceMap[K]>, id?: string, version?: number) {
     return this.http.request<ResourceMap[K]>(
       `${this.kind}${id ? `/${encodeURIComponent(id)}` : ""}`,
-      { method: id ? "PUT" : "POST", body: JSON.stringify(input) },
+      {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify({ ...input, version }),
+      },
     );
   }
 }
@@ -131,7 +134,13 @@ export class ConversationRepository extends ApiResourceRepository<"conversations
   }
   templates(signal?: AbortSignal) {
     return this.client.request<
-      Page<{ id: string; subject: string; content: string; enabled: boolean }>
+      Page<{
+        id: string;
+        version: number;
+        subject: string;
+        content: string;
+        enabled: boolean;
+      }>
     >("templates?limit=100", { signal });
   }
   saveTemplate(
@@ -139,12 +148,13 @@ export class ConversationRepository extends ApiResourceRepository<"conversations
     content: string,
     enabled: boolean,
     id?: string,
+    version?: number,
   ) {
     return this.client.request(
       `templates${id ? "/" + encodeURIComponent(id) : ""}`,
       {
         method: id ? "PUT" : "POST",
-        body: JSON.stringify({ subject, content, enabled }),
+        body: JSON.stringify({ subject, content, enabled, version }),
       },
     );
   }
@@ -165,12 +175,18 @@ export class ConversationRepository extends ApiResourceRepository<"conversations
     content: string,
     sender: "agent" | "customer" | "note",
     attachment?: { attachment_name: string; attachment_data: string },
+    sourceMessageId?: string,
   ) {
     return this.client.request<Message>(
       `conversations/${encodeURIComponent(id)}/messages`,
       {
         method: "POST",
-        body: JSON.stringify({ content, sender, ...attachment }),
+        body: JSON.stringify({
+          content,
+          sender,
+          ...attachment,
+          source_message_id: sourceMessageId,
+        }),
       },
     );
   }

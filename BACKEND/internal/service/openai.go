@@ -13,10 +13,12 @@ import (
 )
 
 type OpenAIKnowledge struct {
-	key, model string
-	client     *http.Client
-	cacheMu    sync.Mutex
-	vectors    map[string][]float64
+	key, model  string
+	client      *http.Client
+	cacheMu     sync.Mutex
+	vectors     map[string][]float64
+	vectorIndex core.KnowledgeVectors
+	meter       func(string, string, providerUsage)
 }
 
 func NewOpenAIKnowledge(key, model string) *OpenAIKnowledge {
@@ -25,6 +27,8 @@ func NewOpenAIKnowledge(key, model string) *OpenAIKnowledge {
 	}
 	return &OpenAIKnowledge{key: key, model: model, client: &http.Client{Timeout: 12 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, vectors: make(map[string][]float64)}
 }
+
+func (p *OpenAIKnowledge) ConfigureVectorIndex(index core.KnowledgeVectors) { p.vectorIndex = index }
 
 func (p *OpenAIKnowledge) request(path string, input, output any) error {
 	body, err := json.Marshal(input)

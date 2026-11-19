@@ -4,6 +4,7 @@ import { messages } from "@/shared/i18n/messages";
 import { PWAProvider } from "@/shared/ui/platform-tools";
 import type { Metadata } from "next";
 import "./globals.css";
+import "./workspace-layout.css";
 
 export const metadata: Metadata = {
   title: {

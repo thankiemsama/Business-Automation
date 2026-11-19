@@ -7,14 +7,6 @@ import (
 	"businessautomation/internal/core"
 )
 
-func medianDuration(samples []time.Duration, fallback time.Duration) time.Duration {
-	if len(samples) < 5 {
-		return fallback
-	}
-	sort.Slice(samples, func(i, j int) bool { return samples[i] < samples[j] })
-	return samples[len(samples)/2]
-}
-
 func sameNullableTime(a, b *time.Time) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
@@ -25,9 +17,10 @@ func sameNullableTime(a, b *time.Time) bool {
 func (s *AIService) predict() {
 	now := s.clock.Now().UTC()
 	type prediction struct {
-		ticket   core.Record
-		reason   string
-		transfer bool
+		ticket               core.Record
+		reason               string
+		transfer             bool
+		response, resolution slaForecast
 	}
 	pending := []prediction{}
 	_ = s.repo.View(func(store core.Reader) error {
@@ -36,39 +29,75 @@ func (s *AIService) predict() {
 				continue
 			}
 			tickets := store.Records(tenant, core.KindTickets)
-			responseSamples, resolutionSamples := []time.Duration{}, []time.Duration{}
-			queues := map[string]int{}
-			for _, ticket := range tickets {
-				if ticket.Status != core.StatusResolved && ticket.FirstResponseAt == nil {
-					queues[ticket.AssigneeID]++
+			sort.Slice(tickets, func(i, j int) bool {
+				if tickets[i].CreatedAt.Equal(tickets[j].CreatedAt) {
+					return tickets[i].ID < tickets[j].ID
 				}
+				return tickets[i].CreatedAt.Before(tickets[j].CreatedAt)
+			})
+			channels := map[string]string{}
+			for _, conversation := range store.Records(tenant, core.KindConversations) {
+				channels[conversation.ID] = conversation.Channel
+			}
+			histories := slaWorkloads(tickets)
+			features := func(ticket core.Record, workload int) slaFeatures {
+				return slaFeatures{channels[ticket.ConversationID], ticket.Priority, ticket.CreatedAt.In(ReportZone).Hour(), workload}
+			}
+			var responses, resolutions []slaSample
+			for _, ticket := range tickets {
 				if ticket.CreatedAt.Before(now.AddDate(0, 0, -60)) {
 					continue
 				}
-				if ticket.FirstResponseAt != nil && ticket.FirstResponseAt.After(ticket.CreatedAt) {
-					responseSamples = append(responseSamples, ticket.FirstResponseAt.Sub(ticket.CreatedAt))
+				f := features(ticket, histories[ticket.AssigneeID].at(ticket.CreatedAt))
+				if ticket.FirstResponseAt != nil && ticket.FirstResponseAt.After(ticket.CreatedAt) && !ticket.FirstResponseAt.After(now) {
+					responses = append(responses, slaSample{f, ticket.FirstResponseAt.Sub(ticket.CreatedAt)})
 				}
-				if ticket.ResolvedAt != nil && ticket.ResolvedAt.After(ticket.CreatedAt) {
-					resolutionSamples = append(resolutionSamples, ticket.ResolvedAt.Sub(ticket.CreatedAt))
+				if ticket.ResolvedAt != nil && ticket.ResolvedAt.After(ticket.CreatedAt) && !ticket.ResolvedAt.After(now) {
+					resolutions = append(resolutions, slaSample{f, ticket.ResolvedAt.Sub(ticket.CreatedAt)})
 				}
 			}
-			responseETA := medianDuration(responseSamples, 30*time.Minute)
-			resolutionETA := medianDuration(resolutionSamples, 8*time.Hour)
+			responses = responses[max(0, len(responses)-2000):]
+			resolutions = resolutions[max(0, len(resolutions)-2000):]
+			responseMedian, responseTail := fitSLAQuantile(responses, .5), fitSLAQuantile(responses, .9)
+			resolutionMedian, resolutionTail := fitSLAQuantile(resolutions, .5), fitSLAQuantile(resolutions, .9)
 			for _, ticket := range tickets {
+				var response, resolution slaForecast
 				reason := ""
 				elapsed := now.Sub(ticket.CreatedAt)
-				if ticket.Status != core.StatusResolved && !ticketOverdue(ticket, now) && elapsed > 0 {
-					response, resolution := ticketDeadlines(ticket)
-					if ticket.FirstResponseAt == nil && elapsed*4 >= response.Sub(ticket.CreatedAt)*3 &&
-						response.Sub(now) <= responseETA+time.Duration(min(queues[ticket.AssigneeID]-1, 8))*10*time.Minute {
-						reason = "Có nguy cơ trễ phản hồi theo lịch sử và số phiếu đang chờ."
-					} else if elapsed*4 >= resolution.Sub(ticket.CreatedAt)*3 && resolution.Sub(now) <= resolutionETA {
-						reason = "Có nguy cơ trễ xử lý theo thời gian giải quyết gần đây."
+				if ticket.Status != core.StatusResolved && elapsed > 0 {
+					respondBy, resolveBy := ticketDeadlines(ticket)
+					f := features(ticket, max(0, histories[ticket.AssigneeID].at(now)-1))
+					if ticket.FirstResponseAt == nil {
+						if len(responses) >= 20 {
+							response = forecastSLA(responseMedian, responseTail, f)
+						} else {
+							response = slaForecast{15 * time.Minute, 30 * time.Minute}
+						}
+					}
+					if len(resolutions) >= 20 {
+						resolution = forecastSLA(resolutionMedian, resolutionTail, f)
+					} else {
+						resolution = slaForecast{4 * time.Hour, 8 * time.Hour}
+					}
+					if !ticketOverdue(ticket, now) {
+						responseRisk := response.p90 > respondBy.Sub(ticket.CreatedAt)
+						resolutionRisk := resolution.p90 > resolveBy.Sub(ticket.CreatedAt)
+						if len(responses) < 20 && response.p90 > 0 {
+							responseRisk = elapsed*4 >= respondBy.Sub(ticket.CreatedAt)*3 && respondBy.Sub(now) <= response.p90
+						}
+						if len(resolutions) < 20 {
+							resolutionRisk = elapsed*4 >= resolveBy.Sub(ticket.CreatedAt)*3 && resolveBy.Sub(now) <= resolution.p90
+						}
+						if responseRisk {
+							reason = "Dự báo p90 có nguy cơ trễ phản hồi."
+						} else if resolutionRisk {
+							reason = "Dự báo p90 có nguy cơ trễ xử lý."
+						}
 					}
 				}
 				transfer := reason != "" && s.autoEscalate && ticket.EscalatedAt == nil
-				if ticket.RiskReason != reason || transfer {
-					pending = append(pending, prediction{ticket, reason, transfer})
+				if ticket.RiskReason != reason || transfer || forecastChanged(ticket, response, resolution) {
+					pending = append(pending, prediction{ticket, reason, transfer, response, resolution})
 				}
 			}
 		}
@@ -81,7 +110,7 @@ func (s *AIService) predict() {
 		for _, item := range pending {
 			prev := item.ticket
 			current, ok := store.Record(prev.TenantID, prev.ID, core.KindTickets)
-			if !ok || current.Status != prev.Status || current.Priority != prev.Priority || !current.UpdatedAt.Equal(prev.UpdatedAt) || !sameNullableTime(current.FirstResponseAt, prev.FirstResponseAt) {
+			if !ok || current.Version != prev.Version || current.Status != prev.Status || current.Priority != prev.Priority || !current.UpdatedAt.Equal(prev.UpdatedAt) || !sameNullableTime(current.FirstResponseAt, prev.FirstResponseAt) {
 				continue
 			}
 			if item.transfer && current.EscalatedAt == nil {
@@ -92,15 +121,27 @@ func (s *AIService) predict() {
 					}
 				}
 			}
-			if current.RiskReason == item.reason && current.AssigneeID == prev.AssigneeID && sameNullableTime(current.EscalatedAt, prev.EscalatedAt) {
+			if !forecastChanged(current, item.response, item.resolution) && current.RiskReason == item.reason && current.AssigneeID == prev.AssigneeID && sameNullableTime(current.EscalatedAt, prev.EscalatedAt) {
 				continue
 			}
+			riskChanged := current.RiskReason != item.reason
 			current.RiskReason = item.reason
+			current.ResponseP50, current.ResponseP90 = slaMinutes(item.response.p50), slaMinutes(item.response.p90)
+			current.ResolutionP50, current.ResolutionP90 = slaMinutes(item.resolution.p50), slaMinutes(item.resolution.p90)
 			store.PutRecord(current)
-			if current.RiskReason != "" {
+			if riskChanged && current.RiskReason != "" {
 				store.(*workspaceWriter).notify(current, "sla_risk", "Phiếu có nguy cơ trễ SLA")
 			}
 		}
 		return nil
 	})
+}
+
+func slaMinutes(duration time.Duration) int {
+	return int((duration + time.Minute - 1) / time.Minute)
+}
+
+func forecastChanged(ticket core.Record, response, resolution slaForecast) bool {
+	return ticket.ResponseP50 != slaMinutes(response.p50) || ticket.ResponseP90 != slaMinutes(response.p90) ||
+		ticket.ResolutionP50 != slaMinutes(resolution.p50) || ticket.ResolutionP90 != slaMinutes(resolution.p90)
 }

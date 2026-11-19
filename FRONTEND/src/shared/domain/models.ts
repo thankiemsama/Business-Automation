@@ -8,6 +8,7 @@ export interface User {
 }
 export interface Entity {
   id: string;
+  version?: number;
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +31,10 @@ export interface Conversation extends Entity {
 export interface Ticket extends Entity {
   ai_summary?: string;
   sla_risk_reason?: string;
+  sla_response_p50_minutes?: number;
+  sla_response_p90_minutes?: number;
+  sla_resolution_p50_minutes?: number;
+  sla_resolution_p90_minutes?: number;
   tags?: string[];
   assignee_id?: string;
   overdue?: boolean;
@@ -58,7 +63,7 @@ export interface Automation extends Entity {
 }
 export interface Message extends Entity {
   sentiment?: "neutral" | "negative" | "angry";
-  status?: "pending" | "sent";
+  status?: "pending" | "sending" | "sent" | "failed";
   attachment_name?: string;
   attachment_data?: string;
   conversation_id: string;
@@ -92,6 +97,7 @@ export interface ListQuery {
   status?: string;
 }
 export interface Credentials {
+  industry?: string;
   email: string;
   password: string;
   name?: string;
@@ -119,6 +125,7 @@ export interface OperationsReport {
 export interface Reply {
   message: Message;
   source_id?: string;
+  source_message_id?: string;
   provider: string;
   needs_human: boolean;
 }

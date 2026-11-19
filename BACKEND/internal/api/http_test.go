@@ -94,7 +94,9 @@ func TestWorkflowIsolationAndPersistence(t *testing.T) {
 	if fallback["needs_human"] != true {
 		t.Fatal("expected handoff")
 	}
-	a.call("PUT", base, map[string]any{"customer_id": customerID, "status": "closed"}, 200)
+	latest := a.call("GET", base, nil, 200)
+	a.call("PUT", base, map[string]any{"customer_id": customerID, "status": "closed", "version": latest["version"]}, 200)
+	a.call("PUT", base, map[string]any{"customer_id": customerID, "status": "open", "version": latest["version"]}, 409)
 	a.call("POST", base+"/messages", map[string]any{"content": "hello", "sender": "customer"}, 409)
 	a.call("GET", "/api/v1/customers?limit=0", nil, 400)
 	a.call("POST", "/api/v1/tickets", map[string]any{"subject": "Bad", "status": "invalid"}, 400)
@@ -161,7 +163,8 @@ func TestTypedInputsAndConversationOwnership(t *testing.T) {
 	first := c.call("POST", "/api/v1/customers", map[string]any{"name": "First"}, 201)
 	second := c.call("POST", "/api/v1/customers", map[string]any{"name": "Second"}, 201)
 	conversation := c.call("POST", "/api/v1/conversations", map[string]any{"customer_id": first["id"]}, 201)
-	c.call("PUT", "/api/v1/conversations/"+conversation["id"].(string), map[string]any{"customer_id": second["id"]}, 409)
+	c.call("PUT", "/api/v1/conversations/"+conversation["id"].(string),
+		map[string]any{"customer_id": second["id"], "version": conversation["version"]}, 409)
 	c.call("POST", "/api/v1/automations", map[string]any{"name": "Bad", "keywords": []string{" "}}, 400)
 	c.call("POST", "/api/v1/customers", nil, 400)
 	root.call("POST", "/api/v1/auth/register", map[string]any{"name": "Bad", "email": "Display <bad@example.com>", "password": "a-strong-password-2026"}, 400)

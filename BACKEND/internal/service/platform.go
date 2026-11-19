@@ -260,7 +260,7 @@ func (s *PlatformService) Login(tenant, email, code string) (PortalCustomer, err
 			return core.Fail(401, "Mã không hợp lệ hoặc đã hết hạn")
 		}
 		customer, exists := store.Record(tenant, record.CustomerID, core.KindCustomers)
-		if !exists || !strings.EqualFold(customer.Email, email) {
+		if !exists || customer.Status == core.CustomerMerged || !strings.EqualFold(customer.Email, email) {
 			return core.Fail(401, "Mã không hợp lệ hoặc đã hết hạn")
 		}
 		record.Enabled = false
@@ -282,18 +282,23 @@ func (s *PlatformService) Login(tenant, email, code string) (PortalCustomer, err
 func (s *PlatformService) sessionCustomer(tenant, token string) (core.Record, error) {
 	var customer core.Record
 	err := s.repo.View(func(store core.Reader) error {
-		session, ok := store.Record(tenant, tokenHash("portal-session:"+token), "portal_sessions")
-		if !ok || !session.Enabled || s.clock.Now().After(session.UpdatedAt) {
-			return core.Fail(401, "Phiên khách hàng không hợp lệ")
-		}
-		var exists bool
-		customer, exists = store.Record(tenant, session.CustomerID, core.KindCustomers)
-		if !exists || !strings.EqualFold(customer.Email, session.Email) {
-			return core.Fail(401, "Phiên khách hàng không hợp lệ")
-		}
-		return nil
+		var err error
+		customer, err = s.sessionCustomerIn(store, tenant, token)
+		return err
 	})
 	return customer, err
+}
+
+func (s *PlatformService) sessionCustomerIn(store core.Reader, tenant, token string) (core.Record, error) {
+	session, ok := store.Record(tenant, tokenHash("portal-session:"+token), "portal_sessions")
+	if !ok || !session.Enabled || s.clock.Now().After(session.UpdatedAt) {
+		return core.Record{}, core.Fail(401, "Phiên khách hàng không hợp lệ")
+	}
+	customer, exists := store.Record(tenant, session.CustomerID, core.KindCustomers)
+	if !exists || customer.Status == core.CustomerMerged || !strings.EqualFold(customer.Email, session.Email) {
+		return core.Record{}, core.Fail(401, "Phiên khách hàng không hợp lệ")
+	}
+	return customer, nil
 }
 
 // PortalTickets lists the customer's tickets newest-first.

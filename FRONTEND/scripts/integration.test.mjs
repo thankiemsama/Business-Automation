@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-// Run only against an isolated backend data file. This suite creates test tenants.
+// Run only against an isolated backend store. This suite creates test tenants.
 const base = process.env.TEST_FRONTEND_URL || "http://127.0.0.1:3001";
 const origin = new URL(base).origin;
 const password = "Nexa-local-test-2026!";
@@ -72,11 +72,28 @@ test("BFF: session, CRUD, knowledge reply, automation, roles, isolation and logo
       phone: "0900000000",
     });
     const update = await success(`customers/${customer.id}`, "PUT", {
+      version: customer.version,
       name: "Khách hàng đã cập nhật",
       email: "updated@example.test",
       phone: "0911111111",
     });
     assert.equal(update.email, "updated@example.test");
+    assert.equal(update.version, customer.version + 1);
+    const fixture = { name: "Thay đổi từ bản cũ" };
+    assert.equal(
+      (await api(`customers/${customer.id}`, "PUT", fixture)).response.status,
+      428,
+    );
+    assert.equal(
+      (
+        await api(`customers/${customer.id}`, "PUT", {
+          ...fixture,
+          version: customer.version,
+        })
+      ).response.status,
+      409,
+    );
+    assert.equal((await success(`customers/${customer.id}`)).name, update.name);
     knowledge = await success("knowledge", "POST", {
       subject: "Chính sách hoàn tiền",
       content: "Hoàn tiền trong 7 ngày sau khi xác nhận.",
@@ -133,6 +150,7 @@ test("BFF: session, CRUD, knowledge reply, automation, roles, isolation and logo
       );
       assert.equal((await success("customers?q=not-found")).total, 0);
       await success(`tickets/${ticket.id}`, "PUT", {
+        version: ticket.version,
         subject: ticket.subject,
         content: "Đã hỗ trợ",
         customer_id: customer.id,
@@ -141,16 +159,20 @@ test("BFF: session, CRUD, knowledge reply, automation, roles, isolation and logo
         priority: "normal",
       });
       await success(`knowledge/${knowledge.id}`, "PUT", {
+        version: knowledge.version,
         subject: knowledge.subject,
         content: knowledge.content,
         enabled: false,
       });
       await success(`automations/${automation.id}`, "PUT", {
+        version: automation.version,
         name: automation.name,
         keywords: automation.keywords,
         enabled: false,
       });
+      const latest = await success(`conversations/${conversation.id}`);
       await success(`conversations/${conversation.id}`, "PUT", {
+        version: latest.version,
         customer_id: customer.id,
         subject: conversation.subject,
         channel: "web",

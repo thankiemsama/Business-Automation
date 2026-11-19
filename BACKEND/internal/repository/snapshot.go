@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"cmp"
+	"slices"
 	"time"
 
 	"businessautomation/internal/core"
@@ -70,20 +72,65 @@ func (s snapshot) Record(tenantID, id, kind string) (core.Record, bool) {
 	if !ok || record.TenantID != tenantID || record.Kind != kind {
 		return core.Record{}, false
 	}
-	record.Tags = append([]string(nil), record.Tags...)
-	record.Keywords = append([]string(nil), record.Keywords...)
-	return record, true
+	return detachRecord(record), true
 }
 
 func (s snapshot) Records(tenantID, kind string) []core.Record {
 	records := []core.Record{}
 	for _, record := range s.state.Records {
 		if record.TenantID == tenantID && (kind == "" || record.Kind == kind) {
-			record.Keywords = append([]string(nil), record.Keywords...)
-			records = append(records, record)
+			records = append(records, detachRecord(record))
 		}
 	}
 	return records
+}
+
+func (s snapshot) DueEmailReplies(now time.Time, limit int) []core.Record {
+	records := []core.Record{}
+	for _, record := range s.state.Records {
+		if record.Kind == core.KindMessages && record.Status == "pending" && record.Sender == core.SenderAgent &&
+			record.Email != "" && (record.EmailRetryAt == nil || !record.EmailRetryAt.After(now)) {
+			records = append(records, record)
+		}
+	}
+	slices.SortFunc(records, func(a, b core.Record) int {
+		if order := a.CreatedAt.Compare(b.CreatedAt); order != 0 {
+			return order
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+	records = records[:min(len(records), limit)]
+	for i := range records {
+		records[i] = detachRecord(records[i])
+	}
+	return records
+}
+
+func (s snapshot) ConversationMessages(tenantID, conversationID string) []core.Record {
+	records := []core.Record{}
+	for _, record := range s.state.Records {
+		if record.TenantID == tenantID && record.Kind == core.KindMessages && record.ConversationID == conversationID {
+			records = append(records, detachRecord(record))
+		}
+	}
+	return records
+}
+
+func detachRecord(record core.Record) core.Record {
+	record.Keywords = slices.Clone(record.Keywords)
+	record.Tags = slices.Clone(record.Tags)
+	if record.AICostUSD != nil {
+		value := *record.AICostUSD
+		record.AICostUSD = &value
+	}
+	for _, field := range []**time.Time{&record.FirstResponseAt, &record.ResolvedAt, &record.RatedAt,
+		&record.ResponseDueAt, &record.ResolutionDueAt, &record.EscalatedAt, &record.ReadAt, &record.EmailRetryAt} {
+		if *field != nil {
+			value := **field
+			*field = &value
+		}
+	}
+	return record
 }
 
 func (s snapshot) PutUser(user core.User)                      { s.state.Users[user.ID] = user }
@@ -106,8 +153,105 @@ func (s snapshot) ExpireSessions(now time.Time) {
 }
 
 func (s snapshot) PutRecord(record core.Record) {
-	record.Keywords = append([]string(nil), record.Keywords...)
-	s.state.Records[record.ID] = record
+	if core.VersionedResource(record.Kind) {
+		record.Version = s.state.Records[record.ID].Version + 1
+	}
+	s.state.Records[record.ID] = detachRecord(record)
 }
 
 var _ core.Repository = (*File)(nil)
+
+func (s snapshot) IdleTickets(tenantID string, cutoff time.Time) []core.Record {
+	records := []core.Record{}
+	for _, ticket := range s.state.Records {
+		if ticket.TenantID != tenantID || ticket.Kind != core.KindTickets || ticket.Status == core.StatusResolved {
+			continue
+		}
+		activity := ticket.UpdatedAt
+		if activity.IsZero() {
+			activity = ticket.CreatedAt
+		}
+		if conversation, ok := s.Record(tenantID, ticket.ConversationID, core.KindConversations); ok && conversation.UpdatedAt.After(activity) {
+			activity = conversation.UpdatedAt
+		}
+		if !activity.After(cutoff) {
+			records = append(records, detachRecord(ticket))
+		}
+	}
+	slices.SortFunc(records, func(a, b core.Record) int {
+		first, second := workflowActivityAt(a), workflowActivityAt(b)
+		if order := first.Compare(*second); order != 0 {
+			return order
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+	return records
+}
+
+func workflowActivityAt(record core.Record) *time.Time {
+	switch record.Kind {
+	case core.KindConversations:
+		return &record.UpdatedAt
+	case core.KindTickets:
+		if record.Status == core.StatusResolved {
+			return nil
+		}
+		if record.UpdatedAt.IsZero() {
+			return &record.CreatedAt
+		}
+		return &record.UpdatedAt
+	default:
+		return nil
+	}
+}
+
+func pendingWorkflowAt(record core.Record) *time.Time {
+	if record.Kind != core.KindWorkflowJobs || !record.Enabled {
+		return nil
+	}
+	return &record.CreatedAt
+}
+
+func (s snapshot) PendingWorkflowJobs(limit int) []core.Record {
+	if limit <= 0 {
+		return nil
+	}
+	tenants := map[string]bool{}
+	for _, tenant := range s.Tenants() {
+		tenants[tenant] = true
+	}
+	jobs := []core.Record{}
+	for _, job := range s.state.Records {
+		if tenants[job.TenantID] && pendingWorkflowAt(job) != nil {
+			jobs = append(jobs, job)
+		}
+	}
+	slices.SortFunc(jobs, func(a, b core.Record) int {
+		if order := a.CreatedAt.Compare(b.CreatedAt); order != 0 {
+			return order
+		}
+		if order := cmp.Compare(a.ID, b.ID); order != 0 {
+			return order
+		}
+		return cmp.Compare(a.TenantID, b.TenantID)
+	})
+	jobs = jobs[:min(limit, len(jobs))]
+	for i := range jobs {
+		jobs[i] = detachRecord(jobs[i])
+	}
+	return jobs
+}
+
+func (s snapshot) LockWorkflowJob(tenantID, id string) (core.Record, bool) {
+	job, ok := s.Record(tenantID, id, core.KindWorkflowJobs)
+	return job, ok && job.Enabled
+}
+
+func (s snapshot) Savepoint(run func(core.Writer) error) error {
+	next := clone(*s.state)
+	if err := run(snapshot{state: &next}); err != nil {
+		return err
+	}
+	*s.state = next
+	return nil
+}

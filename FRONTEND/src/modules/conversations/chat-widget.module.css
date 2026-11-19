@@ -1,0 +1,131 @@
+.page {
+  --chat-accent: light-dark(#13756c, #86ded0);
+  --chat-tint: color-mix(in srgb, var(--chat-accent) 10%, var(--surface));
+  min-height: 100dvh;
+  padding: clamp(10px, 4vw, 44px);
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    var(--chat-tint),
+    var(--bg) 66%
+  );
+}
+
+.page .card {
+  width: min(100%, 42rem);
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 18px 55px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: clamp(16px, 4vw, 25px);
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(120deg, var(--chat-tint), var(--surface));
+}
+
+.header h1 {
+  color: var(--ink);
+  font-size: clamp(1.2rem, 4vw, 1.65rem);
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--chat-accent);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.card .messages {
+  min-height: clamp(120px, 25vh, 210px);
+  padding: clamp(14px, 3vw, 22px);
+  background: var(--bg);
+}
+
+.prompt {
+  margin: auto;
+  max-width: 32ch;
+  text-align: center;
+  color: var(--secondary-ink);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.messages :global(.message) {
+  gap: 4px;
+}
+
+.messages :global(.message) strong {
+  color: var(--secondary-ink);
+  font-size: 0.75rem;
+}
+
+.messages :global(.message) p {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.messages :global(.message.outbound) p {
+  background: var(--chat-tint);
+}
+
+.messages a {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+}
+
+.composer,
+.actions {
+  padding: clamp(14px, 3vw, 22px);
+  border-top: 1px solid var(--line);
+}
+
+.composer textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.composer input[type="file"] {
+  min-width: 0;
+  width: 100%;
+}
+
+.composer .send {
+  justify-self: end;
+}
+
+.actions form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.error {
+  margin: 12px 18px;
+  color: light-dark(#a52a39, #ffabb5);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .page .card {
+    border-radius: 15px;
+  }
+
+  .composer .send {
+    justify-self: stretch;
+    justify-content: center;
+  }
+}

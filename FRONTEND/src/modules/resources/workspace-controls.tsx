@@ -2,19 +2,13 @@
 import { useCallback, useState } from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
+import { emptyFilters } from "./use-collection-filters";
 import { errorMessage } from "@/shared/api/http-client";
 import {
   parseTags,
-  type Filters,
   type SavedView,
   type WorkKind,
 } from "@/shared/api/workspace";
-
-export const emptyFilters: Filters = { priority: "", tags: [], assignee: "" };
-
-export function toggleSelection(ids: string[], id: string) {
-  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
-}
 
 function useMembers() {
   const { auth } = useServices();

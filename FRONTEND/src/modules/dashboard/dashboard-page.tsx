@@ -1,8 +1,8 @@
 "use client";
+import { FeatureSections } from "@/shared/ui/feature-sections";
 import Link from "next/link";
 import { useCallback } from "react";
 import { useServices } from "@/shared/providers/services-provider";
-import { useUser } from "@/shared/providers/workspace-provider";
 import { useQuery } from "@/shared/hooks/use-query";
 import {
   Badge,
@@ -56,8 +56,37 @@ const metrics: {
   },
 ];
 export function DashboardPage() {
+  return (
+    <>
+      <PageHeading
+        title="Tổng quan"
+        description="Theo dõi hàng đợi hỗ trợ và hoạt động của đội ngũ."
+      >
+        <Link href="/conversations" className="button primary">
+          <Icon name="chat" size={17} /> Mở hộp hội thoại
+        </Link>
+      </PageHeading>
+      <FeatureSections
+        label="Tổng quan và báo cáo"
+        sections={[
+          {
+            id: "overview",
+            label: "Tổng quan",
+            content: <DashboardOverview />,
+          },
+          {
+            id: "reports",
+            label: "Báo cáo hỗ trợ",
+            content: <OperationsReport />,
+          },
+        ]}
+      />
+    </>
+  );
+}
+
+function DashboardOverview() {
   const services = useServices();
-  const user = useUser();
   const load = useCallback(
     (signal: AbortSignal) => services.dashboard.get(signal),
     [services],
@@ -74,58 +103,18 @@ export function DashboardPage() {
   const rate = data?.tickets ? Math.round((resolved / data.tickets) * 100) : 0;
   return (
     <>
-      <PageHeading
-        eyebrow="MỘT NGÀY LÀM VIỆC HIỆU QUẢ"
-        title={`Xin chào, ${user.name.split(" ").slice(-1)[0]} 👋`}
-        description="Mọi kết nối và công việc của bạn, trong một góc nhìn."
-      >
+      <div className="overview-toolbar">
+        <h2>Chỉ số hỗ trợ</h2>
         <button
-          className="button secondary"
+          className="button secondary compact"
           onClick={() => {
             dashboard.reload();
             tickets.reload();
           }}
         >
-          <Icon name="refresh" size={17} />
-          Làm mới
+          <Icon name="refresh" size={16} /> Làm mới
         </button>
-        <Link href="/conversations" className="button primary">
-          <Icon name="chat" size={17} />
-          Mở hộp hội thoại
-        </Link>
-      </PageHeading>
-      <section className="welcome-banner">
-        <div>
-          <span className="banner-eyebrow">KẾT NỐI TỐT HƠN, MỖI NGÀY</span>
-          <h2>
-            Chăm sóc bằng sự thấu hiểu.
-            <br />
-            <span>Vận hành bằng sự đơn giản.</span>
-          </h2>
-          <p>Đội ngũ, khách hàng và quy trình — cùng chung một nhịp.</p>
-          <Link href="/automations">
-            Khám phá tự động hóa <Icon name="arrow" size={17} />
-          </Link>
-        </div>
-        <div className="connection-art" aria-hidden="true">
-          <div className="orbit orbit-one" />
-          <div className="orbit orbit-two" />
-          <span className="art-center">
-            <span className="brand-mark">n</span>
-          </span>
-          <span className="art-node node-one">
-            <Icon name="chat" size={26} />
-          </span>
-          <span className="art-node node-two">
-            <Icon name="users" size={25} />
-          </span>
-          <span className="art-node node-three">
-            <Icon name="bolt" size={25} />
-          </span>
-          <span className="art-dot dot-one" />
-          <span className="art-dot dot-two" />
-        </div>
-      </section>
+      </div>
       {dashboard.error && (
         <ErrorState message={dashboard.error} retry={dashboard.reload} />
       )}
@@ -150,7 +139,6 @@ export function DashboardPage() {
           </Link>
         ))}
       </section>
-      <OperationsReport />
       <div className="dashboard-columns">
         <section className="panel">
           <div className="panel-header">

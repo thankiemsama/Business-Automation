@@ -20,6 +20,10 @@ func (h *Handler) resource(kind string, decoder resourceDecoder) authenticatedHa
 				respond(w, http.StatusNotFound, nil, err)
 				return
 			}
+			if len(items) == 0 {
+				respond(w, http.StatusNotFound, nil, core.Fail(http.StatusNotFound, "Không tìm thấy dữ liệu"))
+				return
+			}
 			respond(w, http.StatusOK, items[0], nil)
 		case http.MethodPost, http.MethodPut:
 			if (r.Method == http.MethodPost && key != "") || (r.Method == http.MethodPut && key == "") {
@@ -59,17 +63,22 @@ func (h *Handler) messages(w http.ResponseWriter, r *http.Request, u core.User, 
 		return
 	}
 	var input struct {
-		Content        string `json:"content"`
-		Sender         string `json:"sender"`
-		AttachmentName string `json:"attachment_name"`
-		AttachmentData string `json:"attachment_data"`
+		Content         string `json:"content"`
+		Sender          string `json:"sender"`
+		SourceMessageID string `json:"source_message_id"`
+		AttachmentName  string `json:"attachment_name"`
+		AttachmentData  string `json:"attachment_data"`
 	}
 	if err := decode(w, r, &input); err != nil {
 		respond(w, http.StatusBadRequest, nil, err)
 		return
 	}
-	result, err := h.conversations.MessageWithAttachment(u, key, input.Content, input.Sender, input.AttachmentName, input.AttachmentData)
-	respond(w, http.StatusCreated, result, err)
+	result, err := h.conversations.SendMessage(u, key, input.Content, input.Sender, input.AttachmentName, input.AttachmentData, input.SourceMessageID)
+	status := http.StatusCreated
+	if result.Status == "pending" {
+		status = http.StatusAccepted
+	}
+	respond(w, status, result, err)
 }
 
 func (h *Handler) reply(w http.ResponseWriter, r *http.Request, u core.User, _ string) {

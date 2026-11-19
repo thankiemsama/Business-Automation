@@ -22,11 +22,34 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
+const CustomerMerged = "merged"
+const KindWorkflowJobs = "workflow_jobs"
+
 type Record struct {
+	// Record is a kind-dependent, shared MVP storage shape: the meaning of most
+	// fields depends on Kind (e.g. EmailRetryAt only on pending agent email
+	// messages, Slug only on knowledge articles, Rating only on resolved
+	// tickets). This cross-kind coupling is deliberate technical debt for the
+	// file-based snapshot repository. When migrating to a typed database,
+	// replace per-kind reads with the projections in model_kinds.go (Customer,
+	// Conversation, Ticket, Message, KnowledgeArticle, ...) and one table per
+	// kind; keep this struct only as the JSON wire/legacy-import format.
+	AICostUSD       *float64   `json:"ai_cost_usd,omitempty"`
+	Version         uint64     `json:"version,omitempty"`
+	EmailAttempts   int        `json:"email_attempts,omitempty"`
+	EmailRetryAt    *time.Time `json:"email_retry_at,omitempty"`
+	EmailReferences string     `json:"email_references,omitempty"`
+	EmailInReplyTo  string     `json:"email_in_reply_to,omitempty"`
+	EmailProviderID string     `json:"email_provider_id,omitempty"`
+	EmailLastError  string     `json:"email_last_error,omitempty"`
 	CustomValues    string     `json:"custom_values,omitempty"`
 	Summary         string     `json:"ai_summary,omitempty"`
 	SummarySource   string     `json:"ai_summary_source,omitempty"`
 	Sentiment       string     `json:"sentiment,omitempty"`
+	ResponseP50     int        `json:"sla_response_p50_minutes,omitempty"`
+	ResponseP90     int        `json:"sla_response_p90_minutes,omitempty"`
+	ResolutionP50   int        `json:"sla_resolution_p50_minutes,omitempty"`
+	ResolutionP90   int        `json:"sla_resolution_p90_minutes,omitempty"`
 	RiskReason      string     `json:"sla_risk_reason,omitempty"`
 	Public          bool       `json:"public,omitempty"`
 	RatingComment   string     `json:"rating_comment,omitempty"`
@@ -57,6 +80,7 @@ type Record struct {
 	Subject         string     `json:"subject,omitempty"`
 	Content         string     `json:"content,omitempty"`
 	CustomerID      string     `json:"customer_id,omitempty"`
+	MessageID       string     `json:"message_id,omitempty"`
 	ConversationID  string     `json:"conversation_id,omitempty"`
 	Status          string     `json:"status,omitempty"`
 	AutomationID    string     `json:"automation_id,omitempty"`
@@ -81,6 +105,19 @@ type Reader interface {
 	Sessions(string) map[string]Session
 	Records(tenantID, kind string) []Record
 	Record(tenantID, id, kind string) (Record, bool)
+	ConversationMessages(tenantID, conversationID string) []Record
+	IdleTickets(tenantID string, cutoff time.Time) []Record
+	DueEmailReplies(now time.Time, limit int) []Record
+	PendingWorkflowJobs(limit int) []Record
+}
+
+func VersionedResource(kind string) bool {
+	switch kind {
+	case KindCustomers, KindConversations, KindTickets, KindKnowledge, KindAutomations, "templates":
+		return true
+	default:
+		return false
+	}
 }
 
 type Writer interface {
@@ -91,6 +128,9 @@ type Writer interface {
 	RevokeSessions(string)
 	ExpireSessions(time.Time)
 	PutRecord(Record)
+	LockWorkflowJob(tenantID, id string) (Record, bool)
+	// Savepoint rolls back writes from a failed sub-operation while preserving the outer transaction.
+	Savepoint(func(Writer) error) error
 }
 
 // Repository is a Unit of Work: all writes inside a callback commit or roll back together.
@@ -98,6 +138,15 @@ type Writer interface {
 type Repository interface {
 	View(func(Reader) error) error
 	Update(func(Writer) error) error
+}
+
+type TenantViewer interface {
+	ViewTenant(string, func(Reader) error) error
+}
+
+// TenantUpdater executes business writes for one authenticated tenant. Authentication mutations use Repository.Update.
+type TenantUpdater interface {
+	UpdateTenant(string, func(Writer) error) error
 }
 
 type Error struct {

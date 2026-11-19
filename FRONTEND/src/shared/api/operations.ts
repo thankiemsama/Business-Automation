@@ -1,7 +1,21 @@
 import type { ReportRow } from "../domain/models";
 import { FetchHttpClient } from "./http-client";
 
+type MetricAverage = { name: string; samples: number; value: number | null };
+
 export type AnalyticsReport = {
+  ai: {
+    bot_cases: number;
+    auto_resolved: number;
+    avoided_tickets: number;
+    tickets: number;
+    metered_requests: number;
+    unpriced_requests: number;
+    cost_usd: number | null;
+    cost_per_ticket_usd: number | null;
+  };
+  csat_by_channel: MetricAverage[];
+  response_minutes_by_priority: MetricAverage[];
   daily: {
     day: string;
     tickets: number;

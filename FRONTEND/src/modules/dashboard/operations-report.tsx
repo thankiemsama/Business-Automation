@@ -42,7 +42,7 @@ export function OperationsReport() {
           {user.role === "owner" && (
             <Link
               className="button secondary compact"
-              href="/workflows#report-schedules"
+              href="/workflows?section=schedules#report-schedules"
             >
               Lịch gửi báo cáo
             </Link>

@@ -9,12 +9,21 @@ import (
 
 // findCustomerByEmail locates a customer record by lower-cased email.
 func findCustomerByEmail(store core.Reader, tenant, email string) (core.Record, bool) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return core.Record{}, false
+	}
+	var match core.Record
 	for _, record := range store.Records(tenant, core.KindCustomers) {
-		if strings.EqualFold(record.Email, email) {
-			return record, true
+		if record.Status == core.CustomerMerged || !strings.EqualFold(strings.TrimSpace(record.Email), email) {
+			continue
+		}
+		if match.ID == "" || record.CreatedAt.Before(match.CreatedAt) ||
+			(record.CreatedAt.Equal(match.CreatedAt) && record.ID < match.ID) {
+			match = record
 		}
 	}
-	return core.Record{}, false
+	return match, match.ID != ""
 }
 
 // CustomerEmail resolves a customer's email address for a ticket (best effort).
@@ -36,10 +45,6 @@ func (s *PlatformService) CustomerEmail(tenant, customerID string) string {
 // CreatePortalTicket lets a portal customer open a new ticket through their
 // own web conversation channel, then runs enabled automations.
 func (s *PlatformService) CreatePortalTicket(tenant, token, subject, content, priority, fileName, fileData string) (core.Record, error) {
-	customer, err := s.sessionCustomer(tenant, token)
-	if err != nil {
-		return core.Record{}, err
-	}
 	if err := validateAttachment(fileName, fileData); err != nil {
 		return core.Record{}, err
 	}
@@ -58,7 +63,11 @@ func (s *PlatformService) CreatePortalTicket(tenant, token, subject, content, pr
 		return core.Record{}, core.Fail(400, "Mức ưu tiên không hợp lệ")
 	}
 	var result core.Record
-	err = s.repo.Update(func(store core.Writer) error {
+	err := s.repo.Update(func(store core.Writer) error {
+		customer, err := s.sessionCustomerIn(store, tenant, token)
+		if err != nil {
+			return err
+		}
 		now := s.clock.Now().UTC()
 		// Separate ticket threads so replies and files remain associated with the right request.
 		conversation := core.Record{
@@ -98,22 +107,28 @@ func portalTicketRecord(ticket core.Record) core.Record {
 // Messenger, WhatsApp, SMS, Instagram DM). Implementations translate in/out.
 type ChannelProvider interface {
 	Name() string
-	Validate(store core.Reader, config *core.Record) error
-	// Send delivers an outbound message to a customer on this channel.
-	Send(store core.Reader, config core.Record, to, body string) error
+	Validate(store core.Reader, config *core.ChannelConfig) error
 }
 
 // ChannelManager stores and validates per-tenant channel configurations.
 type ChannelManager struct {
-	repo      core.Repository
-	providers map[string]ChannelProvider
+	repo          core.Repository
+	providers     map[string]ChannelProvider
+	conversations *ConversationService
 }
 
 func NewChannels(repo core.Repository) *ChannelManager {
-	return &ChannelManager{repo: repo, providers: map[string]ChannelProvider{}}
+	m := &ChannelManager{repo: repo, providers: map[string]ChannelProvider{}}
+	m.registerLiveChannels()
+	return m
 }
 
 // Register adds a provider implementation for a channel name.
+func (m *ChannelManager) ConfigureConversations(conversations *ConversationService) {
+	m.conversations = conversations
+	conversations.channels = m
+}
+
 func (m *ChannelManager) Register(provider ChannelProvider) { m.providers[provider.Name()] = provider }
 
 // Provider returns a registered provider, or a generic built-in adapter.
@@ -130,15 +145,11 @@ type GenericChannel struct{ name string }
 
 func (g *GenericChannel) Name() string { return g.name }
 
-func (g *GenericChannel) Validate(store core.Reader, config *core.Record) error {
+func (g *GenericChannel) Validate(store core.Reader, config *core.ChannelConfig) error {
 	if config.Name == "" && config.Content == "" {
 		return core.Fail(400, "Thiếu thông tin cấu hình kênh")
 	}
 	return nil
-}
-
-func (g *GenericChannel) Send(store core.Reader, config core.Record, to, body string) error {
-	return core.Fail(501, "Kênh "+g.name+" chưa có trình kết nối")
 }
 
 // Configure stores channel settings for a tenant (owner only).
@@ -157,14 +168,19 @@ func (m *ChannelManager) Configure(user core.User, channel string, input core.Re
 		if !ok {
 			record = core.Record{ID: id, TenantID: user.TenantID, Kind: core.KindChannelConfig}
 		}
-		record.Channel, record.Name, record.Content = channel, input.Name, input.Content
-		record.Enabled = input.Enabled
-		record.UpdatedAt = time.Now().UTC()
-		if err := provider.Validate(store, &record); err != nil {
+		config := core.ChannelConfigFromRecord(record)
+		config.Channel, config.Name, config.Content = channel, input.Name, input.Content
+		config.Enabled = input.Enabled
+		config.UpdatedAt = time.Now().UTC()
+		if live, ok := provider.(*liveChannel); ok && !strings.HasPrefix(strings.TrimSpace(config.Content), "{") && live.credentials[user.TenantID].AccessToken == "" {
+			if err := (&GenericChannel{name: channel}).Validate(store, &config); err != nil {
+				return err
+			}
+		} else if err := provider.Validate(store, &config); err != nil {
 			return err
 		}
-		store.PutRecord(record)
-		result = record
+		result = config.ApplyTo(record)
+		store.PutRecord(result)
 		return nil
 	})
 	return result, err
@@ -178,6 +194,12 @@ func (m *ChannelManager) Status(user core.User) (map[string]core.Record, error) 
 			record, ok := store.Record(user.TenantID, tokenHash("channel:"+user.TenantID+":"+channel), core.KindChannelConfig)
 			if !ok {
 				record = core.Record{ID: tokenHash("channel:" + user.TenantID + ":" + channel), TenantID: user.TenantID, Kind: core.KindChannelConfig, Channel: channel}
+			}
+			if isLiveChannel(channel) && record.Enabled {
+				record.Status = "configured"
+				if _, _, _, err := m.providerAccount(store, user.TenantID, channel); err != nil {
+					record.Status = "credentials_required"
+				}
 			}
 			status[channel] = record
 		}

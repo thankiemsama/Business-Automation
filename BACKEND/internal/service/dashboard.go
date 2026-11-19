@@ -16,9 +16,12 @@ func (s *DashboardService) Dashboard(user core.User) (map[string]int, error) {
 		core.KindMessages:      0,
 		"open_tickets":         0,
 	}
-	err := s.repo.View(func(store core.Reader) error {
+	err := viewTenant(s.repo, user.TenantID, func(store core.Reader) error {
 		for _, record := range store.Records(user.TenantID, "") {
 			if _, isDashboardKind := counts[record.Kind]; record.TenantID == user.TenantID && isDashboardKind {
+				if record.Kind == core.KindCustomers && record.Status == core.CustomerMerged {
+					continue
+				}
 				counts[record.Kind]++
 				if record.Kind == core.KindTickets && record.Status != core.StatusResolved {
 					counts["open_tickets"]++

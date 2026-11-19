@@ -39,7 +39,12 @@ export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
       ...(needCode && mode === "login"
         ? { code: String(fields.get("code")) }
         : {}),
-      ...(mode === "register" ? { name: String(fields.get("name")) } : {}),
+      ...(mode === "register"
+        ? {
+            name: String(fields.get("name")),
+            industry: String(fields.get("industry") ?? ""),
+          }
+        : {}),
     };
     try {
       onSuccess(await auth[mode](credentials));
@@ -52,161 +57,125 @@ export function AuthScreen({ onSuccess }: { onSuccess: (user: User) => void }) {
     }
   }
   return (
-    <div className="auth-page">
-      <section className="auth-story">
-        <TenantBrand guest fallback={<Brand />} />
-        <div className="auth-story-content">
-          <span className="story-label">
-            <span className="status-dot" /> CUSTOMER EXPERIENCE PLATFORM
-          </span>
-          <h1>
-            Mỗi kết nối.
-            <br />
-            Một trải nghiệm
-            <br />
-            <em>tốt hơn.</em>
-          </h1>
-          <p>
-            Một không gian để lắng nghe khách hàng, hỗ trợ đội ngũ và để những
-            việc lặp lại được tự động hóa.
-          </p>
-          <div className="story-cards">
-            <div>
-              <Icon name="chat" />
-              <span>Hội thoại tập trung</span>
-            </div>
-            <div>
-              <Icon name="bolt" />
-              <span>Tự động hóa thông minh</span>
-            </div>
-            <div>
-              <Icon name="users" />
-              <span>Khách hàng là trung tâm</span>
-            </div>
-          </div>
-        </div>
-        <span className="auth-footer">
-          NEXA WORKSPACE{" "}
-          <span>Được xây dựng cho những kết nối có ý nghĩa.</span>
-        </span>
-      </section>
-      <section className="auth-form-side">
-        <span className="auth-top-note">KHÔNG GIAN LÀM VIỆC CỦA BẠN</span>
-        <div className="auth-form-wrap">
+    <main className="auth-entry">
+      <section className="auth-entry-card">
+        <header className="auth-entry-header">
+          <TenantBrand guest fallback={<Brand />} />
           <LanguageSelect />
-          <span className="auth-symbol">
-            <Icon name="globe" size={26} />
-          </span>
-          <h2>{t(mode === "login" ? "welcome" : "start")}</h2>
-          <p>
-            {mode === "login"
-              ? "Đăng nhập để tiếp tục chăm sóc khách hàng của bạn."
-              : "Tạo tài khoản quản trị và không gian doanh nghiệp mới."}
-          </p>
-          <form onSubmit={submit} className="form-stack">
-            {mode === "register" && (
-              <label>
-                Họ và tên
-                <input
-                  name="name"
-                  required
-                  autoComplete="name"
-                  placeholder="Nguyễn Minh Anh"
-                  maxLength={200}
-                />
-              </label>
-            )}
+        </header>
+        <h1>{t(mode === "login" ? "welcome" : "start")}</h1>
+        {mode === "register" && (
+          <p>Tạo tài khoản quản trị và không gian doanh nghiệp mới.</p>
+        )}
+        <form onSubmit={submit} className="form-stack">
+          {mode === "register" && (
             <label>
-              {t("email")}
+              Họ và tên
               <input
-                type="email"
-                name="email"
+                name="name"
                 required
-                autoComplete="email"
-                placeholder="ban@congty.vn"
-                maxLength={254}
+                autoComplete="name"
+                placeholder="Nguyễn Minh Anh"
+                maxLength={200}
               />
             </label>
+          )}
+          <label>
+            {t("email")}
+            <input
+              type="email"
+              name="email"
+              required
+              autoComplete="email"
+              placeholder="ban@congty.vn"
+              maxLength={254}
+            />
+          </label>
+          {mode === "register" && (
             <label>
-              {t("password")}
+              {t("industry")}
+              <select name="industry" defaultValue="">
+                <option value="">{t("industryBlank")}</option>
+                <option value="ecommerce">{t("industryEcommerce")}</option>
+                <option value="food_beverage">{t("industryFood")}</option>
+                <option value="saas">{t("industrySaas")}</option>
+                <option value="education">{t("industryEducation")}</option>
+                <option value="logistics">{t("industryLogistics")}</option>
+              </select>
+            </label>
+          )}
+          <label>
+            {t("password")}
+            <input
+              type="password"
+              name="password"
+              required
+              minLength={mode === "register" ? 12 : 1}
+              maxLength={128}
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
+              placeholder={
+                mode === "register"
+                  ? "Ít nhất 12 ký tự"
+                  : "Nhập mật khẩu của bạn"
+              }
+            />
+          </label>
+          {mode === "login" && needCode && (
+            <label>
+              Mã xác thực hoặc mã khôi phục
               <input
-                type="password"
-                name="password"
+                name="code"
                 required
-                minLength={mode === "register" ? 12 : 1}
-                maxLength={128}
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-                placeholder={
-                  mode === "register"
-                    ? "Ít nhất 12 ký tự"
-                    : "Nhập mật khẩu của bạn"
-                }
+                autoComplete="one-time-code"
+                maxLength={20}
               />
             </label>
-            {mode === "login" && needCode && (
-              <label>
-                Mã xác thực hoặc mã khôi phục
-                <input
-                  name="code"
-                  required
-                  autoComplete="one-time-code"
-                  maxLength={20}
-                />
-              </label>
-            )}
-            {error && <ErrorState message={error} />}
-            <button className="button primary full" disabled={busy}>
-              {busy
-                ? "Đang xử lý…"
-                : mode === "login"
-                  ? t("login")
-                  : "Tạo không gian làm việc"}
-              <Icon name="arrow" size={18} />
-            </button>
-          </form>
-          {mode === "login" && (
-            <Link className="text-link" href="/account/forgot">
-              Quên mật khẩu?
-            </Link>
           )}
-          {mode === "login" && providers.length > 0 && (
-            <div className="form-stack">
-              {providers.map((provider) => (
-                <a
-                  key={provider}
-                  className="button secondary"
-                  href={`/api/oidc/${provider}/start`}
-                >
-                  SSO · {provider}
-                </a>
-              ))}
-            </div>
-          )}
-          <div className="auth-switch">
-            {mode === "login"
-              ? "Chưa có không gian làm việc?"
-              : "Đã có tài khoản?"}{" "}
-            <button
-              disabled={busy}
-              onClick={() => {
-                setMode(mode === "login" ? "register" : "login");
-                setError("");
-              }}
-            >
-              {mode === "login" ? "Tạo tài khoản" : "Đăng nhập"}
-            </button>
+          {error && <ErrorState message={error} />}
+          <button className="button primary full" disabled={busy}>
+            {busy
+              ? "Đang xử lý…"
+              : mode === "login"
+                ? t("login")
+                : "Tạo không gian làm việc"}
+            <Icon name="arrow" size={18} />
+          </button>
+        </form>
+        {mode === "login" && (
+          <Link className="text-link" href="/account/forgot">
+            Quên mật khẩu?
+          </Link>
+        )}
+        {mode === "login" && providers.length > 0 && (
+          <div className="form-stack">
+            {providers.map((provider) => (
+              <a
+                key={provider}
+                className="button secondary"
+                href={`/api/oidc/${provider}/start`}
+              >
+                SSO · {provider}
+              </a>
+            ))}
           </div>
-          <div className="auth-trust">
-            <Icon name="shield" size={16} /> Kết nối an toàn. Dữ liệu riêng cho
-            từng doanh nghiệp.
-          </div>
+        )}
+        <div className="auth-switch">
+          {mode === "login"
+            ? "Chưa có không gian làm việc?"
+            : "Đã có tài khoản?"}{" "}
+          <button
+            disabled={busy}
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError("");
+            }}
+          >
+            {mode === "login" ? "Tạo tài khoản" : "Đăng nhập"}
+          </button>
         </div>
-        <span className="auth-bottom-note">
-          Ít thao tác hơn. Nhiều kết nối hơn.
-        </span>
       </section>
-    </div>
+    </main>
   );
 }

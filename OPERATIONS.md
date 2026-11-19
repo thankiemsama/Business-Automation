@@ -58,6 +58,8 @@ Trong **Hộp hội thoại**, chủ doanh nghiệp chọn **Mở widget hỗ tr
 
 ## Email
 
+Trong cùng tenant, các chuỗi thư mới từ cùng địa chỉ email được liên kết với một hồ sơ khách đang hoạt động. Nếu đã có hồ sơ trùng, owner có thể gộp hồ sơ từ màn hình chi tiết khách hàng. Hai hồ sơ cần có cùng email hoặc một hồ sơ chưa có email. Lịch sử chuyển sang hồ sơ đích và thời hạn phiên cổng khách được giữ nguyên.
+
 Cấu hình biến môi trường cho tiến trình Go:
 
 | Biến | Tác dụng |
@@ -69,7 +71,7 @@ Cấu hình biến môi trường cho tiến trình Go:
 | `INBOUND_EMAIL_TENANT` | Tenant đích. Có thể lấy từ URL widget hoặc `/api/v1/auth/me`. |
 | `INBOUND_EMAIL_SECRET` | Bí mật ngẫu nhiên từ 32 ký tự dùng giữa gateway nhận thư và API. |
 
-Cấu hình gateway hộp thư để chuẩn hóa email nhận được thành JSON và gửi `POST /api/v1/email/inbound` trực tiếp đến backend. Gateway truyền `Authorization: Bearer <INBOUND_EMAIL_SECRET>`. Giữ nguyên `id` giữa các lần thử lại và dùng cùng `thread_id` cho chuỗi thư.
+Nếu dùng gateway hộp thư, cấu hình gateway để chuẩn hóa email nhận được thành JSON và gửi `POST /api/v1/email/inbound` trực tiếp đến backend. Gateway truyền `Authorization: Bearer <INBOUND_EMAIL_SECRET>`. Giữ nguyên `id` giữa các lần thử lại và dùng cùng `thread_id` cho chuỗi thư.
 
 ```json
 {
@@ -81,14 +83,91 @@ Cấu hình gateway hộp thư để chuẩn hóa email nhận được thành J
 }
 ```
 
-Khi email gửi trong hội thoại chưa thành công, giao diện hiện **Email chưa gửi · Thử lại**. Có thể thử lại trong 23 giờ với cùng mã gửi để tránh gửi trùng.
+Gửi email trong hội thoại trả HTTP `202` và trạng thái `pending` sau khi lưu hàng chờ. Worker gửi và thử lại theo khoảng chờ tăng dần trong tối đa 23 giờ tính từ lúc tạo tin, dùng cùng mã gửi phía Resend. Nút **Kiểm tra lại** dùng chung lịch gửi và cơ chế giữ lượt với worker.
+
+- Trạng thái `sent` cho biết Resend đã tiếp nhận yêu cầu. Dùng `email_provider_id` trong bản ghi tin nhắn để tra trạng thái phát thư thực tế trong Resend. Mốc phản hồi SLA được lưu khi Resend tiếp nhận email.
+- Trạng thái `failed` dừng gửi tự động và phát thông báo trong workspace. Cấu hình hệ thống tập trung log cảnh báo theo sự kiện `email reply requires reconciliation`. Log có tenant, mã tin nhắn, số lần thử và mã lỗi gần nhất.
+- Khi không có mã Resend, đối chiếu người nhận, tiêu đề và giờ gửi với nhật ký Resend trước khi gửi một tin mới. Việc gửi lại sau cửa sổ 23 giờ cần xác nhận thủ công vì yêu cầu trước đó có thể đã được tiếp nhận trong khi ứng dụng mất kết nối.
 
 ## AI nâng cao
 
-Cấu hình `OPENAI_API_KEY` trên backend. Có thể đặt `OPENAI_CHAT_MODEL` để chọn model soạn nháp, mặc định là `gpt-4.1-mini`. Tìm kiếm dùng `text-embedding-3-small` trên tối đa 100 bài kiến thức đang bật gần đây nhất. Khi nhân viên chọn **Soạn nháp từ kiến thức**, backend gửi câu hỏi và nội dung kiến thức cần tìm đến OpenAI. Bản nháp được đặt trong ô soạn cùng nguồn để nhân viên kiểm tra và quyết định gửi. Khi thiếu dữ kiện, hệ thống mở phiếu bàn giao hoặc dùng phiếu đang mở của hội thoại. Nếu thiếu khóa, chức năng soạn nháp dùng tìm kiếm từ khóa trong kho kiến thức.
+Đặt `OPENAI_API_KEY` và tùy chọn `OPENAI_CHAT_MODEL` trên backend. Model soạn nháp mặc định là `gpt-4.1-mini`.
 
-- Tìm kiếm nội bộ dùng từ khóa và cosine similarity, tối đa 5 kết quả. Vector bài viết được giữ trong bộ nhớ theo tenant và nội dung. Bản nháp lấy tối đa 4 nguồn. Tóm tắt được tạo khi mở hội thoại hoặc phiếu có ít nhất 8 tin nhắn, bỏ qua ghi chú nội bộ và lưu vào phiếu liên quan.
-- Tiến trình nền phân loại cảm xúc và đề xuất nhãn, độ ưu tiên cho dữ liệu mới trong 24 giờ gần nhất. Nhân viên xác nhận trước khi thay đổi phiếu.
-- Bật `AI_CHATBOT_AUTO_REPLY=true` để tự trả lời cho chat web chưa phân công. AI dùng các bài đã bật và xuất bản, hoặc hỗ trợ chung cho một số lời chào/yêu cầu trợ giúp đơn giản. Nội dung thiếu căn cứ, có tệp hoặc khách tức giận sẽ được bàn giao. Điểm tin cậy từ mô hình dùng để lọc và chưa được hiệu chuẩn thành xác suất.
-- Bộ dự báo SLA dùng trung vị lịch sử và hàng chờ. Mặc định chỉ cảnh báo. Bật `AI_SLA_AUTO_ESCALATE=true` để tự chuyển phiếu có nguy cơ cao cho chủ doanh nghiệp. Quy tắc hiện áp dụng sau khi đã dùng ít nhất 75% thời hạn.
-- Ghi âm trong trình soạn hội thoại giới hạn 45 giây hoặc tải tối đa 4 MiB. `gpt-transcribe` chuyển âm thanh thành bản nháp để nhân viên xem trước. Máy chủ chuyển âm thanh sang OpenAI khi người dùng thao tác. Bật `AI_CHAT_WIDGET_VOICE=true` để cho phép khách đang có phiên chat chuyển tối đa 5 đoạn/giờ. `OPENAI_TRANSCRIPTION_MODEL=whisper-1` cho phép dùng Whisper cũ trong thời gian OpenAI còn hỗ trợ.
+- RAG xếp hạng theo cosine tối đa 5 bài từ 100 bài đang bật cập nhật gần nhất. `text-embedding-3-small` tạo 256 chiều. Khi mở tìm kiếm hoặc tạo bản nháp lần đầu, backend tự tạo vector còn thiếu và lưu theo tenant, ID bài viết và nội dung. PostgreSQL cần pgvector và quyền tạo hoặc sử dụng extension. Backend dùng bảng có RLS theo tenant và chỉ mục IVFFlat. File store hoặc PostgreSQL thiếu pgvector dùng cosine trong bộ nhớ. Trình soạn nháp giữ link tới bài được dùng làm nguồn.
+- Triage tự lưu nhãn, ưu tiên và cảm xúc khi kết quả đạt ngưỡng. Các gợi ý chưa đạt ngưỡng chờ nhân viên duyệt trong chi tiết phiếu. `AI_TRIAGE_CONFIDENCE_THRESHOLD` mặc định 0,85.
+- `AI_CHATBOT_AUTO_REPLY=true` bật bot cho widget web, Zalo OA và WhatsApp ở hội thoại chưa phân công. `AI_CHATBOT_CONFIDENCE_THRESHOLD` mặc định 0,70. Bot dùng bài đã bật và công khai để trả lời câu hỏi nghiệp vụ. Thiếu căn cứ, khách tức giận hoặc có tệp sẽ tạo phiếu bàn giao. Sau câu trả lời có nguồn, khách có thể trả lời **Đã giải quyết** để bot đóng hội thoại. Khách dùng Zalo hoặc WhatsApp sẽ nhận tin mời chấm CSAT từ 1 đến 5.
+- Đặt `AI_TRIAGE_CALIBRATION` và `AI_CHATBOT_CALIBRATION` bằng hai mảng JSON, mỗi mảng gồm 10 phần tử `{"correct":0,"total":0}` tương ứng các khoảng điểm 0–0,1, 0,1–0,2,…, 0,9–1. Đếm kết quả đúng trên bộ mẫu đã gắn nhãn, tách riêng từng tác vụ và dùng đúng model đang triển khai. Với triage, chỉ tính đúng khi nhãn, ưu tiên và cảm xúc đều được chấp nhận. Với chatbot, kiểm cả căn cứ, nội dung và quyết định trả lời. Mỗi khoảng cần ít nhất 20 mẫu. Điều kiện tự động dùng cận dưới Wilson 95% của tỷ lệ đúng. Thiếu dữ liệu hiệu chuẩn thì triage chờ duyệt và chatbot bàn giao. Hiệu chuẩn lại khi đổi model hoặc dữ liệu thực tế thay đổi.
+- SLA ước lượng p50/p90 cho phản hồi đầu tiên và xử lý bằng hồi quy phân vị riêng theo tenant. Biến dự báo gồm kênh, ưu tiên, giờ tạo phiếu theo ICT và tải hàng chờ của người phụ trách. Tải quá khứ được dựng từ vòng đời ticket và người phụ trách hiện lưu. Dùng tối đa 2.000 mẫu hoàn tất gần nhất trong 60 ngày cho mỗi mốc. Dưới 20 mẫu, backend dùng mốc mặc định. `AI_SLA_AUTO_ESCALATE=true` chuyển phiếu có nguy cơ trễ cho owner.
+- Ghi âm tối đa 45 giây hoặc tải tệp tối đa 4 MiB. `gpt-transcribe` hoặc `OPENAI_TRANSCRIPTION_MODEL=whisper-1` tạo bản chép lời. Backend xác định ý định và cảm xúc từ nội dung chép lời, sau đó cho phép chỉnh văn bản trước khi gửi. `AI_CHAT_WIDGET_VOICE=true` bật ghi âm cho khách đã có phiên chat.
+- Báo cáo phân tích theo khoảng ngày hiển thị số và tỷ lệ hội thoại bot tự giải quyết đã có xác nhận của khách, tỷ lệ yêu cầu giải quyết trước khi tạo phiếu, CSAT trung bình theo kênh, thời gian phản hồi trung bình theo ưu tiên và chi phí AI ước tính cho mỗi phiếu mới. Đặt `AI_USD_RATES` dạng JSON theo tên model. Dùng `input_per_million` và `output_per_million` cho token, hoặc `per_minute` cho âm thanh tính theo thời lượng. Báo cáo chia tổng chi phí AI có đơn giá trong kỳ cho số phiếu mới cùng kỳ và hiển thị số lượt chưa định giá.
+
+## Zalo OA, WhatsApp và Resend inbound
+
+1. Đặt `NEXA_CHANNEL_CREDENTIALS` bằng JSON sau trên backend, thay các giá trị ví dụ bằng thông tin từ kho bí mật của môi trường triển khai.
+
+   ```json
+   {
+     "tenant-id": {
+       "zalo": {
+         "account_id": "111",
+         "app_id": "222",
+         "access_token": "<OA access token>",
+         "webhook_secret": "<OA Secret Key>"
+       },
+       "whatsapp": {
+         "account_id": "333",
+         "access_token": "<Cloud API token>",
+         "webhook_secret": "<Meta App Secret>",
+         "verify_token": "<Meta Webhook Verify Token>",
+         "graph_version": "v25.0"
+       }
+     }
+   }
+   ```
+
+2. Trong **Tích hợp → Kênh**, nhập JSON công khai gồm `account_id` và thêm `app_id` cho Zalo. `account_id` là OA ID cho Zalo hoặc Phone Number ID cho WhatsApp. Bật và lưu kênh. Dùng phiên bản Graph còn được hỗ trợ cho ứng dụng. Xoay access token Zalo trong kho bí mật và nạp lại cấu hình backend trước khi token hết hạn.
+3. Đăng ký HTTPS callback trực tiếp vào backend tại `/api/v1/channel-webhooks/{tenant}/zalo` hoặc `/api/v1/channel-webhooks/{tenant}/whatsapp`. Proxy cần giữ nguyên raw body và header chữ ký. Chọn đúng callback cho tài khoản đã khai báo và đăng ký sự kiện tin nhắn. Các endpoint quản trị gửi thử và DLQ dùng BFF và phiên owner.
+4. Từ một tài khoản khách đã mở phiên nhắn tin hợp lệ, gửi tin vào Zalo OA hoặc WhatsApp, kiểm tra hội thoại và trả lời từ hộp thư. Dùng **Gửi tin kiểm thử** để kiểm tra outbound. Chức năng gửi dùng văn bản trong cửa sổ nhắn tin của nhà cung cấp. Tệp đến được đánh dấu để nhân viên kiểm tra trên kênh nguồn.
+5. Tin đến được dedup bằng ID đã xác thực của nhà cung cấp trong phạm vi tenant và tài khoản. Mỗi lượt gửi có `X-Nexa-Delivery` cố định. Trạng thái **Nhà cung cấp đã tiếp nhận** xác nhận API gửi trả mã tin nhắn. Hàng đợi thử lại khi bị giới hạn tần suất và chuyển lỗi vĩnh viễn hoặc kết quả chưa xác định vào DLQ. Khi chưa xác định, đối soát trên kênh trước khi chọn **Thử lại**.
+6. Để Resend gửi webhook trực tiếp, đăng ký `email.received` trỏ tới `POST /api/v1/email/resend`. Đặt `INBOUND_EMAIL_TENANT`, `RESEND_INBOUND_ADDRESS`, `RESEND_INBOUND_WEBHOOK_SECRET` và `RESEND_INBOUND_API_KEY` có quyền đọc thư đến. Backend xác thực Svix và lấy nội dung văn bản từ Resend. Gateway cũ vẫn có thể dùng `/api/v1/email/inbound` với bearer token và `X-Nexa-Delivery` cố định cho mỗi lần gửi lại.
+
+Tham khảo [kiến trúc OA OpenAPI](https://oa.zalo.me/home/documents/guides/Khoi-tao-ung-dung-va-cap-quyen_117071366476220195), [WhatsApp Business Platform](https://developers.facebook.com/documentation/business-messaging/whatsapp/overview) và [Resend Receiving API](https://resend.com/docs/api-reference/emails/retrieve-received-email).
+
+## Quan sát backend và workflow nền
+
+Đặt `METRICS_TOKEN` bằng bí mật ngẫu nhiên ít nhất 32 byte để bật `GET /metrics` trên backend. Cấu hình Prometheus gửi header `Authorization: Bearer …` từ mạng nội bộ. Endpoint mặc định trả 404 khi chưa cấu hình hoặc thiếu quyền.
+
+- Dùng `platform_http_requests_total` theo nhóm status để theo dõi lưu lượng và tỷ lệ 5xx. Dùng histogram `platform_http_request_duration_seconds` để tính p95/p99 bằng `histogram_quantile`. Kết nối SSE được loại khỏi histogram.
+- Theo dõi histogram `platform_postgres_write_lock_wait_seconds` và bộ đếm `platform_postgres_write_lock_errors_total` khi tăng số replica hoặc tải ghi.
+- Migration `002_workflow_activity.sql` điền lại thời điểm hoạt động từ dữ liệu hiện có và lập chỉ mục ticket chưa giải quyết. Hãy đo thời gian migration trên bản sao staging trước khi nâng cấp database lớn vì bước backfill cập nhật các row hiện có.
+- Migration `004_pending_workflow_jobs.sql` lập chỉ mục job đang chờ. PostgreSQL trả tối đa 25 job mỗi lượt theo thứ tự tạo; worker lấy khóa row bằng `FOR UPDATE SKIP LOCKED` rồi ghi kết quả và cập nhật nghiệp vụ trong cùng transaction. Lịch sử job hoàn thành nằm ngoài chỉ mục hàng chờ. Worker workflow, API danh sách/chi tiết, dashboard, đọc ngữ cảnh cho bản nháp, lưu tài nguyên, gửi tin và các thao tác phân công/SLA trên phiếu đã dùng transaction theo tenant. Đọc có phạm vi không lấy advisory lock ghi. PostgreSQL giữ khóa riêng của tenant cùng một khóa tương thích dùng chung ở chế độ shared; các luồng ghi cũ vẫn lấy khóa tương thích ở chế độ exclusive. Schema `platform_v2` và role RLS thuộc bước cutover riêng.
+
+## Docker Compose và kiểm tra tích hợp
+
+Từ thư mục gốc, dùng Docker với Compose v2 và chạy:
+
+```powershell
+docker compose up --build --wait
+```
+
+Mở `http://127.0.0.1:3000`. Nếu cổng 3000 đã được dùng, đặt `$env:NEXA_PORT = '3001'` trước khi chạy Compose và mở cổng tương ứng. Backend và PostgreSQL chỉ lắng nghe trong mạng Compose. Probe `GET /readyz` của backend trả 204 khi sẵn sàng và 503 nếu PostgreSQL không phản hồi. Endpoint `GET /healthz` tiếp tục kiểm tra tiến trình. Volume `postgres-data` giữ dữ liệu khi chạy `docker compose down`.
+
+Stack này dùng thông tin đăng nhập cố định cho môi trường thử nghiệm cục bộ. Khi chạy bộ kiểm thử BFF, luôn dùng stack và volume riêng vì test tạo workspace và dữ liệu nghiệp vụ. Chạy từ thư mục gốc:
+
+```powershell
+$env:NEXA_PORT = '3001'
+docker compose -p nexa-test up --build --wait
+$env:TEST_FRONTEND_URL = 'http://127.0.0.1:3001'
+npm --prefix FRONTEND run test:integration
+docker compose -p nexa-test down
+```
+
+GitHub Actions chạy kiểm thử Go với PostgreSQL/pgvector, kiểm tra lint và TypeScript, build hai image và chạy kiểm thử BFF qua stack Compose riêng. Pipeline kết thúc ở bước xác nhận bản build. Triển khai tự động cần một môi trường đích, quyền truy cập registry và quy trình rollback.
+
+
+## Chạy thử trên cloud quản lý
+
+- Tạo staging riêng với dữ liệu giả lập. Dùng PostgreSQL quản lý có backup và PITR, object storage tương thích S3 qua danh tính dịch vụ, và bộ thu Prometheus trong mạng nội bộ. Ghi lại vùng triển khai và quyền của role API, worker, migration trước đợt cutover.
+- Diễn tập PITR vào một instance riêng. Tắt gửi email, webhook và các tích hợp có tác dụng bên ngoài trước khi mở bản phục hồi. Đối chiếu số lượng bản ghi theo tenant, kiểm tra đăng nhập và quyền truy cập, rồi đo thời điểm dữ liệu mới nhất đã phục hồi và tổng thời gian khôi phục để xác định RPO/RTO thực tế.
+- Chạy `k6 run BACKEND/loadtest/staging.js` với `CONFIRM_ISOLATED_STAGING=yes`, `STAGING_API_URL` trỏ backend staging, và `STAGING_API_TOKENS` gồm các session token ngắn hạn của tenant thử, phân cách bằng dấu phẩy. Nạp token từ kho bí mật hoặc biến môi trường của runner. Tắt tích hợp gửi ngoài và dùng database có thể dọn lại vì bài test có tạo ticket.
+- Mặc định bài chạy thử ở 5 RPS trong 30 giây với 10% thao tác ghi. Tăng dần bằng `STAGING_RPS` và chỉnh `STAGING_VUS`, `STAGING_DURATION`, `STAGING_WRITE_PERCENT` theo mục tiêu. Ngưỡng mặc định là p95 dưới 300 ms, p99 dưới 1.200 ms, tỷ lệ sai status dưới 0,1% và không có vòng lặp bị bỏ. Đối chiếu từng đợt với histogram chờ khóa PostgreSQL trước khi tăng tiếp. Dùng `STAGING_P95_MS=500` cho cổng cutover W2. Sau khi staging đạt các đợt ngắn, đặt `STAGING_RPS=2000`, `STAGING_VUS=1000` và `STAGING_DURATION=24h` để chạy đợt W5; bộ phát tải phải đủ năng lực để duy trì tốc độ đã đặt.

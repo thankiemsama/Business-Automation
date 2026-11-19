@@ -32,6 +32,8 @@ const display: Record<string, string> = {
   unknown: "Chưa rõ",
   web: "Website",
   email: "Email",
+  zalo: "Zalo OA",
+  whatsapp: "WhatsApp",
   phone: "Điện thoại",
   low: "Thấp",
   normal: "Bình thường",
@@ -58,8 +60,17 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
   if (analysis.error)
     return <ErrorState message={analysis.error} retry={analysis.reload} />;
   if (!analysis.data) return <Loading />;
-  const { daily, channels, priorities, sla, cohorts, leaderboard } =
-    analysis.data;
+  const {
+    daily,
+    channels,
+    priorities,
+    sla,
+    cohorts,
+    leaderboard,
+    ai,
+    csat_by_channel,
+    response_minutes_by_priority,
+  } = analysis.data;
   const ranked = [...leaderboard].sort((a, b) => {
     if (ranking === "response")
       return (
@@ -87,6 +98,72 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
   }));
   return (
     <div className="analytics-content">
+      <div className="analytics-grid">
+        <section className="panel analytics-card">
+          <h3>Hiệu quả AI</h3>
+          <dl>
+            <dt>Hội thoại bot tự giải quyết</dt>
+            <dd>
+              {ai.bot_cases
+                ? `${rate(ai.auto_resolved, ai.bot_cases)} (${ai.auto_resolved}/${ai.bot_cases})`
+                : "Chưa có dữ liệu"}
+            </dd>
+            <dt>Yêu cầu được giải quyết trước khi tạo phiếu</dt>
+            <dd>
+              {ai.avoided_tickets + ai.tickets
+                ? `${rate(ai.avoided_tickets, ai.avoided_tickets + ai.tickets)} (${ai.avoided_tickets} yêu cầu)`
+                : "Chưa có dữ liệu"}
+            </dd>
+            <dt>Chi phí AI ước tính mỗi phiếu</dt>
+            <dd>
+              {ai.cost_per_ticket_usd == null
+                ? "Chưa có dữ liệu"
+                : new Intl.NumberFormat("vi-VN", {
+                    style: "currency",
+                    currency: "USD",
+                    maximumFractionDigits: 6,
+                  }).format(ai.cost_per_ticket_usd)}
+            </dd>
+          </dl>
+          {ai.unpriced_requests > 0 && (
+            <p>
+              {ai.unpriced_requests} lượt AI chưa có đủ dữ liệu để tính giá.
+            </p>
+          )}
+        </section>
+        <section className="panel analytics-card">
+          <h3>CSAT theo kênh</h3>
+          {csat_by_channel.length === 0 ? (
+            <p>Chưa có đánh giá</p>
+          ) : (
+            <ul>
+              {csat_by_channel.map(({ name, value, samples }) => (
+                <li key={name}>
+                  {display[name] || name} ·{" "}
+                  {value == null ? "—" : vn.format(value) + "/5"} ({samples}{" "}
+                  đánh giá)
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="panel analytics-card">
+          <h3>Phản hồi đầu tiên theo độ ưu tiên</h3>
+          {response_minutes_by_priority.length === 0 ? (
+            <p>Chưa có phản hồi ghi nhận</p>
+          ) : (
+            <ul>
+              {response_minutes_by_priority.map(({ name, value, samples }) => (
+                <li key={name}>
+                  {display[name] || name || "Chưa rõ"} ·{" "}
+                  {value == null ? "—" : vn.format(value) + " phút"} ({samples}{" "}
+                  phiếu)
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
       <div className="analytics-grid">
         <section className="panel analytics-card">
           <h3>Phiếu mới theo ngày</h3>

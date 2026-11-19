@@ -64,7 +64,7 @@ func (s *CSATService) IssueLink(ticket core.Record) (CSATLink, error) {
 			customer, ok := store.Record(tenant, current.CustomerID, core.KindCustomers)
 			if ok && customer.Email != "" && current.Rating == 0 {
 				link := s.publicLink(tenant, token, current.Subject, expires.Unix())
-				store.PutRecord(core.Record{ID: tokenHash("csat-email:" + token), TenantID: tenant, Kind: "csat_mail", Email: customer.Email, CustomerID: customer.ID, ConversationID: current.ID, Content: link.URL, Enabled: true, CreatedAt: now, UpdatedAt: now})
+				store.PutRecord((core.SurveyEmailJob{ID: tokenHash("csat-email:" + token), TenantID: tenant, Recipient: customer.Email, CustomerID: customer.ID, TicketID: current.ID, SurveyURL: link.URL, Pending: true, CreatedAt: now, NextAttemptAt: now}).ApplyTo(core.Record{}))
 			}
 		}
 		return nil

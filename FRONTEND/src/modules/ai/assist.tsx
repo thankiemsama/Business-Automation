@@ -198,6 +198,10 @@ export function VoiceInput({
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [analysis, setAnalysis] = useState<{
+    intent?: string;
+    sentiment?: string;
+  }>({});
   const active = useRef<MediaRecorder | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(false);
@@ -212,23 +216,28 @@ export function VoiceInput({
   if (!status.data?.enabled) return null;
   async function transcribe(file: Blob) {
     setError("");
+    setAnalysis({});
     if (!file.size || file.size > 4 * 1024 * 1024) {
       setError("Âm thanh phải có dữ liệu và tối đa 4 MiB.");
       return;
     }
     setBusy(true);
     try {
-      const data = await api.request<{ text: string }>(
-        guestPath ? `${guestPath}/transcribe` : "ai/transcribe",
-        {
-          headers: guestToken
-            ? { Authorization: `Bearer ${guestToken}` }
-            : undefined,
-          method: "POST",
-          body: file,
-        },
-      );
-      if (mounted.current) onText(data.text);
+      const data = await api.request<{
+        text: string;
+        intent?: string;
+        sentiment?: string;
+      }>(guestPath ? `${guestPath}/transcribe` : "ai/transcribe", {
+        headers: guestToken
+          ? { Authorization: `Bearer ${guestToken}` }
+          : undefined,
+        method: "POST",
+        body: file,
+      });
+      if (mounted.current) {
+        onText(data.text);
+        setAnalysis(data);
+      }
     } catch (error) {
       if (mounted.current) setError(errorMessage(error));
     } finally {
@@ -306,6 +315,17 @@ export function VoiceInput({
         />
       </label>
       {busy && !recording && <span role="status">Đang xử lý âm thanh…</span>}
+      {!guestPath && analysis.intent && <span>Ý định: {analysis.intent}</span>}
+      {!guestPath && analysis.sentiment && (
+        <span>
+          Cảm xúc:{" "}
+          {analysis.sentiment === "angry"
+            ? "Tức giận"
+            : analysis.sentiment === "negative"
+              ? "Tiêu cực"
+              : "Trung tính"}
+        </span>
+      )}
       {error && <span role="alert">{error}</span>}
     </div>
   );

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
@@ -33,4 +34,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default function config(phase: string): NextConfig {
+  if (phase === PHASE_DEVELOPMENT_SERVER && process.platform === "win32") {
+    return {
+      ...nextConfig,
+      // Webpack can fail to unlink the MCP file logger's output during startup.
+      experimental: { ...nextConfig.experimental, mcpServer: false },
+    };
+  }
+
+  return nextConfig;
+}

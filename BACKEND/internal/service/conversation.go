@@ -18,6 +18,7 @@ type ConversationService struct {
 	draftProvider ReplyProvider
 	automations   AutomationRunner
 	mailer        *EmailMailer
+	channels      *ChannelManager
 }
 
 func NewConversations(repo core.Repository, clock Clock, ids IDGenerator, replies ReplyProvider, automations AutomationRunner) *ConversationService {
@@ -30,6 +31,10 @@ func (s *ConversationService) Message(user core.User, conversationID, content, s
 }
 
 func (s *ConversationService) MessageWithAttachment(user core.User, conversationID, content, sender, name, attachment string) (core.Record, error) {
+	return s.SendMessage(user, conversationID, content, sender, name, attachment, "")
+}
+
+func (s *ConversationService) SendMessage(user core.User, conversationID, content, sender, name, attachment, sourceMessageID string) (core.Record, error) {
 	var result core.Record
 	var recipient string
 	if err := validateAttachment(name, attachment); err != nil {
@@ -42,7 +47,10 @@ func (s *ConversationService) MessageWithAttachment(user core.User, conversation
 	if sender != core.SenderCustomer && sender != core.SenderAgent && sender != "note" {
 		return result, core.Fail(400, "Vai trò gửi không hợp lệ")
 	}
-	err := updateAs(s.repo, user.ID, func(store core.Writer) error {
+	if sourceMessageID != "" && (sender != core.SenderAgent || len(sourceMessageID) > 512) {
+		return result, core.Fail(400, "Tin nguồn không hợp lệ")
+	}
+	err := updateAsTenant(s.repo, user, func(store core.Writer) error {
 		conversation, err := findOwnedRecord(store, user, conversationID, core.KindConversations)
 		if err != nil {
 			return err
@@ -50,21 +58,39 @@ func (s *ConversationService) MessageWithAttachment(user core.User, conversation
 		if conversation.Status == core.StatusClosed {
 			return core.Fail(409, "Hội thoại đã đóng")
 		}
+		if sourceMessageID != "" {
+			if _, err := checkDraftContext(store, user, conversationID, sourceMessageID); err != nil {
+				return err
+			}
+		}
 		if conversation.Channel == core.ChannelEmail && conversation.Email != "" && sender == core.SenderAgent {
 			if s.mailer == nil {
 				return core.Fail(503, "Chưa cấu hình gửi email")
 			}
 			recipient = conversation.Email
 		}
+		external := sender == core.SenderAgent && isLiveChannel(conversation.Channel)
+		if external && (s.channels == nil || attachment != "") {
+			return core.Fail(400, "Kênh này hiện hỗ trợ gửi tin văn bản")
+		}
 		result = s.storeMessage(store, user, conversation, content, sender)
+		if external {
+			if err := s.channels.enqueueReply(store, conversation, result); err != nil {
+				return err
+			}
+			result.Status = "pending"
+		}
 		if attachment != "" {
 			result.AttachmentName, result.AttachmentData = name, attachment
-			store.PutRecord(result)
 		}
 		if recipient != "" {
 			result.Status = "pending"
 			result.Email = recipient
 			result.Subject = conversation.Subject
+			inbound := latestInboundBefore(store, conversation, result)
+			result.EmailInReplyTo, result.EmailReferences = inbound.EmailInReplyTo, inbound.EmailReferences
+		}
+		if attachment != "" || recipient != "" || external {
 			store.PutRecord(result)
 		}
 		if sender == core.SenderCustomer {
@@ -74,19 +100,15 @@ func (s *ConversationService) MessageWithAttachment(user core.User, conversation
 
 		return nil
 	})
-	if err == nil && recipient != "" {
-		if delivered, deliveryErr := s.DeliverEmail(user, conversationID, result.ID); deliveryErr == nil {
-			result = delivered
-		}
-	}
 	return result, err
 }
 
 type Reply struct {
-	Message    core.Record `json:"message"`
-	SourceID   string      `json:"source_id,omitempty"`
-	Provider   string      `json:"provider"`
-	NeedsHuman bool        `json:"needs_human"`
+	Message         core.Record `json:"message"`
+	SourceID        string      `json:"source_id,omitempty"`
+	SourceMessageID string      `json:"source_message_id,omitempty"`
+	Provider        string      `json:"provider"`
+	NeedsHuman      bool        `json:"needs_human"`
 }
 
 func (s *ConversationService) Reply(user core.User, conversationID string) (Reply, error) {
@@ -99,9 +121,12 @@ func (s *ConversationService) Reply(user core.User, conversationID string) (Repl
 		if conversation.Status == core.StatusClosed {
 			return core.Fail(409, "Hội thoại đã đóng")
 		}
+		if isLiveChannel(conversation.Channel) {
+			return core.Fail(409, "Hãy dùng Soạn nháp hoặc gửi tin từ hộp thư của kênh")
+		}
 		var latest core.Record
-		for _, message := range store.Records(user.TenantID, core.KindMessages) {
-			if message.TenantID == user.TenantID && message.Kind == core.KindMessages && message.ConversationID == conversationID && laterMessage(message, latest) {
+		for _, message := range store.ConversationMessages(user.TenantID, conversationID) {
+			if laterMessage(message, latest) {
 				latest = message
 			}
 		}
@@ -113,10 +138,11 @@ func (s *ConversationService) Reply(user core.User, conversationID string) (Repl
 			return err
 		}
 		result = Reply{
-			SourceID:   answer.SourceID,
-			NeedsHuman: answer.NeedsHuman,
-			Provider:   answer.Provider,
-			Message:    s.storeMessage(store, user, conversation, answer.Content, core.SenderAssistant),
+			SourceID:        answer.SourceID,
+			SourceMessageID: latest.ID,
+			NeedsHuman:      answer.NeedsHuman,
+			Provider:        answer.Provider,
+			Message:         s.storeMessage(store, user, conversation, answer.Content, core.SenderAssistant),
 		}
 		return nil
 	})
@@ -126,10 +152,8 @@ func (s *ConversationService) Reply(user core.User, conversationID string) (Repl
 // Sequence makes message ordering deterministic even when a clock returns equal timestamps.
 func nextSequence(store core.Reader, user core.User, conversationID string) uint64 {
 	var highestSequence uint64
-	for _, message := range store.Records(user.TenantID, core.KindMessages) {
-		if message.ConversationID == conversationID && message.Sequence > highestSequence {
-			highestSequence = message.Sequence
-		}
+	for _, message := range store.ConversationMessages(user.TenantID, conversationID) {
+		highestSequence = max(highestSequence, message.Sequence)
 	}
 	return highestSequence + 1
 }
@@ -159,7 +183,7 @@ func (s *ConversationService) storeMessage(store core.Writer, user core.User, co
 		Sequence:       nextSequence(store, user, conversation.ID),
 	}
 	store.PutRecord(message)
-	if sender == core.SenderAgent && (conversation.Channel != core.ChannelEmail || conversation.Email == "") {
+	if sender == core.SenderAgent && !isLiveChannel(conversation.Channel) && (conversation.Channel != core.ChannelEmail || conversation.Email == "") {
 		for _, ticket := range store.Records(user.TenantID, core.KindTickets) {
 			if ticket.ConversationID == conversation.ID && ticket.Status != core.StatusResolved && ticket.FirstResponseAt == nil {
 				recordTicketResponse(store, &ticket, user.ID, now)

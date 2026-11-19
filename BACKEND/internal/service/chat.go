@@ -73,12 +73,15 @@ func (s *ConversationService) PublicChat(token, content, fileName, fileData stri
 			if conversation.Status != core.StatusOpen {
 				return core.Fail(409, "Hội thoại đã đóng")
 			}
+			previous := latestPublicMessage(store, tenant, conversation.ID)
 			message := s.storeMessage(writer, user, conversation, content, core.SenderCustomer)
 			if fileData != "" {
 				message.AttachmentName, message.AttachmentData = fileName, fileData
 				writer.PutRecord(message)
 			}
-			if err := s.automations.Run(writer, user, conversation, message); err != nil {
+			if fileData == "" && confirmBotResolution(writer, conversation, previous, message) {
+				conversation.Status = core.StatusClosed
+			} else if err := s.automations.Run(writer, user, conversation, message); err != nil {
 				return err
 			}
 		}

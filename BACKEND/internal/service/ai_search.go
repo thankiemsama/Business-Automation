@@ -20,9 +20,10 @@ func clipped(value string, limit int) string {
 	return string(runes[:min(limit, len(runes))])
 }
 
-func (p *OpenAIKnowledge) embed(input []string) ([][]float64, error) {
+func (p *OpenAIKnowledge) embed(tenant string, input []string) ([][]float64, error) {
 	var result struct {
-		Data []struct {
+		Usage providerUsage
+		Data  []struct {
 			Index     int
 			Embedding []float64
 		}
@@ -30,6 +31,7 @@ func (p *OpenAIKnowledge) embed(input []string) ([][]float64, error) {
 	if err := p.request("embeddings", map[string]any{"model": "text-embedding-3-small", "input": input, "dimensions": 256}, &result); err != nil {
 		return nil, err
 	}
+	p.recordUsage(tenant, "text-embedding-3-small", result.Usage)
 	vectors := make([][]float64, len(input))
 	for _, item := range result.Data {
 		if item.Index < 0 || item.Index >= len(input) || len(item.Embedding) != 256 || vectors[item.Index] != nil {
@@ -67,13 +69,22 @@ func (p *OpenAIKnowledge) Search(question string, articles []core.Record, k int)
 		return []KnowledgeMatch{}, nil
 	}
 	texts, keys := make([]string, len(candidates)), make([]string, len(candidates))
+	tenant := candidates[0].TenantID
+	for i, article := range candidates {
+		if article.TenantID != tenant {
+			return nil, core.Fail(400, "Kho kiến thức không cùng doanh nghiệp")
+		}
+		texts[i] = clipped(article.Subject+"\n"+article.Content, 3500)
+		keys[i] = tokenHash("embedding-v1\x00" + tenant + "\x00" + article.ID + "\x00" + texts[i])
+	}
+	if p.vectorIndex != nil && tenant != "" {
+		return p.searchVectorIndex(question, tenant, candidates, texts, keys, k)
+	}
 	cached := make([][]float64, len(candidates))
 	inputs := []string{question}
 	misses := []int{}
 	p.cacheMu.Lock()
-	for i, article := range candidates {
-		texts[i] = clipped(article.Subject+"\n"+article.Content, 3500)
-		keys[i] = tokenHash(article.TenantID + "\x00" + texts[i])
+	for i := range candidates {
 		if vector, ok := p.vectors[keys[i]]; ok {
 			cached[i] = vector
 		} else {
@@ -82,7 +93,7 @@ func (p *OpenAIKnowledge) Search(question string, articles []core.Record, k int)
 		}
 	}
 	p.cacheMu.Unlock()
-	vectors, err := p.embed(inputs)
+	vectors, err := p.embed(tenant, inputs)
 	if err != nil {
 		return nil, err
 	}
@@ -95,28 +106,63 @@ func (p *OpenAIKnowledge) Search(question string, articles []core.Record, k int)
 		p.vectors[keys[i]] = cached[i]
 	}
 	p.cacheMu.Unlock()
-	tokens := searchTokens(normalizeDiacritics(question))
 	matches := []KnowledgeMatch{}
 	for i, article := range candidates {
 		similarity := cosine(vectors[0], cached[i])
-		normalized := article
-		normalized.Subject, normalized.Content = normalizeDiacritics(article.Subject), normalizeDiacritics(article.Content)
-		lexical := float64(scoreArticle(normalized, tokens)) / float64(max(1, len(tokens)))
-		if similarity < 0.34 && lexical < 0.6 {
+		if similarity < 0.34 {
 			continue
 		}
-		matches = append(matches, KnowledgeMatch{ID: article.ID, Subject: article.Subject, Score: 0.8*similarity + 0.2*lexical, text: texts[i]})
+		matches = append(matches, KnowledgeMatch{ID: article.ID, Subject: article.Subject, Score: similarity, text: texts[i]})
 	}
 	sort.SliceStable(matches, func(i, j int) bool { return matches[i].Score > matches[j].Score })
 	return matches[:min(k, len(matches))], nil
 }
 
-func (p *OpenAIKnowledge) complete(rule string, data any, tokens int, out any) error {
+func (p *OpenAIKnowledge) searchVectorIndex(question, tenant string, articles []core.Record, texts, keys []string, limit int) ([]KnowledgeMatch, error) {
+	existing, err := p.vectorIndex.HasKnowledgeVectors(tenant, keys)
+	if err != nil {
+		return nil, err
+	}
+	inputs := []string{question}
+	missing := []string{}
+	byKey := make(map[string]KnowledgeMatch, len(keys))
+	for i, key := range keys {
+		byKey[key] = KnowledgeMatch{ID: articles[i].ID, Subject: articles[i].Subject, text: texts[i]}
+		if !existing[key] {
+			missing = append(missing, key)
+			inputs = append(inputs, texts[i])
+		}
+	}
+	vectors, err := p.embed(tenant, inputs)
+	if err != nil {
+		return nil, err
+	}
+	additions := make(map[string][]float64, len(missing))
+	for i, key := range missing {
+		additions[key] = vectors[i+1]
+	}
+	ranked, err := p.vectorIndex.RankKnowledgeVectors(tenant, keys, additions, vectors[0], limit)
+	if err != nil {
+		return nil, err
+	}
+	matches := make([]KnowledgeMatch, 0, len(ranked))
+	for _, result := range ranked {
+		match, ok := byKey[result.Key]
+		if ok && result.Score >= 0.34 {
+			match.Score = result.Score
+			matches = append(matches, match)
+		}
+	}
+	return matches, nil
+}
+
+func (p *OpenAIKnowledge) complete(tenant, rule string, data any, tokens int, out any) error {
 	input, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
 	var response struct {
+		Usage   providerUsage
 		Choices []struct {
 			FinishReason string `json:"finish_reason"`
 			Message      struct{ Content string }
@@ -129,6 +175,7 @@ func (p *OpenAIKnowledge) complete(rule string, data any, tokens int, out any) e
 	if err != nil {
 		return err
 	}
+	p.recordUsage(tenant, p.model, response.Usage)
 	if len(response.Choices) != 1 || response.Choices[0].FinishReason != "stop" || json.Unmarshal([]byte(response.Choices[0].Message.Content), out) != nil {
 		return core.Fail(502, "OpenAI trả kết quả không đầy đủ")
 	}
@@ -136,7 +183,15 @@ func (p *OpenAIKnowledge) complete(rule string, data any, tokens int, out any) e
 }
 
 func (p *OpenAIKnowledge) Answer(question string, articles []core.Record) (Answer, error) {
-	matches, err := p.Search(question, articles, 4)
+	tenant := ""
+	if len(articles) > 0 {
+		tenant = articles[0].TenantID
+	}
+	return p.answer(tenant, question, articles)
+}
+
+func (p *OpenAIKnowledge) answer(tenant, question string, articles []core.Record) (Answer, error) {
+	matches, err := p.Search(question, articles, 5)
 	if err != nil {
 		return Answer{}, err
 	}
@@ -150,9 +205,10 @@ func (p *OpenAIKnowledge) Answer(question string, articles []core.Record) (Answe
 		Source     string
 		Mode       string
 		Confidence float64
+		Sentiment  string
 	}
-	rule := "Soạn câu trả lời tiếng Việt cho nhân viên duyệt. JSON gồm content, source (ID tài liệu hoặc chuỗi rỗng), mode (grounded, general hoặc handoff), confidence (0-1). Chọn grounded khi tài liệu thực sự hỗ trợ câu trả lời. Nếu tài liệu thiếu, chỉ dùng general cho hướng dẫn phổ thông, ít rủi ro và có thể đảo ngược. Thiếu dữ liệu về đơn hàng, chính sách, chi phí, tài khoản, tài chính, y tế, pháp lý hoặc hành động nhạy cảm thì chọn handoff. Không cam kết và không tự nhận đã thực hiện hành động."
-	err = p.complete(rule, map[string]any{"question": clipped(question, 4000), "evidence": evidence}, 750, &result)
+	rule := "Soạn câu trả lời tiếng Việt cho nhân viên duyệt. JSON gồm content, source (ID tài liệu hoặc chuỗi rỗng), mode (grounded, general hoặc handoff), confidence (0-1), sentiment (neutral, negative hoặc angry của khách). Chọn grounded khi tài liệu thực sự hỗ trợ câu trả lời. Nếu tài liệu thiếu, chỉ dùng general cho hướng dẫn phổ thông, ít rủi ro và có thể đảo ngược. Thiếu dữ liệu về đơn hàng, chính sách, chi phí, tài khoản, tài chính, y tế, pháp lý hoặc hành động nhạy cảm thì chọn handoff. Không cam kết và không tự nhận đã thực hiện hành động."
+	err = p.complete(tenant, rule, map[string]any{"question": clipped(question, 4000), "evidence": evidence}, 750, &result)
 	if err != nil {
 		return handoff, err
 	}
@@ -161,10 +217,10 @@ func (p *OpenAIKnowledge) Answer(question string, articles []core.Record) (Answe
 		return handoff, nil
 	}
 	if result.Mode == "grounded" && evidence[result.Source] != "" {
-		return Answer{Content: content, SourceID: result.Source, Provider: "openai"}, nil
+		return Answer{Content: content, SourceID: result.Source, Provider: "openai", Confidence: result.Confidence, Sentiment: result.Sentiment}, nil
 	}
 	if result.Mode == "general" && result.Source == "" && result.Confidence >= 0.92 {
-		return Answer{Content: content, Provider: "openai-general"}, nil
+		return Answer{Content: content, Provider: "openai-general", Confidence: result.Confidence, Sentiment: result.Sentiment}, nil
 	}
 	return handoff, nil
 }

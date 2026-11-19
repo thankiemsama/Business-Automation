@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
 	"sort"
 
@@ -40,6 +41,30 @@ func updateAs(repo core.Repository, actor string, fn func(core.Writer) error) er
 	}
 	return repo.Update(fn)
 }
+func viewTenant(repo core.Repository, tenantID string, fn func(core.Reader) error) error {
+	if scoped, ok := repo.(core.TenantViewer); ok {
+		return scoped.ViewTenant(tenantID, fn)
+	}
+	return errors.New("repository does not support tenant-scoped reads")
+}
+
+func updateTenant(repo core.Repository, tenantID string, fn func(core.Writer) error) error {
+	if scoped, ok := repo.(core.TenantUpdater); ok {
+		return scoped.UpdateTenant(tenantID, fn)
+	}
+	return errors.New("repository does not support tenant-scoped writes")
+}
+
+func updateAsTenant(repo core.Repository, user core.User, fn func(core.Writer) error) error {
+	if user.TenantID == "" {
+		return core.Fail(400, "Thiếu phạm vi doanh nghiệp")
+	}
+	if workspace, ok := repo.(*Workspace); ok {
+		return workspace.updateAsTenant(user.TenantID, user.ID, fn)
+	}
+	return updateTenant(repo, user.TenantID, fn)
+}
+
 func (w *workspaceWriter) PutSession(id string, session core.Session) {
 	w.Writer.PutSession(id, session)
 	if user, ok := w.UserByID(session.UserID); ok {

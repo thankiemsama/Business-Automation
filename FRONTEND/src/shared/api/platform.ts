@@ -59,7 +59,16 @@ export interface ChannelStatus {
     name?: string;
     content?: string;
     enabled: boolean;
+    status?: string;
   };
+}
+
+export interface ChannelDelivery {
+  id: string;
+  status: "pending" | "sending" | "sent" | "failed";
+  email_last_error?: string;
+  email_attempts?: number;
+  updated_at: string;
 }
 
 export interface PublicArticle {
@@ -107,6 +116,11 @@ export class PlatformRepository {
   addNote(id: string, content: string) {
     return this.post(`customers/${encodeURIComponent(id)}/notes`, { content });
   }
+  mergeCustomers(sourceId: string, targetId: string) {
+    return this.post(`customers/${encodeURIComponent(sourceId)}/merge`, {
+      target_id: targetId,
+    });
+  }
 
   // Multi-channel config
   channels(signal?: AbortSignal) {
@@ -122,6 +136,25 @@ export class PlatformRepository {
     input: { name: string; content: string; enabled: boolean },
   ) {
     return this.post(`channels/${encodeURIComponent(channel)}`, input);
+  }
+
+  channelDeliveries(channel: string, signal?: AbortSignal) {
+    return this.http.request<ChannelDelivery[]>(
+      `channels/${encodeURIComponent(channel)}/deliveries`,
+      { signal },
+    );
+  }
+  testChannel(channel: string, to: string, text: string) {
+    return this.post<ChannelDelivery>(
+      `channels/${encodeURIComponent(channel)}/test`,
+      { to, text },
+    );
+  }
+  retryChannel(channel: string, id: string) {
+    return this.post(
+      `channels/${encodeURIComponent(channel)}/deliveries/${encodeURIComponent(id)}/retry`,
+      {},
+    );
   }
 
   // Webhooks

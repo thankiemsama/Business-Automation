@@ -7,14 +7,17 @@ import (
 	"businessautomation/internal/core"
 )
 
-// ServerFields accepts legacy metadata but never forwards it into domain commands.
+// ServerFields accepts legacy metadata and forwards only the edit precondition.
 type ServerFields struct {
+	Version   uint64    `json:"version"`
 	ID        string    `json:"id"`
 	TenantID  string    `json:"tenant_id"`
 	Kind      string    `json:"kind"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+func (v ServerFields) expectedVersion() uint64 { return v.Version }
 
 type CustomerInput struct {
 	Tags []string `json:"tags"`
@@ -89,7 +92,10 @@ func (v AutomationInput) Record() core.Record {
 	return core.Record{Name: v.Name, Keywords: v.Keywords, Enabled: v.Enabled}
 }
 
-type recordInput interface{ Record() core.Record }
+type recordInput interface {
+	Record() core.Record
+	expectedVersion() uint64
+}
 type resourceDecoder func(http.ResponseWriter, *http.Request) (core.Record, error)
 
 func decodeInput[T recordInput](w http.ResponseWriter, r *http.Request) (core.Record, error) {
@@ -97,7 +103,9 @@ func decodeInput[T recordInput](w http.ResponseWriter, r *http.Request) (core.Re
 	if err := decode(w, r, &input); err != nil {
 		return core.Record{}, err
 	}
-	return input.Record(), nil
+	record := input.Record()
+	record.Version = input.expectedVersion()
+	return record, nil
 }
 
 func resourceDecoders() map[string]resourceDecoder {

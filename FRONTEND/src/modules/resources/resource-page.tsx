@@ -5,6 +5,10 @@ import { useServices } from "@/shared/providers/services-provider";
 import { useUser } from "@/shared/providers/workspace-provider";
 import { errorMessage } from "@/shared/api/http-client";
 import { useQuery } from "@/shared/hooks/use-query";
+import {
+  toggleSelection,
+  useCollectionFilters,
+} from "./use-collection-filters";
 import type { ResourceKind, ResourceMap } from "@/shared/domain/models";
 import {
   Avatar,
@@ -20,13 +24,7 @@ import { Icon } from "@/shared/ui/icon";
 import { ResourceEditor } from "./resource-editor";
 import { ResourceDetails } from "./resource-details";
 import { resourceModules } from "./registry";
-import {
-  BulkToolbar,
-  ExportLinks,
-  ViewControls,
-  emptyFilters,
-  toggleSelection,
-} from "./workspace-controls";
+import { BulkToolbar, ExportLinks, ViewControls } from "./workspace-controls";
 import { AIKnowledgeSearch } from "../ai/assist";
 import { Assignment, AssignmentFilter } from "../team/assignment";
 import { ticketStatuses } from "./module-definition";
@@ -40,12 +38,21 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
   const user = useUser();
   const definition = resourceModules[kind];
   const repository = services.resources[kind];
-  const [filters, setFilters] = useState(emptyFilters);
-  const [checked, setChecked] = useState<string[]>([]);
-  const [q, setQ] = useState("");
-  const [assignment, setAssignment] = useState("");
-  const [status, setStatus] = useState("");
-  const [page, setPage] = useState(1);
+  const {
+    filters,
+    setFilters,
+    checked,
+    setChecked,
+    page,
+    setPage,
+    q,
+    setQ,
+    assignment,
+    setAssignment,
+    status,
+    setStatus,
+    query,
+  } = useCollectionFilters(12);
   const [editor, setEditor] = useState<{ entity?: ResourceMap[K] } | null>(
     null,
   );
@@ -53,21 +60,8 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
   const [notice, setNotice] = useState("");
   const [viewing, setViewing] = useState<ResourceMap[K] | null>(null);
   const loader = useCallback(
-    (signal: AbortSignal) =>
-      repository.list(
-        {
-          page,
-          limit: 12,
-          q,
-          status,
-          assignment,
-          priority: filters.priority,
-          tag: filters.tags,
-          assignee: filters.assignee,
-        },
-        signal,
-      ),
-    [repository, page, q, status, assignment, filters],
+    (signal: AbortSignal) => repository.list(query, signal),
+    [repository, query],
   );
   const result = useQuery(loader, "workspace-refresh");
   const canWrite = !definition.ownerOnly || user.role === "owner";
@@ -110,32 +104,20 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
           Mở workflow nhiều bước
         </Link>
       )}
-      {kind === "automations" && (
-        <div className="module-banner">
-          <span className="banner-icon">
-            <Icon name="bolt" size={24} />
-          </span>
-          <div>
-            <strong>Đúng tín hiệu. Đúng thời điểm.</strong>
-            <p>
-              Khi tin nhắn mới của khách hàng chứa từ khóa, một phiếu hỗ trợ
-              được tạo tự động.
-            </p>
-          </div>
-          <span className="banner-pill">TỪ KHÓA → PHIẾU HỖ TRỢ</span>
-        </div>
-      )}
       {kind === "knowledge" && (
-        <AIKnowledgeSearch
-          onSelect={async (id) => {
-            try {
-              const item = await repository.get(id);
-              setViewing(item);
-            } catch (error) {
-              setActionError(errorMessage(error));
-            }
-          }}
-        />
+        <details className="panel knowledge-tools">
+          <summary>Tìm trong kho bằng AI</summary>
+          <AIKnowledgeSearch
+            onSelect={async (id) => {
+              try {
+                const item = await repository.get(id);
+                setViewing(item);
+              } catch (error) {
+                setActionError(errorMessage(error));
+              }
+            }}
+          />
+        </details>
       )}
       {kind === "knowledge" && (
         <div className="subtle-note">

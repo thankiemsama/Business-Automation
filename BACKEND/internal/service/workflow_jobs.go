@@ -2,7 +2,7 @@ package service
 
 import (
 	"encoding/json"
-	"sort"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +21,7 @@ func idleEligible(ticket, conversation core.Record, rule WorkflowRule, now time.
 	if conversation.UpdatedAt.After(activity) {
 		activity = conversation.UpdatedAt
 	}
-	return !activity.AddDate(0, 0, rule.IdleDays).After(now)
+	return !activity.After(now.UTC().AddDate(0, 0, -rule.IdleDays))
 }
 
 func (o *Operations) scheduleIdle() {
@@ -31,19 +31,15 @@ func (o *Operations) scheduleIdle() {
 		ticket core.Record
 	}
 	jobs := []candidate{}
-	_ = o.repo.View(func(store core.Reader) error {
+	if err := o.repo.View(func(store core.Reader) error {
 		for _, tenant := range store.Tenants() {
 			rules := workflowConfig[WorkflowRule](store, tenant, workflowRulesKind)
-			tickets := store.Records(tenant, core.KindTickets)
 			for _, rule := range rules {
 				if !rule.Enabled || rule.Trigger != "ticket_idle" {
 					continue
 				}
-				for _, ticket := range tickets {
+				for _, ticket := range store.IdleTickets(tenant, now.AddDate(0, 0, -rule.IdleDays)) {
 					conversation, _ := store.Record(tenant, ticket.ConversationID, core.KindConversations)
-					if !idleEligible(ticket, conversation, rule, now) {
-						continue
-					}
 					if !conditionsMatch(rule.Conditions, conversation.Channel, ticket.Priority, ticket.Status, ticket.Content) {
 						continue
 					}
@@ -57,41 +53,37 @@ func (o *Operations) scheduleIdle() {
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		slog.Error("workflow idle candidates query failed", "error", err)
+		return
+	}
 	if len(jobs) == 0 {
 		return
 	}
-	_ = o.repo.Update(func(store core.Writer) error {
+	if err := o.repo.Update(func(store core.Writer) error {
 		writer := store.(*workspaceWriter)
 		for _, job := range jobs {
 			writer.queueRule(job.rule, job.ticket, now)
 		}
 		return nil
-	})
+	}); err != nil {
+		slog.Error("workflow idle enqueue failed", "error", err)
+	}
 }
 
 func (o *Operations) runJobs() {
-	jobs := []core.Record{}
-	_ = o.repo.View(func(store core.Reader) error {
-		for _, tenant := range store.Tenants() {
-			for _, job := range store.Records(tenant, workflowJobsKind) {
-				if job.Enabled {
-					jobs = append(jobs, job)
-				}
-			}
-		}
+	var jobs []core.Record
+	if err := o.repo.View(func(store core.Reader) error {
+		jobs = store.PendingWorkflowJobs(25)
 		return nil
-	})
-	sort.Slice(jobs, func(i, j int) bool {
-		if jobs[i].CreatedAt.Equal(jobs[j].CreatedAt) {
-			return jobs[i].ID < jobs[j].ID
-		}
-		return jobs[i].CreatedAt.Before(jobs[j].CreatedAt)
-	})
-	for _, job := range jobs[:min(25, len(jobs))] {
-		err := o.repo.Update(func(store core.Writer) error {
-			current, ok := store.Record(job.TenantID, job.ID, workflowJobsKind)
-			if !ok || !current.Enabled {
+	}); err != nil {
+		slog.Error("workflow queue read failed", "error", err)
+		return
+	}
+	for _, job := range jobs {
+		err := o.repo.UpdateTenant(job.TenantID, func(store core.Writer) error {
+			current, ok := store.LockWorkflowJob(job.TenantID, job.ID)
+			if !ok {
 				return nil
 			}
 			if current.Subject == "ticket_idle" {
@@ -114,6 +106,7 @@ func (o *Operations) runJobs() {
 			return nil
 		})
 		if err != nil {
+			slog.Error("workflow job transaction failed", "tenant", job.TenantID, "job", job.ID, "error", err)
 			return
 		}
 	}

@@ -49,7 +49,10 @@ export function ReplyTemplates({
           ))}
       </select>
       {role === "owner" && (
-        <div key={selected?.id ?? "new"} className="form-stack">
+        <div
+          key={selected ? `${selected.id}:${selected.version}` : "new"}
+          className="form-stack"
+        >
           <label>
             Tên mẫu
             <input
@@ -85,6 +88,7 @@ export function ReplyTemplates({
                   content,
                   true,
                   selected?.id,
+                  selected?.version,
                 );
                 templates.reload();
               } catch (error) {
@@ -110,6 +114,7 @@ export function ReplyTemplates({
                     selected.content,
                     false,
                     selected.id,
+                    selected.version,
                   );
                   templates.reload();
                 } catch (error) {

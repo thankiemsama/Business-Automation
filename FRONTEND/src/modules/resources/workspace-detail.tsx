@@ -108,6 +108,18 @@ export function WorkspaceDetail<K extends "customers" | "tickets">({
               <Badge value={ticket.status} /> <Badge value={ticket.priority} />
             </div>
             <p>{ticket.content}</p>
+            {ticket.sla_response_p90_minutes != null && (
+              <p>
+                Phản hồi dự báo (p50 / p90): {ticket.sla_response_p50_minutes} /{" "}
+                {ticket.sla_response_p90_minutes} phút
+              </p>
+            )}
+            {ticket.sla_resolution_p90_minutes != null && (
+              <p>
+                Xử lý dự báo (p50 / p90): {ticket.sla_resolution_p50_minutes} /{" "}
+                {ticket.sla_resolution_p90_minutes} phút
+              </p>
+            )}
             {ticket.sla_risk_reason && (
               <p role="status">{ticket.sla_risk_reason}</p>
             )}

@@ -23,11 +23,12 @@ func (s *CSATService) RunEmail(ctx context.Context) {
 
 func (s *CSATService) deliverSurveys(ctx context.Context) {
 	now := s.clock.Now()
-	items := []core.Record{}
+	items := []core.SurveyEmailJob{}
 	_ = s.repo.View(func(store core.Reader) error {
 		for _, tenant := range store.Tenants() {
-			for _, item := range store.Records(tenant, "csat_mail") {
-				if item.Enabled && !item.UpdatedAt.After(now) {
+			for _, record := range store.Records(tenant, core.KindSurveyEmailJobs) {
+				item := core.SurveyEmailJobFromRecord(record)
+				if item.Pending && !item.NextAttemptAt.After(now) {
 					items = append(items, item)
 				}
 				if len(items) >= 8 {
@@ -44,27 +45,28 @@ func (s *CSATService) deliverSurveys(ctx context.Context) {
 		valid := false
 		_ = s.repo.View(func(store core.Reader) error {
 			customer, ok := store.Record(item.TenantID, item.CustomerID, core.KindCustomers)
-			ticket, found := store.Record(item.TenantID, item.ConversationID, core.KindTickets)
-			valid = ok && found && strings.EqualFold(customer.Email, item.Email) && ticket.Status == core.StatusResolved && ticket.Rating == 0 && now.Sub(item.CreatedAt) < 23*time.Hour
+			ticket, found := store.Record(item.TenantID, item.TicketID, core.KindTickets)
+			valid = ok && found && strings.EqualFold(customer.Email, item.Recipient) && ticket.Status == core.StatusResolved && ticket.Rating == 0 && now.Sub(item.CreatedAt) < 23*time.Hour
 			return nil
 		})
 		var deliveryErr error
 		if valid {
-			deliveryErr = s.mailer.Send(item.Email, "Vui lòng đánh giá dịch vụ hỗ trợ", "Cảm ơn bạn đã sử dụng dịch vụ:\r\n"+item.Content, item.ID, "", "")
+			deliveryErr = s.mailer.Send(item.Recipient, "Vui lòng đánh giá dịch vụ hỗ trợ", "Cảm ơn bạn đã sử dụng dịch vụ:\r\n"+item.SurveyURL, item.ID, "", "")
 		}
 		_ = s.repo.Update(func(store core.Writer) error {
-			current, ok := store.Record(item.TenantID, item.ID, "csat_mail")
+			record, ok := store.Record(item.TenantID, item.ID, core.KindSurveyEmailJobs)
 			if !ok {
 				return nil
 			}
+			current := core.SurveyEmailJobFromRecord(record)
 			if deliveryErr == nil {
-				current.Enabled = false
-				current.Content = ""
+				current.Pending = false
+				current.SurveyURL = ""
 			} else {
-				current.Sequence++
-				current.UpdatedAt = now.Add(time.Minute * time.Duration(1<<min(current.Sequence, 6)))
+				current.Attempts++
+				current.NextAttemptAt = now.Add(time.Minute * time.Duration(1<<min(current.Attempts, 6)))
 			}
-			store.PutRecord(current)
+			store.PutRecord(current.ApplyTo(record))
 			return nil
 		})
 	}
