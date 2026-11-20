@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
 import { errorMessage } from "@/shared/api/http-client";
-import { Badge } from "@/shared/ui/primitives";
+import { Badge, Loading } from "@/shared/ui/primitives";
 import { publicChannels } from "@/shared/api/platform";
 
 const stateLabels = {
@@ -20,6 +20,13 @@ const failureLabels: Record<string, string> = {
   provider_rejected: "Nhà cung cấp từ chối tin nhắn",
   channel_unavailable: "Kênh hoặc tài khoản gửi không khả dụng",
 };
+
+const channelName = (channel: string) =>
+  channel === "zalo"
+    ? "Zalo OA"
+    : channel === "whatsapp"
+      ? "WhatsApp"
+      : channel.toUpperCase();
 
 export function Channels() {
   const { platform } = useServices();
@@ -38,7 +45,8 @@ export function Channels() {
   const [testText, setTestText] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const live = channel === "zalo" || channel === "whatsapp";
+  const live =
+    channel === "zalo" || channel === "whatsapp" || channel === "sms";
   const selected =
     settings?.channel === channel ? settings : channels.data?.[channel];
   const enabled = selected?.enabled ?? false;
@@ -80,6 +88,7 @@ export function Channels() {
   return (
     <div className="integrations-grid">
       <div className="form-stack">
+        <h3>Cấu hình kênh</h3>
         <label>
           Kênh
           <select
@@ -94,7 +103,7 @@ export function Channels() {
           >
             {publicChannels.map((item) => (
               <option key={item} value={item}>
-                {item.toUpperCase()}
+                {channelName(item)}
               </option>
             ))}
           </select>
@@ -109,11 +118,13 @@ export function Channels() {
             placeholder={
               channel === "zalo"
                 ? '{"account_id":"OA ID","app_id":"App ID"}'
-                : '{"account_id":"Phone Number ID"}'
+                : channel === "sms"
+                  ? '{"account_id":"+12025550123"}'
+                  : '{"account_id":"Phone Number ID"}'
             }
           />
         </label>
-        <label>
+        <label className="check-row">
           <input
             type="checkbox"
             checked={enabled}
@@ -140,14 +151,15 @@ export function Channels() {
           Lưu cấu hình
         </button>
         {live && (
-          <>
+          <section className="form-stack integration-subsection">
+            <h4>Gửi tin kiểm thử · {channelName(channel)}</h4>
             <label>
               {channel === "zalo"
                 ? "UID Zalo nhận tin kiểm thử"
-                : "Số WhatsApp nhận tin, gồm mã quốc gia"}
+                : "Số điện thoại nhận tin, gồm mã quốc gia"}
               <input
                 value={recipient}
-                inputMode="numeric"
+                inputMode={channel === "sms" ? "tel" : "numeric"}
                 onChange={(event) => setRecipient(event.target.value)}
               />
             </label>
@@ -175,40 +187,52 @@ export function Channels() {
             >
               Gửi tin kiểm thử
             </button>
-          </>
+          </section>
         )}
         {(error || channels.error || deliveryError) && (
           <p role="alert">{error || channels.error || deliveryError}</p>
         )}
       </div>
-      <div className="workspace-results">
-        {publicChannels.map((item) => {
-          const status = channels.data?.[item];
-          let label = "chưa cấu hình";
-          if (status?.enabled) {
-            label =
-              status.status === "configured"
-                ? "sẵn sàng kiểm thử"
-                : status.status === "credentials_required"
-                  ? "thiếu cấu hình kết nối"
-                  : "đã lưu cấu hình, chưa kết nối";
-          }
-          return (
-            <div key={item} className="integration-item">
-              <strong>{item.toUpperCase()}</strong>
-              <Badge value={label} />
-            </div>
-          );
-        })}
+      <section className="workspace-results">
+        <h3>Trạng thái kết nối</h3>
+        {channels.loading && <Loading />}
+        {channels.data && (
+          <div className="integration-channel-list">
+            {publicChannels.map((item) => {
+              const status = channels.data?.[item];
+              let label = "chưa cấu hình";
+              if (status?.enabled) {
+                label =
+                  status.status === "configured"
+                    ? "sẵn sàng kiểm thử"
+                    : status.status === "credentials_required"
+                      ? "thiếu cấu hình kết nối"
+                      : "đã lưu cấu hình, chưa kết nối";
+              }
+              return (
+                <div
+                  key={item}
+                  className="integration-item"
+                  data-current={item === channel ? "" : undefined}
+                >
+                  <strong>{channelName(item)}</strong>
+                  <Badge value={label} />
+                </div>
+              );
+            })}
+          </div>
+        )}
         {live && (
-          <section className="form-stack">
-            <h3>Hàng đợi gửi · {channel.toUpperCase()}</h3>
-            <button
-              className="button secondary compact"
-              onClick={reloadDeliveries}
-            >
-              Làm mới
-            </button>
+          <section className="form-stack integration-subsection">
+            <div className="integration-actions">
+              <h4>Hàng đợi gửi · {channelName(channel)}</h4>
+              <button
+                className="button secondary compact"
+                onClick={reloadDeliveries}
+              >
+                Làm mới
+              </button>
+            </div>
             {deliveries?.length === 0 && (
               <p>Chưa có lượt gửi đang chờ, tin kiểm thử hoặc lỗi.</p>
             )}
@@ -250,7 +274,7 @@ export function Channels() {
             ))}
           </section>
         )}
-      </div>
+      </section>
     </div>
   );
 }

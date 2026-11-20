@@ -295,3 +295,57 @@ test("BFF: session, CRUD, knowledge reply, automation, roles, isolation and logo
     },
   );
 });
+
+test("public chat exposes persisted rating eligibility without changing legacy responses", async () => {
+  const account = {
+    name: "Chat Rating QA",
+    email: `chat-rating-${suffix}@example.test`,
+    password,
+  };
+  await success("auth/register", "POST", account);
+  const login = await api("auth/login", "POST", account);
+  assert.equal(login.response.status, 200);
+  cookie = login.response.headers.get("set-cookie").split(";")[0];
+  const owner = await success("auth/me");
+  const path = `chat/${owner.tenant_id}`;
+  const { token } = await success(path, "POST", {
+    name: "Khách QA",
+    content: "Cần hỗ trợ",
+  });
+  const headers = { Authorization: `Bearer ${token}` };
+  const state = async () => {
+    const result = await api(`${path}?include_state=true`, "GET", undefined, {
+      headers,
+    });
+    assert.equal(result.response.status, 200);
+    return result.data;
+  };
+  const rate = () => api(path, "POST", { rating: 5 }, { headers });
+
+  const open = await state();
+  assert.equal(open.can_rate, false);
+  assert.equal(open.rated, false);
+  const legacy = await api(path, "GET", undefined, { headers });
+  assert.deepEqual(legacy.data, open.messages);
+  assert.equal(open.messages[0].content, "Cần hỗ trợ");
+  assert.equal((await rate()).response.status, 409);
+
+  const {
+    items: [conversation],
+  } = await success("conversations");
+  await success(`conversations/${conversation.id}`, "PUT", {
+    version: conversation.version,
+    customer_id: conversation.customer_id,
+    channel: conversation.channel,
+    subject: conversation.subject,
+    status: "closed",
+  });
+  assert.equal((await state()).can_rate, true);
+  const rating = await rate();
+  assert.equal(rating.response.status, 200);
+  assert.ok(Array.isArray(rating.data));
+  const rated = await state();
+  assert.equal(rated.can_rate, false);
+  assert.equal(rated.rated, true);
+  assert.equal((await rate()).response.status, 409);
+});

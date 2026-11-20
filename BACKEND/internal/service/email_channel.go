@@ -177,12 +177,23 @@ func (s *ConversationService) DeliverEmail(ctx context.Context, user core.User, 
 	}
 
 	sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	receipt, status, sendErr := s.mailer.send(sendCtx, message.Email, "Re: "+message.Subject, message.Content,
-		message.ID, message.AttachmentName, message.AttachmentData, message.EmailInReplyTo, message.EmailReferences)
+	var receipt string
+	var status int
+	var sendErr, attachmentErr error
+	outbound := message
+	if workspace, ok := s.repo.(*Workspace); ok {
+		attachmentErr = workspace.HydrateAttachment(sendCtx, &outbound)
+	}
+	if attachmentErr == nil {
+		receipt, status, sendErr = s.mailer.send(sendCtx, message.Email, "Re: "+message.Subject, message.Content,
+			message.ID, message.AttachmentName, outbound.AttachmentData, message.EmailInReplyTo, message.EmailReferences)
+	}
 	cancel()
 
 	failure := ""
 	switch {
+	case attachmentErr != nil:
+		failure = "attachment_unavailable"
 	case s.mailer == nil:
 		failure = "mailer_unconfigured"
 	case sendErr != nil && status == 0:

@@ -13,13 +13,16 @@ import (
 const channelOutbox = "channel_outbox"
 
 func isLiveChannel(channel string) bool {
-	return channel == core.ChannelZalo || channel == core.ChannelWhatsApp
+	return channel == core.ChannelZalo || channel == core.ChannelWhatsApp || channel == core.ChannelSMS
 }
 
 func validChannelText(channel, content string) bool {
 	limit := 2000
 	if channel == core.ChannelWhatsApp {
 		limit = 4096
+	}
+	if channel == core.ChannelSMS {
+		limit = 1600
 	}
 	count := utf8.RuneCountInString(content)
 	return count > 0 && count <= limit
@@ -41,7 +44,7 @@ func (m *ChannelManager) enqueue(store core.Writer, tenant, channel, expectedAcc
 	if expectedAccount != "" && account.AccountID != expectedAccount {
 		return core.Fail(409, "Tài khoản kênh đã thay đổi")
 	}
-	if !channelID.MatchString(to) || !validChannelText(channel, content) {
+	if !validChannelAddress(channel, to) || !validChannelText(channel, content) {
 		return core.Fail(400, "ID người nhận hoặc độ dài tin nhắn không hợp lệ")
 	}
 	now := m.conversations.clock.Now().UTC()
@@ -221,6 +224,12 @@ func (m *ChannelManager) processDelivery(ctx context.Context, candidate core.Rec
 func (m *ChannelManager) saveDelivery(store core.Writer, job core.Record, now time.Time) {
 	job.UpdatedAt = now
 	store.PutRecord(job)
+	if leadID, campaign := strings.CutPrefix(job.AutomationID, leadDeliveryPrefix); campaign && job.Status == "sent" {
+		if lead, found := store.Record(job.TenantID, leadID, campaignLeadKind); found && lead.FirstResponseAt == nil {
+			lead.FirstResponseAt, lead.UpdatedAt = &now, now
+			store.PutRecord(lead)
+		}
+	}
 	if message, ok := store.Record(job.TenantID, job.MessageID, core.KindMessages); ok && message.ConversationID == job.ConversationID {
 		previousStatus := message.Status
 		message.Status, message.EmailLastError = job.Status, job.EmailLastError

@@ -1,4 +1,5 @@
 "use client";
+import layout from "@/shared/ui/workspace-settings.module.css";
 
 import { useCallback, useRef, useState } from "react";
 import { FetchHttpClient, errorMessage } from "@/shared/api/http-client";
@@ -83,80 +84,84 @@ export function FieldExtractionPanel() {
   }
 
   return (
-    <section className="panel team-form form-stack">
+    <section className={layout.workspace}>
       <h2>Trích xuất trường tùy chỉnh từ phiếu</h2>
       <p>AI đọc tiêu đề và mô tả, rồi điền các trường đang trống.</p>
-      <fieldset disabled={busy}>
-        <legend>Trường tùy chỉnh · {fieldIDs.length}/10</legend>
-        {activeFields?.length === 0 && (
-          <p>Chưa có trường đang bật cho phiếu.</p>
-        )}
-        {activeFields?.map((field) => (
-          <label key={field.id} className="check-row">
-            <input
-              type="checkbox"
-              checked={fieldIDs.includes(field.id)}
-              disabled={fieldIDs.length >= 10 && !fieldIDs.includes(field.id)}
-              onChange={() => setFieldIDs((value) => toggle(value, field.id))}
-            />
-            {field.name}
-          </label>
-        ))}
-      </fieldset>
-      <fieldset disabled={busy}>
-        <legend>Phiếu hỗ trợ · {ticketIDs.length}/50</legend>
-        <input
-          aria-label="Tìm phiếu hỗ trợ"
-          placeholder="Tìm theo tiêu đề"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setPage(1);
-          }}
-        />
-        {list.data?.items.length === 0 && <p>Không có phiếu phù hợp.</p>}
-        {list.data?.items.map((ticket) => (
-          <label key={ticket.id} className="check-row">
-            <input
-              type="checkbox"
-              checked={ticketIDs.includes(ticket.id)}
-              disabled={
-                ticketIDs.length >= 50 && !ticketIDs.includes(ticket.id)
-              }
-              onChange={() => setTicketIDs((value) => toggle(value, ticket.id))}
-            />
-            {ticket.subject}
-          </label>
-        ))}
-        <div className="toolbar-controls">
-          <button
-            type="button"
-            className="text-link"
-            disabled={page === 1}
-            onClick={() => setPage(page - 1)}
-          >
-            Trang trước
-          </button>
-          <span>Trang {page}</span>
-          <button
-            type="button"
-            className="text-link"
-            disabled={!list.data || page * 10 >= list.data.total}
-            onClick={() => setPage(page + 1)}
-          >
-            Trang sau
-          </button>
-          {ticketIDs.length > 0 && (
+      <div className={layout.split}>
+        <fieldset className={`panel ${layout.card}`} disabled={busy}>
+          <legend>Trường tùy chỉnh · {fieldIDs.length}/10</legend>
+          {activeFields?.length === 0 && (
+            <p>Chưa có trường đang bật cho phiếu.</p>
+          )}
+          {activeFields?.map((field) => (
+            <label key={field.id} className="check-row">
+              <input
+                type="checkbox"
+                checked={fieldIDs.includes(field.id)}
+                disabled={fieldIDs.length >= 10 && !fieldIDs.includes(field.id)}
+                onChange={() => setFieldIDs((value) => toggle(value, field.id))}
+              />
+              {field.name}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className={`panel ${layout.card}`} disabled={busy}>
+          <legend>Phiếu hỗ trợ · {ticketIDs.length}/50</legend>
+          <input
+            aria-label="Tìm phiếu hỗ trợ"
+            placeholder="Tìm theo tiêu đề"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
+          />
+          {list.data?.items.length === 0 && <p>Không có phiếu phù hợp.</p>}
+          {list.data?.items.map((ticket) => (
+            <label key={ticket.id} className="check-row">
+              <input
+                type="checkbox"
+                checked={ticketIDs.includes(ticket.id)}
+                disabled={
+                  ticketIDs.length >= 50 && !ticketIDs.includes(ticket.id)
+                }
+                onChange={() =>
+                  setTicketIDs((value) => toggle(value, ticket.id))
+                }
+              />
+              {ticket.subject}
+            </label>
+          ))}
+          <div className="toolbar-controls">
             <button
               type="button"
               className="text-link"
-              onClick={() => setTicketIDs([])}
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
             >
-              Bỏ chọn phiếu
+              Trang trước
             </button>
-          )}
-        </div>
-      </fieldset>
+            <span>Trang {page}</span>
+            <button
+              type="button"
+              className="text-link"
+              disabled={!list.data || page * 10 >= list.data.total}
+              onClick={() => setPage(page + 1)}
+            >
+              Trang sau
+            </button>
+            {ticketIDs.length > 0 && (
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => setTicketIDs([])}
+              >
+                Bỏ chọn phiếu
+              </button>
+            )}
+          </div>
+        </fieldset>
+      </div>
       <button
         type="button"
         className="button primary"
@@ -169,23 +174,25 @@ export function FieldExtractionPanel() {
         <p role="alert">{error || fields.error || list.error}</p>
       )}
       {notice && <p role="status">{notice}</p>}
-      <h3>Tiến độ các đợt trích xuất</h3>
-      {batches.error && <p role="alert">{batches.error}</p>}
-      {batches.data?.length === 0 && <p>Chưa có đợt trích xuất.</p>}
-      {batches.data?.map((batch) => (
-        <div key={batch.id} className="form-stack">
-          <span>{displayTime.format(new Date(batch.created_at))}</span>
-          <progress
-            aria-label="Số phiếu đã xử lý"
-            max={batch.total}
-            value={batch.total - batch.pending}
-          />
-          <span>
-            Đã điền {batch.applied} · Bỏ qua {batch.skipped} · Lỗi{" "}
-            {batch.failed} · Đang chờ {batch.pending}
-          </span>
-        </div>
-      ))}
+      <section className={`panel ${layout.card}`}>
+        <h3>Tiến độ các đợt trích xuất</h3>
+        {batches.error && <p role="alert">{batches.error}</p>}
+        {batches.data?.length === 0 && <p>Chưa có đợt trích xuất.</p>}
+        {batches.data?.map((batch) => (
+          <div key={batch.id} className="integration-item">
+            <span>{displayTime.format(new Date(batch.created_at))}</span>
+            <progress
+              aria-label="Số phiếu đã xử lý"
+              max={batch.total}
+              value={batch.total - batch.pending}
+            />
+            <span>
+              Đã điền {batch.applied} · Bỏ qua {batch.skipped} · Lỗi{" "}
+              {batch.failed} · Đang chờ {batch.pending}
+            </span>
+          </div>
+        ))}
+      </section>
     </section>
   );
 }

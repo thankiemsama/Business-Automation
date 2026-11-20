@@ -14,6 +14,7 @@ import {
 } from "@/shared/ui/primitives";
 import { OperationsReport } from "./operations-report";
 import { Icon, type IconName } from "@/shared/ui/icon";
+import styles from "./dashboard-overview.module.css";
 const metrics: {
   key: "customers" | "conversations" | "open_tickets" | "messages";
   label: string;
@@ -102,7 +103,7 @@ function DashboardOverview() {
   const resolved = data ? data.tickets - data.open_tickets : 0;
   const rate = data?.tickets ? Math.round((resolved / data.tickets) * 100) : 0;
   return (
-    <>
+    <div className={styles.overview}>
       <div className="overview-toolbar">
         <h2>Chỉ số hỗ trợ</h2>
         <button
@@ -118,7 +119,11 @@ function DashboardOverview() {
       {dashboard.error && (
         <ErrorState message={dashboard.error} retry={dashboard.reload} />
       )}
-      <section className="metric-grid">
+      <section
+        className="metric-grid"
+        aria-label="Chỉ số hỗ trợ"
+        aria-busy={dashboard.loading}
+      >
         {metrics.map((metric) => (
           <Link href={metric.href} className="metric-card" key={metric.key}>
             <div className="metric-top">
@@ -144,7 +149,11 @@ function DashboardOverview() {
           <div className="panel-header">
             <div>
               <h2>Phiếu đang mở</h2>
-              <p>Ưu tiên những yêu cầu đang chờ bạn.</p>
+              {tickets.data && (
+                <p>
+                  {tickets.data.total.toLocaleString("vi-VN")} phiếu đang mở
+                </p>
+              )}
             </div>
             <Link href="/tickets" className="text-link">
               Xem tất cả <Icon name="arrow" size={15} />
@@ -164,7 +173,7 @@ function DashboardOverview() {
             <div className="dashboard-ticket-list">
               {tickets.data.items.map((ticket) => (
                 <Link
-                  href="/tickets"
+                  href={`/tickets/${encodeURIComponent(ticket.id)}`}
                   key={ticket.id}
                   className="dashboard-ticket"
                 >
@@ -192,7 +201,7 @@ function DashboardOverview() {
           <div className="panel-header">
             <div>
               <h2>Tiến độ hỗ trợ</h2>
-              <p>Mỗi yêu cầu đều có một lời giải.</p>
+              <p>Trên toàn bộ phiếu hỗ trợ của doanh nghiệp</p>
             </div>
             <Icon name="ticket" size={20} />
           </div>
@@ -201,7 +210,14 @@ function DashboardOverview() {
               <strong>{data ? `${rate}%` : "—"}</strong>
               <span>phiếu đã giải quyết</span>
             </div>
-            <div className="progress-track">
+            <div
+              className="progress-track"
+              role={data?.tickets ? "meter" : undefined}
+              aria-label={
+                data?.tickets ? "Tỷ lệ phiếu đã giải quyết" : undefined
+              }
+              aria-valuenow={data?.tickets ? rate : undefined}
+            >
               <span style={{ width: `${rate}%` }} />
             </div>
             <div className="progress-stats">
@@ -214,60 +230,53 @@ function DashboardOverview() {
                 <strong>{data?.open_tickets ?? "—"}</strong> Cần xử lý
               </div>
             </div>
-            <div className="progress-note">
-              <Icon name="info" size={17} />
-              <span>
-                {data?.tickets
-                  ? "Dựa trên toàn bộ phiếu hỗ trợ của doanh nghiệp."
-                  : "Tiến độ sẽ xuất hiện khi có phiếu hỗ trợ đầu tiên."}
-              </span>
-            </div>
+            {data && !data.tickets && (
+              <div className="progress-note">
+                <Icon name="info" size={17} />
+                <span>Tiến độ sẽ xuất hiện khi có phiếu hỗ trợ đầu tiên.</span>
+              </div>
+            )}
           </div>
         </section>
       </div>
       <section className="quick-section">
         <div className="section-title">
-          <h2>Không gian vận hành</h2>
-          <span>Công cụ đúng cho từng công việc</span>
+          <h2>Truy cập nhanh</h2>
         </div>
         <div className="quick-grid">
           {[
             {
               href: "/customers",
               icon: "users" as const,
-              title: "Kết nối khách hàng",
-              text: "Lưu thông tin để mỗi tương tác thêm gần gũi.",
-              label: "Quản lý khách hàng",
+              title: "Khách hàng",
+              text: `${data?.customers ?? "—"} hồ sơ khách hàng`,
             },
             {
               href: "/knowledge",
               icon: "book" as const,
-              title: "Câu trả lời nhất quán",
-              text: `${data?.knowledge ?? "—"} bài kiến thức trong thư viện của bạn.`,
-              label: "Mở kho kiến thức",
+              title: "Kho kiến thức",
+              text: `${data?.knowledge ?? "—"} bài kiến thức`,
             },
             {
               href: "/automations",
               icon: "bolt" as const,
-              title: "Bớt việc lặp lại",
-              text: `${data?.automations ?? "—"} quy tắc giúp đội ngũ chủ động hơn.`,
-              label: "Xem quy tắc",
+              title: "Tự động hóa",
+              text: `${data?.automations ?? "—"} quy tắc`,
             },
           ].map((item) => (
             <Link key={item.href} href={item.href} className="quick-card">
               <span className="quick-icon">
                 <Icon name={item.icon} size={21} />
               </span>
-              <h3>{item.title}</h3>
-              <p>{item.text}</p>
-              <span className="text-link">
-                {item.label}
-                <Icon name="arrow" size={16} />
-              </span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
+              <Icon name="arrow" size={16} />
             </Link>
           ))}
         </div>
       </section>
-    </>
+    </div>
   );
 }

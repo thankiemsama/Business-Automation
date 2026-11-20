@@ -1,0 +1,115 @@
+.workspace {
+  --settings-accent: light-dark(#116d63, #95e0d5);
+  --settings-tint: color-mix(
+    in srgb,
+    var(--settings-accent) 8%,
+    var(--surface)
+  );
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.workspace > h2 {
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  font-weight: 750;
+}
+
+.split,
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.split:has(> form) {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: clamp(12px, 2vw, 19px);
+  border-radius: 14px;
+}
+
+.card h3,
+.card legend {
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.card legend {
+  padding-inline: 6px;
+}
+
+.workspace :is(label, p, small) {
+  color: var(--secondary-ink);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.card :is(input:not([type="checkbox"]), select, textarea) {
+  min-height: 39px;
+  font-size: 0.875rem;
+}
+
+.workspace :global(.button) {
+  width: fit-content;
+  min-height: 36px;
+}
+
+.workspace :global(.toolbar-controls) {
+  flex-wrap: wrap;
+}
+
+.card :global(.integration-item) {
+  min-width: 0;
+  background: var(--bg);
+  overflow-wrap: anywhere;
+}
+
+.card :global(.integration-item)[data-selected] {
+  border-color: var(--settings-accent);
+  background: var(--settings-tint);
+}
+
+.card :global(.integration-item) button {
+  justify-self: start;
+  align-self: flex-start;
+  min-height: 28px;
+}
+
+.card :global(.operations-fields) {
+  background: var(--bg);
+}
+
+.card details > summary {
+  cursor: pointer;
+}
+
+.card details[open] > summary {
+  margin-bottom: 8px;
+}
+
+.card progress {
+  width: 100%;
+  accent-color: var(--settings-accent);
+}
+
+@media (max-width: 760px) {
+  .split,
+  .split:has(> form) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 540px) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

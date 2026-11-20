@@ -78,6 +78,8 @@ func TestPlatformFeatures(t *testing.T) {
 		t.Fatalf("webhook secret not generated")
 	}
 	hookID := hook["id"].(string)
+	owner.call("GET", "/api/v1/webhooks/dead-letters", nil, 200)
+	owner.call("POST", "/api/v1/webhooks/dead-letters/missing/replay", nil, 404)
 	owner.call("POST", "/api/v1/webhooks/"+hookID, map[string]any{"name": "renamed", "url": "https://n8n.example.com/y", "events": []string{"message.new"}}, 200)
 	owner.call("POST", "/api/v1/webhooks/"+hookID+"/remove", nil, 200)
 	owner.call("POST", "/api/v1/webhooks", map[string]any{"name": "bad", "url": "ftp://nope"}, 400)
@@ -96,6 +98,8 @@ func TestPlatformFeatures(t *testing.T) {
 	agent := root
 	agent.token = login["access_token"].(string)
 	agent.call("POST", "/api/v1/webhooks", map[string]any{"name": "x", "url": "https://x.example"}, 403)
+	agent.call("GET", "/api/v1/webhooks/dead-letters", nil, 403)
+	agent.call("POST", "/api/v1/webhooks/dead-letters/missing/replay", nil, 403)
 	agent.call("POST", "/api/v1/api-keys", map[string]any{"name": "x"}, 403)
 	agent.call("POST", "/api/v1/channels/zalo", map[string]any{"name": "x"}, 403)
 

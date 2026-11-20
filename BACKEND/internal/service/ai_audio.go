@@ -14,6 +14,10 @@ import (
 
 const MaxAudioBytes = 4 << 20
 
+func (s *AIService) TranscriptionEnabled() bool {
+	return s.model != nil && s.model.provider.SupportsTranscription()
+}
+
 func (s *AIService) Transcribe(data []byte) (string, error) {
 	return s.transcribe("", data)
 }
@@ -24,8 +28,8 @@ func (s *AIService) transcribe(tenant string, data []byte) (string, error) {
 }
 
 func (s *AIService) transcribeAudio(tenant string, data []byte) (string, error) {
-	if !s.Enabled() {
-		return "", core.Fail(503, "Chưa cấu hình OpenAI")
+	if !s.TranscriptionEnabled() {
+		return "", core.Fail(503, "Nhà cung cấp AI chưa hỗ trợ chép lời")
 	}
 	if len(data) < 12 || len(data) > MaxAudioBytes {
 		return "", core.Fail(400, "Âm thanh không hợp lệ hoặc vượt 4 MiB")
@@ -70,11 +74,10 @@ func (s *AIService) transcribeAudio(tenant string, data []byte) (string, error) 
 	if err = writer.Close(); err != nil {
 		return "", err
 	}
-	request, err := http.NewRequest(http.MethodPost, "https://api.openai.com/v1/audio/transcriptions", &body)
+	request, err := s.model.provider.NewRequest("audio/transcriptions", &body)
 	if err != nil {
 		return "", err
 	}
-	request.Header.Set("Authorization", "Bearer "+s.model.key)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	if err := s.model.reserveRequest(tenant); err != nil {
 		return "", err

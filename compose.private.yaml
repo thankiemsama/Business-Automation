@@ -1,0 +1,114 @@
+name: nexa-private
+
+services:
+  postgres:
+    image: nexa-private/postgres:bundle
+    pull_policy: never
+    environment:
+      POSTGRES_USER: nexa
+      POSTGRES_PASSWORD: ${NEXA_PRIVATE_DB_PASSWORD:?Create private.env using the installer}
+      POSTGRES_DB: nexa
+    networks: [core]
+    volumes:
+      - private-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "nexa", "-d", "nexa"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: nexa-private/object-store:bundle
+    pull_policy: never
+    command: server /data
+    environment: &storage_credentials
+      MINIO_ROOT_USER: nexa-private
+      MINIO_ROOT_PASSWORD: ${NEXA_PRIVATE_STORAGE_PASSWORD:?Create private.env using the installer}
+    networks: [core]
+    volumes:
+      - private-objects:/data
+
+  minio-init:
+    image: nexa-private/object-client:bundle
+    pull_policy: never
+    depends_on:
+      - minio
+    networks: [core]
+    environment: *storage_credentials
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        for attempt in $$(seq 1 45); do
+          if mc alias set nexa http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; then
+            mc mb --ignore-existing nexa/nexa-attachments
+            exit 0
+          fi
+          sleep 2
+        done
+        exit 1
+
+  backend:
+    image: nexa-private/backend:bundle
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks: [core]
+    environment:
+      DATABASE_URL: postgres://nexa:${NEXA_PRIVATE_DB_PASSWORD:?Set the private database password}@postgres:5432/nexa?sslmode=disable
+      APP_ORIGIN: ${NEXA_PRIVATE_ORIGIN:-http://127.0.0.1:3000}
+      ATTACHMENT_S3_ENDPOINT: http://minio:9000
+      ATTACHMENT_S3_BUCKET: nexa-attachments
+      ATTACHMENT_S3_ACCESS_KEY: nexa-private
+      ATTACHMENT_S3_SECRET_KEY: ${NEXA_PRIVATE_STORAGE_PASSWORD:?Set the private storage password}
+      LLM_PROVIDER: ${NEXA_PRIVATE_LLM_PROVIDER:-}
+      LLM_CHAT_MODEL: ${NEXA_PRIVATE_CHAT_MODEL:-}
+      LLM_BASE_URL: http://ollama:11434/v1
+      LLM_EMBEDDING_MODEL: ${NEXA_PRIVATE_EMBEDDING_MODEL:-}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  frontend:
+    image: nexa-private/frontend:bundle
+    pull_policy: never
+    init: true
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [core, edge]
+    ports:
+      - "127.0.0.1:${NEXA_PRIVATE_PORT:-3000}:3000"
+    environment:
+      BACKEND_URL: http://backend:8080
+      APP_ORIGIN: ${NEXA_PRIVATE_ORIGIN:-http://127.0.0.1:3000}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ollama:
+    image: nexa-private/ollama:bundle
+    pull_policy: never
+    profiles: [local-ai]
+    networks: [core]
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+    volumes:
+      - private-models:/root/.ollama
+      - ./models:/models:ro
+
+networks:
+  core:
+    internal: true
+  edge: {}
+
+volumes:
+  private-postgres:
+  private-objects:
+  private-models:

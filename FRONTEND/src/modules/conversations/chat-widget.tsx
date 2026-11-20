@@ -4,15 +4,23 @@ import { FetchHttpClient, errorMessage } from "@/shared/api/http-client";
 import { VoiceInput } from "../ai/assist";
 import { useQuery } from "@/shared/hooks/use-query";
 import { Icon } from "@/shared/ui/icon";
+import type { BrandCard } from "@/shared/domain/models";
+import { ConversationBrandCard } from "./brand-card";
 import styles from "./chat-widget.module.css";
 
 const api = new FetchHttpClient();
 type ChatMessage = {
+  brand_card?: BrandCard;
   id: string;
   content: string;
   sender: string;
   attachment_name?: string;
   attachment_data?: string;
+};
+type ChatState = {
+  messages: ChatMessage[];
+  can_rate: boolean;
+  rated: boolean;
 };
 
 export function ChatWidget({ tenant }: { tenant: string }) {
@@ -22,7 +30,6 @@ export function ChatWidget({ tenant }: { tenant: string }) {
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [rated, setRated] = useState(false);
   const path = `chat/${encodeURIComponent(tenant)}`;
   const storageKey = `nexa-chat:${tenant}`;
   const [savedToken, setSavedToken] = useState<string | null>(null);
@@ -30,17 +37,17 @@ export function ChatWidget({ tenant }: { tenant: string }) {
     (signal: AbortSignal) => {
       const secret = token || savedToken;
       return secret
-        ? api.request<ChatMessage[]>(path, {
+        ? api.request<ChatState>(`${path}?include_state=true`, {
             signal,
             headers: { Authorization: `Bearer ${secret}` },
           })
-        : Promise.resolve([]);
+        : Promise.resolve(null);
     },
     [path, token, savedToken],
   );
   const active = token || savedToken;
   const refreshEvent = `nexa-chat-refresh:${tenant}`;
-  const messages = useQuery(read, refreshEvent);
+  const chat = useQuery(read, refreshEvent);
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
@@ -120,7 +127,7 @@ export function ChatWidget({ tenant }: { tenant: string }) {
           headers: { Authorization: `Bearer ${active}` },
           body: JSON.stringify({ content, ...attachment }),
         });
-        messages.reload();
+        chat.reload();
       }
       setContent("");
       setFile(null);
@@ -133,6 +140,7 @@ export function ChatWidget({ tenant }: { tenant: string }) {
   }
   async function rate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!active || busy || chat.loading || !chat.data?.can_rate) return;
     const rating = Number(new FormData(event.currentTarget).get("rating"));
     setError("");
     setBusy(true);
@@ -142,9 +150,10 @@ export function ChatWidget({ tenant }: { tenant: string }) {
         headers: { Authorization: `Bearer ${active}` },
         body: JSON.stringify({ rating }),
       });
-      setRated(true);
+      chat.reload();
     } catch (error) {
       setError(errorMessage(error));
+      chat.reload();
     } finally {
       setBusy(false);
     }
@@ -154,7 +163,6 @@ export function ChatWidget({ tenant }: { tenant: string }) {
     setToken("");
     setSavedToken("");
     setError("");
-    setRated(false);
   }
   return (
     <main className={styles.page} ref={restore}>
@@ -170,14 +178,14 @@ export function ChatWidget({ tenant }: { tenant: string }) {
           aria-label="Tin nhắn hỗ trợ"
           aria-live="polite"
         >
-          {!messages.data?.length && !messages.error && (
+          {!chat.data?.messages.length && !chat.error && (
             <p className={styles.prompt}>
-              {active && messages.loading
+              {active && chat.loading
                 ? "Đang tải tin nhắn…"
                 : "Gửi tin nhắn để bắt đầu trao đổi với đội ngũ hỗ trợ."}
             </p>
           )}
-          {messages.data?.map((message) => (
+          {chat.data?.messages.map((message) => (
             <div
               className={`message ${message.sender === "customer" ? "outbound" : "inbound"}`}
               key={message.id}
@@ -190,6 +198,9 @@ export function ChatWidget({ tenant }: { tenant: string }) {
                     : "Hỗ trợ"}
               </strong>
               <p>{message.content}</p>
+              {message.brand_card && (
+                <ConversationBrandCard card={message.brand_card} />
+              )}
               {message.attachment_data && (
                 <a
                   download={message.attachment_name}
@@ -201,9 +212,9 @@ export function ChatWidget({ tenant }: { tenant: string }) {
             </div>
           ))}
         </section>
-        {(error || messages.error) && (
+        {(error || chat.error) && (
           <p className={styles.error} role="alert">
-            {error || messages.error}
+            {error || chat.error}
           </p>
         )}
         <form className={`form-stack ${styles.composer}`} onSubmit={send}>
@@ -252,9 +263,9 @@ export function ChatWidget({ tenant }: { tenant: string }) {
         </form>
         {active && (
           <div className={`form-stack ${styles.actions}`}>
-            {rated ? (
+            {chat.data?.rated ? (
               <p role="status">Cảm ơn bạn đã đánh giá.</p>
-            ) : (
+            ) : chat.data?.can_rate ? (
               <form onSubmit={rate}>
                 <label>
                   Mức hài lòng sau khi hỗ trợ kết thúc{" "}
@@ -264,11 +275,14 @@ export function ChatWidget({ tenant }: { tenant: string }) {
                     ))}
                   </select>
                 </label>
-                <button className="button secondary" disabled={busy}>
+                <button
+                  className="button secondary"
+                  disabled={busy || chat.loading}
+                >
                   Gửi đánh giá
                 </button>
               </form>
-            )}
+            ) : null}
             <button
               className="button secondary"
               disabled={busy}

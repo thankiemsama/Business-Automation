@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { FetchHttpClient, errorMessage } from "@/shared/api/http-client";
 import { useQuery } from "@/shared/hooks/use-query";
 
@@ -13,7 +14,10 @@ type Plan = {
 
 const api = new FetchHttpClient();
 const loadStatus = (signal: AbortSignal) =>
-  api.request<{ enabled: boolean }>("ai/ticket-agent/status", { signal });
+  api.request<{ enabled: boolean; can_resolve: boolean }>(
+    "ai/ticket-agent/status",
+    { signal },
+  );
 
 const actions = {
   handoff: "Chuyển cho nhân viên xử lý",
@@ -61,6 +65,12 @@ export function TicketAgent({
   return (
     <details className="subtle-note">
       <summary>Agent xử lý phiếu</summary>
+      {!status.data.can_resolve && (
+        <p>
+          Để agent giải quyết phiếu, cần{" "}
+          <Link href="/sparring">chứng chỉ AI Sparring</Link> còn hiệu lực.
+        </p>
+      )}
       {plan && (
         <>
           <p>

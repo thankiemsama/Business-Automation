@@ -14,8 +14,12 @@ func (h *Handler) chat(w http.ResponseWriter, r *http.Request) {
 	tenant := r.PathValue("tenant")
 	secret := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if r.Method == http.MethodGet {
-		messages, err := h.conversations.PublicChat(tenant+"."+secret, "", "", "", 0)
-		respond(w, http.StatusOK, messages, err)
+		state, err := h.conversations.ReadPublicChat(tenant + "." + secret)
+		if r.URL.Query().Get("include_state") == "true" {
+			respond(w, http.StatusOK, state, err)
+		} else {
+			respond(w, http.StatusOK, state.Messages, err)
+		}
 		return
 	}
 	if !h.allowAuth(r) {

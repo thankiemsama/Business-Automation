@@ -1,4 +1,5 @@
 "use client";
+import layout from "@/shared/ui/workspace-settings.module.css";
 import { useCallback, useState, type FormEvent } from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
@@ -88,212 +89,229 @@ export function WorkflowPanel() {
   }
 
   return (
-    <section className="panel team-form form-stack">
+    <section className={layout.workspace}>
       <h2>Workflow nhiều bước</h2>
       <OperationFeedback
         error={error || members.error || workflows.error || legacy.error}
         notice={notice}
       />
-      {legacy.data?.items.some((item) => item.enabled) && (
-        <details className="operations-fields">
-          <summary>Chuyển quy tắc từ khóa đang chạy</summary>
-          {legacy.data.items
-            .filter((item) => item.enabled)
-            .map((item) => (
-              <div key={item.id} className="integration-item">
-                <strong>{item.name}</strong>
-                <button
-                  type="button"
-                  className="text-link"
-                  disabled={busy}
-                  onClick={() =>
-                    void mutate(
-                      async () => {
-                        const rule = await migrateWorkflow(item.id);
-                        setWorkflow(rule);
-                        legacy.reload();
-                      },
-                      workflows.reload,
-                      "Đã chuyển sang workflow và tắt quy tắc cũ.",
-                    )
+      <div className={layout.split}>
+        <section className={`panel ${layout.card}`}>
+          <h3>Workflow đã tạo</h3>
+          {workflows.loading && <p role="status">Đang tải workflow…</p>}
+          {workflows.data?.length === 0 && <p>Chưa có workflow.</p>}
+          {legacy.data?.items.some((item) => item.enabled) && (
+            <details className="operations-fields">
+              <summary>Chuyển quy tắc từ khóa đang chạy</summary>
+              {legacy.data.items
+                .filter((item) => item.enabled)
+                .map((item) => (
+                  <div key={item.id} className="integration-item">
+                    <strong>{item.name}</strong>
+                    <button
+                      type="button"
+                      className="text-link"
+                      disabled={busy}
+                      onClick={() =>
+                        void mutate(
+                          async () => {
+                            const rule = await migrateWorkflow(item.id);
+                            setWorkflow(rule);
+                            legacy.reload();
+                          },
+                          workflows.reload,
+                          "Đã chuyển sang workflow và tắt quy tắc cũ.",
+                        )
+                      }
+                    >
+                      Chuyển sang workflow
+                    </button>
+                  </div>
+                ))}
+            </details>
+          )}
+          {workflows.data?.map((rule) => (
+            <div
+              key={rule.id}
+              className="integration-item"
+              data-selected={workflow.id === rule.id ? "" : undefined}
+            >
+              <strong>{rule.name}</strong>
+              <span>
+                {triggers[rule.trigger as keyof typeof triggers]} ·{" "}
+                {rule.enabled ? "Đang bật" : "Đã tắt"}
+              </span>
+              <button
+                className="text-link"
+                type="button"
+                onClick={() => setWorkflow(rule)}
+              >
+                Chỉnh sửa
+              </button>
+              <button
+                className="text-link"
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void mutate(
+                    async () => {
+                      await removeOperation("workflows", rule.id!);
+                      if (workflow.id === rule.id) setWorkflow(newWorkflow);
+                    },
+                    workflows.reload,
+                    "Đã xóa workflow.",
+                  )
+                }
+              >
+                Xóa
+              </button>
+            </div>
+          ))}
+        </section>
+        <form
+          className={`panel form-stack ${layout.card}`}
+          onSubmit={saveWorkflow}
+        >
+          <h3>{workflow.id ? "Chỉnh sửa workflow" : "Tạo workflow"}</h3>
+          <div className={layout.fields}>
+            <label>
+              Tên workflow
+              <input
+                maxLength={100}
+                required
+                value={workflow.name}
+                onChange={(event) =>
+                  setWorkflow({ ...workflow, name: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              Sự kiện kích hoạt
+              <select
+                value={workflow.trigger}
+                onChange={(event) =>
+                  setWorkflow({ ...workflow, trigger: event.target.value })
+                }
+              >
+                {Object.entries(triggers).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {workflow.trigger === "ticket_idle" && (
+              <label>
+                Số ngày không cập nhật
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={workflow.idle_days || 3}
+                  onChange={(event) =>
+                    setWorkflow({
+                      ...workflow,
+                      idle_days: Number(event.target.value),
+                    })
                   }
-                >
-                  Chuyển sang workflow
-                </button>
-              </div>
-            ))}
-        </details>
-      )}
-      {workflows.data?.map((rule) => (
-        <div key={rule.id} className="integration-item">
-          <strong>{rule.name}</strong>
-          <span>
-            {triggers[rule.trigger as keyof typeof triggers]} ·{" "}
-            {rule.enabled ? "Đang bật" : "Đã tắt"}
-          </span>
-          <button
-            className="text-link"
-            type="button"
-            onClick={() => setWorkflow(rule)}
-          >
-            Chỉnh sửa
-          </button>
-          <button
-            className="text-link"
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void mutate(
-                async () => {
-                  await removeOperation("workflows", rule.id!);
-                  if (workflow.id === rule.id) setWorkflow(newWorkflow);
-                },
-                workflows.reload,
-                "Đã xóa workflow.",
-              )
-            }
-          >
-            Xóa
-          </button>
-        </div>
-      ))}
-      <form className="form-stack" onSubmit={saveWorkflow}>
-        <label>
-          Tên workflow
-          <input
-            maxLength={100}
-            required
-            value={workflow.name}
-            onChange={(event) =>
-              setWorkflow({ ...workflow, name: event.target.value })
-            }
+                />
+              </label>
+            )}
+          </div>
+          <ConditionFields
+            title="Điều kiện kích hoạt (khớp tất cả)"
+            value={workflow.conditions}
+            trigger={workflow.trigger}
+            onChange={(conditions) => setWorkflow({ ...workflow, conditions })}
           />
-        </label>
-        <label>
-          Sự kiện kích hoạt
-          <select
-            value={workflow.trigger}
-            onChange={(event) =>
-              setWorkflow({ ...workflow, trigger: event.target.value })
-            }
-          >
-            {Object.entries(triggers).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {workflow.trigger === "ticket_idle" && (
-          <label>
-            Số ngày không cập nhật
+          <ActionFields
+            title="Hành động theo thứ tự"
+            items={workflow.actions}
+            trigger={workflow.trigger}
+            people={people}
+            onChange={(next) => setWorkflow({ ...workflow, actions: next })}
+          />
+          <label className="check-row">
             <input
-              required
-              type="number"
-              min={1}
-              max={365}
-              value={workflow.idle_days || 3}
+              type="checkbox"
+              checked={Boolean(workflow.branch)}
               onChange={(event) =>
                 setWorkflow({
                   ...workflow,
-                  idle_days: Number(event.target.value),
+                  branch: event.target.checked
+                    ? { conditions: noConditions, then: [], otherwise: [] }
+                    : undefined,
                 })
               }
-            />
+            />{" "}
+            Thêm nhánh điều kiện
           </label>
-        )}
-        <ConditionFields
-          title="Điều kiện kích hoạt (khớp tất cả)"
-          value={workflow.conditions}
-          trigger={workflow.trigger}
-          onChange={(conditions) => setWorkflow({ ...workflow, conditions })}
-        />
-        <ActionFields
-          title="Hành động theo thứ tự"
-          items={workflow.actions}
-          trigger={workflow.trigger}
-          people={people}
-          onChange={(next) => setWorkflow({ ...workflow, actions: next })}
-        />
-        <label>
-          <input
-            type="checkbox"
-            checked={Boolean(workflow.branch)}
-            onChange={(event) =>
-              setWorkflow({
-                ...workflow,
-                branch: event.target.checked
-                  ? { conditions: noConditions, then: [], otherwise: [] }
-                  : undefined,
-              })
-            }
-          />{" "}
-          Thêm nhánh điều kiện
-        </label>
-        {workflow.branch && (
-          <>
-            <ConditionFields
-              title="Điều kiện của nhánh"
-              value={workflow.branch.conditions}
-              trigger={workflow.trigger}
-              onChange={(conditions) =>
-                setWorkflow({
-                  ...workflow,
-                  branch: { ...workflow.branch!, conditions },
-                })
-              }
-            />
-            <ActionFields
-              title="Nếu đúng"
-              items={workflow.branch.then}
-              trigger={workflow.trigger}
-              people={people}
-              onChange={(then) =>
-                setWorkflow({
-                  ...workflow,
-                  branch: { ...workflow.branch!, then },
-                })
-              }
-            />
-            <ActionFields
-              title="Nếu sai"
-              items={workflow.branch.otherwise}
-              trigger={workflow.trigger}
-              people={people}
-              onChange={(otherwise) =>
-                setWorkflow({
-                  ...workflow,
-                  branch: { ...workflow.branch!, otherwise },
-                })
-              }
-            />
-          </>
-        )}
-        <label>
-          <input
-            type="checkbox"
-            checked={workflow.enabled}
-            onChange={(event) =>
-              setWorkflow({ ...workflow, enabled: event.target.checked })
-            }
-          />{" "}
-          Bật workflow
-        </label>
-        <div className="toolbar-controls">
-          <button className="button primary" disabled={busy}>
-            {workflow.id ? "Lưu thay đổi" : "Tạo workflow"}
-          </button>
-          {workflow.id && (
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => setWorkflow(newWorkflow)}
-            >
-              Hủy chỉnh sửa
-            </button>
+          {workflow.branch && (
+            <>
+              <ConditionFields
+                title="Điều kiện của nhánh"
+                value={workflow.branch.conditions}
+                trigger={workflow.trigger}
+                onChange={(conditions) =>
+                  setWorkflow({
+                    ...workflow,
+                    branch: { ...workflow.branch!, conditions },
+                  })
+                }
+              />
+              <ActionFields
+                title="Nếu đúng"
+                items={workflow.branch.then}
+                trigger={workflow.trigger}
+                people={people}
+                onChange={(then) =>
+                  setWorkflow({
+                    ...workflow,
+                    branch: { ...workflow.branch!, then },
+                  })
+                }
+              />
+              <ActionFields
+                title="Nếu sai"
+                items={workflow.branch.otherwise}
+                trigger={workflow.trigger}
+                people={people}
+                onChange={(otherwise) =>
+                  setWorkflow({
+                    ...workflow,
+                    branch: { ...workflow.branch!, otherwise },
+                  })
+                }
+              />
+            </>
           )}
-        </div>
-      </form>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={workflow.enabled}
+              onChange={(event) =>
+                setWorkflow({ ...workflow, enabled: event.target.checked })
+              }
+            />{" "}
+            Bật workflow
+          </label>
+          <div className="toolbar-controls">
+            <button className="button primary" disabled={busy}>
+              {workflow.id ? "Lưu thay đổi" : "Tạo workflow"}
+            </button>
+            {workflow.id && (
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setWorkflow(newWorkflow)}
+              >
+                Hủy chỉnh sửa
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
     </section>
   );
 }

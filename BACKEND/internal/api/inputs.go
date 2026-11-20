@@ -72,13 +72,16 @@ func (v TicketInput) Record() core.Record {
 type KnowledgeInput struct {
 	Public bool `json:"public"`
 	ServerFields
-	Subject string `json:"subject"`
-	Content string `json:"content"`
-	Enabled bool   `json:"enabled"`
+	Subject         string `json:"subject"`
+	Content         string `json:"content"`
+	Enabled         bool   `json:"enabled"`
+	VideoURL        string `json:"video_url"`
+	VideoTranscript string `json:"video_transcript"`
 }
 
 func (v KnowledgeInput) Record() core.Record {
-	return core.Record{Subject: v.Subject, Content: v.Content, Enabled: v.Enabled, Public: v.Public}
+	return core.Record{Subject: v.Subject, Content: v.Content, Enabled: v.Enabled, Public: v.Public,
+		VideoURL: v.VideoURL, VideoTranscript: v.VideoTranscript}
 }
 
 type AutomationInput struct {

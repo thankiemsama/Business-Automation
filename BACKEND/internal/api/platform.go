@@ -44,6 +44,8 @@ func (h *Handler) platformRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/webhooks", h.protected(h.webhookSave))
 	mux.HandleFunc("POST /api/v1/webhooks/{id}", h.protected(h.webhookUpdate))
 	mux.HandleFunc("POST /api/v1/webhooks/{id}/remove", h.protected(h.webhookRemove))
+	mux.HandleFunc("GET /api/v1/webhooks/dead-letters", h.protected(h.webhookDeadLetters))
+	mux.HandleFunc("POST /api/v1/webhooks/dead-letters/{id}/replay", h.protected(h.webhookReplay))
 
 	// ---- Public API keys (owner manages; public API is BFF-gated) ----
 	mux.HandleFunc("GET /api/v1/api-keys", h.protected(h.apiKeyList))
@@ -284,6 +286,15 @@ func (h *Handler) channelConfigure(w http.ResponseWriter, r *http.Request, user 
 }
 
 // ---- Webhooks ----
+
+func (h *Handler) webhookDeadLetters(w http.ResponseWriter, _ *http.Request, user core.User, _ string) {
+	items, err := h.webhooks.DeadLetters(user)
+	respond(w, http.StatusOK, items, err)
+}
+
+func (h *Handler) webhookReplay(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	respond(w, http.StatusOK, nil, h.webhooks.Replay(user, r.PathValue("id")))
+}
 
 func (h *Handler) webhookList(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
 	if !ownerIntegration(w, user) {

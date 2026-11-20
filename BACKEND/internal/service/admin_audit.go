@@ -13,7 +13,9 @@ var auditedKinds = map[string]bool{
 	"customers": true, "tickets": true, "conversations": true, "messages": true, "knowledge": true, "automations": true,
 	"workflow_rules": true, "report_schedules": true, "tenant_settings": true, "webhooks": true, "api_keys": true, "channel_config": true,
 	"custom_fields": true, "crm_sync": true, "billing_plan": true,
+	skillRoutingKind: true,
 	ticketAgentPlansKind: true, leadCampaignKind: true, qaReviewsKind: true,
+	trainingScenariosKind: true, sparringCertificatesKind: true, evalSetsKind: true,
 }
 
 type auditChange struct {
@@ -33,6 +35,9 @@ func auditRecord(r core.Record) map[string]any {
 	}
 	if r.Kind == ticketAgentPlansKind {
 		result["tool"], result["ticket_id"], result["crm_lookup"] = r.Name, r.ConversationID, r.Enabled
+	}
+	if r.Kind == sparringCertificatesKind {
+		result["model"], result["assessment_id"], result["valid_until"] = r.Name, r.ConversationID, r.EmailRetryAt
 	}
 	return result
 }

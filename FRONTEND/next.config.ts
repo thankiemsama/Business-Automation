@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
       config.module.rules.push({
         rules: [
           {
-            test: /\.css$/i,
+            test: /[\\/]src[\\/]app[\\/]globals\.css$/,
             enforce: "pre",
             loader: "@tailwindcss/turbopack",
           },
@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     rules: {
-      "*.css": {
+      "src/app/globals.css": {
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },

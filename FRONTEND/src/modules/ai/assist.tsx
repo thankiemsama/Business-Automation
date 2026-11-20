@@ -15,7 +15,7 @@ export function AIKnowledgeSearch({
   const load = useCallback(
     (signal: AbortSignal) =>
       q
-        ? api.request<{ id: string; subject: string }[]>(
+        ? api.request<{ id: string; subject: string; video_url?: string }[]>(
             `ai/search?${new URLSearchParams({ q })}`,
             { signal },
           )
@@ -63,6 +63,20 @@ export function AIKnowledgeSearch({
             >
               {item.subject}
             </button>
+            {item.video_url && (
+              <>
+                {" "}
+                ·{" "}
+                <a
+                  className="text-link"
+                  href={item.video_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Mở video
+                </a>
+              </>
+            )}
           </li>
         ))}
       </ul>
@@ -241,7 +255,7 @@ export function VoiceInput({
   const guestToken = guest?.token;
   const load = useCallback(
     (signal: AbortSignal) =>
-      api.request<{ enabled: boolean }>(
+      api.request<{ enabled: boolean; transcription?: boolean }>(
         guestPath ? `${guestPath}/voice-status` : "ai/status",
         {
           signal,
@@ -271,7 +285,8 @@ export function VoiceInput({
       active.current?.stream.getTracks().forEach((track) => track.stop());
     };
   }, []);
-  if (!status.data?.enabled) return null;
+  if (!status.data?.enabled || (!guestPath && !status.data.transcription))
+    return null;
   async function transcribe(file: Blob) {
     setError("");
     setAnalysis({});

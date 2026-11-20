@@ -14,12 +14,14 @@ type Operations struct {
 	mailer    *EmailMailer
 	clock     Clock
 	aiModel   *OpenAIKnowledge
+	idleAfter core.IdleWorkflowCandidate
 }
 
 func (o *Operations) ConfigureAIJobs(model *OpenAIKnowledge) {
 	o.aiModel = model
 	if model != nil {
 		o.repo.enableAIJobs()
+		o.repo.sparringModel = model.model
 	}
 }
 
@@ -29,7 +31,7 @@ func NewOperations(repo *Workspace, dashboard *DashboardService, mailer *EmailMa
 
 func (o *Operations) Run(ctx context.Context) {
 	if o.aiModel != nil {
-		go runAIWork(ctx, o.runAIJobs)
+		go o.runQueuedAI(ctx)
 	}
 	if o.mailer != nil {
 		go runAIWork(ctx, func() { o.deliverMail(ctx) })
@@ -44,6 +46,22 @@ func (o *Operations) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+		}
+	}
+}
+
+func (o *Operations) runQueuedAI(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	o.runAIJobs()
+	for ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+			return
+		case job := <-o.repo.realtimeQAReady:
+			o.runRealtimeQA(job)
+		case <-ticker.C:
+			o.runAIJobs()
 		}
 	}
 }

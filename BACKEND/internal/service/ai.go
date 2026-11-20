@@ -239,6 +239,7 @@ func suggestionKey(ticket core.Record) string {
 
 func (s *AIService) Run(ctx context.Context) {
 	if s.Enabled() {
+		go s.queueAgentRegression(ctx)
 		go runAIWork(ctx, s.analyzeOne)
 		go runAIWork(ctx, s.runChatbot)
 	}

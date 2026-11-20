@@ -1,16 +1,23 @@
 "use client";
+import layout from "@/shared/ui/workspace-settings.module.css";
 import { useState, type FormEvent } from "react";
 import { errorMessage } from "@/shared/api/http-client";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
-import { ErrorState, Loading } from "@/shared/ui/primitives";
+import { Badge, ErrorState, Loading } from "@/shared/ui/primitives";
 import { RelationSelect } from "../resources/relation-select";
 const flags = {
-  ai: "OpenAI",
+  ai_multimodal_qa: "QA tự động cho văn bản, ảnh và bản chép lời",
+  ai_sales_persona: "AI Sales · Gợi ý bước tư vấn khách từ QR",
+  ai_cs_persona: "AI CS · Áp dụng SOP nhóm hỗ trợ",
+  ai_ops_persona: "AI Ops · Gợi ý xử lý rủi ro SLA theo SOP",
+  ai: "Tính năng AI",
   ai_quality_review: "AI kiểm tra chất lượng phiếu đã giải quyết",
+  ai_realtime_qa: "Bật QA thực thời cho bản nháp phản hồi",
   ai_knowledge_drafts: "AI soạn bản nháp từ khoảng trống kho kiến thức",
   ai_voice_import: "Nhập ghi âm và chép lời cuộc gọi",
   ai_ticket_agent: "Agent xử lý phiếu có bước duyệt",
+  ai_sparring: "AI Sparring và kiểm định AI agent",
   ai_ticket_agent_auto_resolve:
     "Agent tự giải quyết phiếu khi khách xác nhận «Đã giải quyết»",
   ai_teammate: "AI teammate",
@@ -69,6 +76,22 @@ export function AccessPanel() {
         accent: string("accent"),
         host: string("host"),
         daily_ai_requests: Number(string("daily_ai_requests")),
+        realtime_qa_policy: string("realtime_qa_policy"),
+        persona_sop: {
+          sales: string("sales_sop"),
+          cs: string("cs_sop"),
+          ops: string("ops_sop"),
+        },
+        ai_handoff: {
+          enabled: fields.has("ai_handoff_enabled"),
+          minimum_confidence: Number(string("ai_handoff_confidence")),
+        },
+        brand_card: {
+          enabled: fields.has("brand_card_enabled"),
+          intro: string("brand_card_intro"),
+          product_url: string("brand_card_product"),
+          support_url: string("brand_card_support"),
+        },
         allowlist: string("allowlist")
           .split(/[\n,]+/)
           .map((value) => value.trim())
@@ -83,85 +106,173 @@ export function AccessPanel() {
   }
 
   return (
-    <section className="panel team-form form-stack">
+    <section className={layout.workspace}>
       <h2>Truy cập và thương hiệu</h2>
       <ActionFeedback error={error || settings.error} notice={notice} />
       {settings.loading && <Loading />}
       {settings.data && (
         <form
-          className="form-stack"
+          className={layout.workspace}
           onSubmit={save}
           key={JSON.stringify(settings.data)}
         >
-          <label>
-            Tên hiển thị
-            <input
-              name="display_name"
-              defaultValue={settings.data.display_name}
-              maxLength={80}
-            />
-          </label>
-          <label>
-            URL logo HTTPS
-            <input
-              type="url"
-              name="logo_url"
-              defaultValue={settings.data.logo_url}
-            />
-          </label>
-          <label>
-            Màu thương hiệu (#RRGGBB)
-            <input
-              pattern="#[0-9a-fA-F]{6}"
-              name="accent"
-              defaultValue={settings.data.accent}
-            />
-          </label>
-          <label>
-            Tên miền đã trỏ về ứng dụng
-            <input
-              name="host"
-              defaultValue={settings.data.host}
-              placeholder="support.example.com"
-            />
-          </label>
-          <label>
-            Mạng được phép (CIDR, mỗi dòng một mục)
-            <textarea
-              name="allowlist"
-              defaultValue={settings.data.allowlist?.join("\n")}
-              placeholder="203.0.113.0/24"
-            />
-          </label>
-          <label>
-            Quota AI theo ngày (giờ Việt Nam)
-            <input
-              type="number"
-              name="daily_ai_requests"
-              min={0}
-              max={100000}
-              step={1}
-              defaultValue={settings.data.daily_ai_requests ?? 0}
-            />
-          </label>
-          <p>
-            Nhập 0 để không đặt giới hạn. Mỗi lượt gọi mô hình, tìm vector hoặc
-            chép lời dùng một lượt.
-          </p>
-          <fieldset>
-            <legend>Tính năng</legend>
-            {Object.entries(flags).map(([key, name]) => (
-              <label key={key}>
+          <div className={layout.split}>
+            <fieldset className={`panel ${layout.card}`}>
+              <legend>Thương hiệu</legend>
+              <label>
+                Tên hiển thị
                 <input
-                  type="checkbox"
-                  name={key}
-                  defaultChecked={
-                    settings.data?.flags?.[key] ?? !key.startsWith("ai_")
-                  }
-                />{" "}
-                {name}
+                  name="display_name"
+                  defaultValue={settings.data.display_name}
+                  maxLength={80}
+                />
+              </label>
+              <label>
+                URL logo HTTPS
+                <input
+                  type="url"
+                  name="logo_url"
+                  defaultValue={settings.data.logo_url}
+                />
+              </label>
+              <label>
+                Màu thương hiệu (#RRGGBB)
+                <input
+                  pattern="#[0-9a-fA-F]{6}"
+                  name="accent"
+                  defaultValue={settings.data.accent}
+                />
+              </label>
+              <label>
+                Tên miền đã trỏ về ứng dụng
+                <input
+                  name="host"
+                  defaultValue={settings.data.host}
+                  placeholder="support.example.com"
+                />
+              </label>
+            </fieldset>
+            <fieldset className={`panel ${layout.card}`}>
+              <legend>Truy cập và hạn mức</legend>
+              <label>
+                Mạng được phép (CIDR, mỗi dòng một mục)
+                <textarea
+                  name="allowlist"
+                  defaultValue={settings.data.allowlist?.join("\n")}
+                  placeholder="203.0.113.0/24"
+                />
+              </label>
+              <label>
+                Quota AI theo ngày (giờ Việt Nam)
+                <input
+                  type="number"
+                  name="daily_ai_requests"
+                  min={0}
+                  max={100000}
+                  step={1}
+                  defaultValue={settings.data.daily_ai_requests ?? 0}
+                />
+              </label>
+              <p>
+                Nhập 0 để không đặt giới hạn. Mỗi lượt gọi mô hình, tìm vector
+                hoặc chép lời dùng một lượt.
+              </p>
+            </fieldset>
+          </div>
+          <fieldset className={`panel ${layout.card}`}>
+            <legend>Danh thiếp trong hội thoại</legend>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                name="brand_card_enabled"
+                defaultChecked={settings.data.brand_card?.enabled}
+              />
+              Đính kèm khi nhân viên phản hồi
+            </label>
+            <label>
+              Giới thiệu thương hiệu
+              <textarea
+                name="brand_card_intro"
+                maxLength={240}
+                defaultValue={settings.data.brand_card?.intro ?? ""}
+              />
+            </label>
+            <label>
+              Liên kết sản phẩm
+              <input
+                type="url"
+                name="brand_card_product"
+                maxLength={400}
+                defaultValue={settings.data.brand_card?.product_url ?? ""}
+              />
+            </label>
+            <label>
+              Liên kết hỗ trợ
+              <input
+                type="url"
+                name="brand_card_support"
+                maxLength={400}
+                defaultValue={settings.data.brand_card?.support_url ?? ""}
+              />
+            </label>
+          </fieldset>
+          <fieldset className={`panel ${layout.card}`}>
+            <legend>Tính năng</legend>
+            <div className={layout.fields}>
+              {Object.entries(flags).map(([key, name]) => (
+                <label key={key} className="check-row">
+                  <input
+                    type="checkbox"
+                    name={key}
+                    defaultChecked={
+                      settings.data?.flags?.[key] ?? !key.startsWith("ai_")
+                    }
+                  />{" "}
+                  {name}
+                </label>
+              ))}
+            </div>
+            {(["sales", "cs", "ops"] as const).map((role) => (
+              <label key={role}>
+                SOP nhóm{" "}
+                {role === "sales" ? "Sales" : role === "cs" ? "CS" : "Ops"}
+                <textarea
+                  name={`${role}_sop`}
+                  maxLength={2000}
+                  defaultValue={settings.data?.persona_sop?.[role] ?? ""}
+                />
               </label>
             ))}
+            <label>
+              Quy trình và từ cấm dùng cho QA thực thời
+              <textarea
+                name="realtime_qa_policy"
+                maxLength={2000}
+                defaultValue={settings.data.realtime_qa_policy ?? ""}
+              />
+            </label>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                name="ai_handoff_enabled"
+                defaultChecked={settings.data.ai_handoff?.enabled}
+              />
+              Áp dụng quy tắc bàn giao chatbot cho nhân viên
+            </label>
+            <label>
+              Ngưỡng tin cậy tối thiểu để chatbot tự trả lời
+              <input
+                type="number"
+                name="ai_handoff_confidence"
+                min={0.7}
+                max={1}
+                step={0.01}
+                placeholder="Dùng ngưỡng hệ thống"
+                defaultValue={
+                  settings.data.ai_handoff?.minimum_confidence || undefined
+                }
+              />
+            </label>
           </fieldset>
           <button className="button primary" disabled={busy}>
             Lưu cài đặt
@@ -209,6 +320,7 @@ export function BillingPanel() {
   const { admin } = useServices();
   const usage = useQuery(admin.usage);
   const billing = useQuery(admin.billing);
+  const quotas = usage.data?.quota;
   const { busy, error, notice, run } = useAdminAction();
   async function billingLink(plan: string) {
     const result = await admin.billingLink(plan);
@@ -228,6 +340,27 @@ export function BillingPanel() {
           {usage.data.messages} tin nhắn · {usage.data.tickets} phiếu ·{" "}
           {usage.data.requests} yêu cầu đã xác thực
         </p>
+      )}
+      {quotas && (
+        <ul>
+          {(["tickets", "ai"] as const).map((metric) => {
+            const quota = quotas[metric];
+            const total = quota.included + quota.credits;
+            return (
+              <li key={metric}>
+                {metric === "tickets" ? "Phiếu mới" : "Lượt gọi AI"} ·{" "}
+                {quota.used.toLocaleString("vi-VN")} đã dùng
+                {quota.limited
+                  ? ` / ${total.toLocaleString("vi-VN")} · còn ${Math.max(0, total - quota.used).toLocaleString("vi-VN")}`
+                  : " · Không giới hạn"}
+                {quota.credits > 0 && ` · ${quota.credits} tín dụng đã cấp`}
+                {quota.overage > 0 &&
+                  ` · ${quota.overage} lượt vượt mức cơ bản`}
+                {quota.low && <Badge value="Sắp hết hạn mức" />}
+              </li>
+            );
+          })}
+        </ul>
       )}
       <div className="toolbar-controls">
         {(["pro", "enterprise"] as const).map((plan) => (

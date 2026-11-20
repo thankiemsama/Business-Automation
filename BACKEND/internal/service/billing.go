@@ -142,6 +142,9 @@ func (a *Admin) StripeEvent(signature string, body []byte) error {
 	if json.Unmarshal(body, &event) != nil || event.ID == "" || event.Created <= 0 || event.Created > now+300 {
 		return core.Fail(400, "Sự kiện Stripe không hợp lệ")
 	}
+	if event.Type == "invoice.paid" {
+		return a.applyPaidInvoice(body, time.Unix(event.Created, 0))
+	}
 	if !contains([]string{"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}, event.Type) {
 		return nil
 	}

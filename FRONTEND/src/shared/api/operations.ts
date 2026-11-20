@@ -2,8 +2,37 @@ import type { ReportRow } from "../domain/models";
 import { FetchHttpClient } from "./http-client";
 
 type MetricAverage = { name: string; samples: number; value: number | null };
+type HandoffResolution = {
+  channel?: string;
+  priority?: string;
+  touched_resolved: number;
+  human_resolved: number;
+  agent_resolved: number;
+  unknown_resolver: number;
+};
 
 export type AnalyticsReport = {
+  multimodal_qa?: {
+    statuses: Record<string, number>;
+    modalities: Record<string, number>;
+    risks: Record<string, number>;
+    alerts: {
+      conversation_id: string;
+      message_id: string;
+      at: string;
+      labels: { kind: string; message: string }[];
+    }[];
+  };
+  realtime_qa?: {
+    by_kind: Record<string, number>;
+    by_agent: Record<string, number>;
+    by_day: Record<string, number>;
+  };
+  workforce?: {
+    forecast: { day: string; expected: number | null; samples: number }[];
+    ai_to_human: HandoffResolution;
+    by_queue_type: HandoffResolution[];
+  };
   ai: {
     agent_proposed: number;
     agent_applied: number;
@@ -75,6 +104,36 @@ export type Schedule = {
 };
 
 const api = new FetchHttpClient();
+
+export type SkillGroup = {
+  key: string;
+  name: string;
+  members: string[];
+  capacity: number;
+};
+export type SkillRoute = {
+  channel: string;
+  tag: string;
+  priority: string;
+  primary: string;
+  overflow: string;
+};
+export type SkillRouting = {
+  enabled: boolean;
+  groups: SkillGroup[];
+  rules: SkillRoute[];
+};
+
+export function loadSkillRouting(signal: AbortSignal) {
+  return api.request<SkillRouting>("operations/skill-routing", { signal });
+}
+
+export function saveSkillRouting(config: SkillRouting) {
+  return api.request<SkillRouting>("operations/skill-routing", {
+    method: "POST",
+    body: JSON.stringify(config),
+  });
+}
 
 export function loadAnalytics(from: string, to: string, signal: AbortSignal) {
   return api.request<AnalyticsReport>(

@@ -14,13 +14,17 @@ import (
 )
 
 type TenantSettings struct {
-	Allowlist       []string        `json:"allowlist"`
-	Flags           map[string]bool `json:"flags"`
-	DailyAIRequests int             `json:"daily_ai_requests,omitempty"`
-	DisplayName     string          `json:"display_name"`
-	LogoURL         string          `json:"logo_url"`
-	Accent          string          `json:"accent"`
-	Host            string          `json:"host"`
+	Allowlist        []string        `json:"allowlist"`
+	Flags            map[string]bool `json:"flags"`
+	DailyAIRequests  int             `json:"daily_ai_requests,omitempty"`
+	RealtimeQAPolicy string          `json:"realtime_qa_policy,omitempty"`
+	BrandCard        BrandCardSettings `json:"brand_card,omitempty"`
+	AIHandoff        AIHandoffPolicy   `json:"ai_handoff,omitempty"`
+	PersonaSOP      map[string]string `json:"persona_sop,omitempty"`
+	DisplayName      string          `json:"display_name"`
+	LogoURL          string          `json:"logo_url"`
+	Accent           string          `json:"accent"`
+	Host             string          `json:"host"`
 }
 type Admin struct {
 	repo     *Workspace
@@ -74,9 +78,12 @@ func (a *Admin) Allowed(tenant string, ip netip.Addr) bool {
 var hexAccent = regexp.MustCompile("^#[a-fA-F0-9]{6}$")
 var tenantHostname = regexp.MustCompile("^[a-z0-9](?:[a-z0-9-]{0,62})(?:\\.[a-z0-9](?:[a-z0-9-]{0,62}))+\\z")
 var tenantFlags = map[string]bool{
+	"ai_multimodal_qa": true, "ai_sales_persona": true, "ai_cs_persona": true, "ai_ops_persona": true,
 	"ai": true, "ai_quality_review": true, "ai_knowledge_drafts": true, "ai_voice_import": true,
 	"ai_ticket_agent": true, "ai_ticket_agent_auto_resolve": true,
-	"ai_teammate": true, "ai_teammate_sla": true, "ai_teammate_inbox": true,
+	"ai_sparring":    true,
+	"ai_realtime_qa": true,
+	"ai_teammate":    true, "ai_teammate_sla": true, "ai_teammate_inbox": true,
 	"workflows": true, "public_api": true,
 }
 
@@ -86,6 +93,10 @@ func (a *Admin) SaveSettings(user core.User, value TenantSettings, ip netip.Addr
 	}
 	if value.DailyAIRequests < 0 || value.DailyAIRequests > 100000 {
 		return value, core.Fail(400, "Quota AI theo ngày phải từ 0 đến 100.000 lượt")
+	}
+	value.RealtimeQAPolicy = strings.TrimSpace(value.RealtimeQAPolicy)
+	if len([]rune(value.RealtimeQAPolicy)) > 2000 {
+		return value, core.Fail(400, "Quy tắc QA thực thời tối đa 2.000 ký tự")
 	}
 	if len(value.Allowlist) > 30 || len([]rune(value.DisplayName)) > 80 || len(value.LogoURL) > 1000 || value.Accent != "" && !hexAccent.MatchString(value.Accent) {
 		return value, core.Fail(400, "Cấu hình không hợp lệ")
@@ -105,11 +116,24 @@ func (a *Admin) SaveSettings(user core.User, value TenantSettings, ip netip.Addr
 			return value, core.Fail(400, "Feature flag không hợp lệ")
 		}
 	}
+	for role, sop := range value.PersonaSOP {
+		if !contains([]string{"sales", "cs", "ops"}, role) || len([]rune(sop)) > 2000 {
+			return value, core.Fail(400, "SOP chỉ áp dụng cho Sales, CS hoặc Ops và tối đa 2.000 ký tự")
+		}
+		value.PersonaSOP[role] = strings.TrimSpace(sop)
+	}
 	if value.LogoURL != "" {
 		parsed, err := url.Parse(value.LogoURL)
 		if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil {
 			return value, core.Fail(400, "Logo phải là URL HTTPS")
 		}
+	}
+	if err := validateBrandCard(value.DisplayName, &value.BrandCard); err != nil {
+		return value, err
+	}
+	if value.AIHandoff.MinimumConfidence != 0 &&
+		(value.AIHandoff.MinimumConfidence < .7 || value.AIHandoff.MinimumConfidence > 1) {
+		return value, core.Fail(400, "Ngưỡng bàn giao AI phải từ 0,70 đến 1,00")
 	}
 	value.Host = strings.ToLower(strings.TrimSpace(value.Host))
 	if value.Host != "" && (len(value.Host) > 253 || !tenantHostname.MatchString(value.Host)) {
@@ -240,6 +264,9 @@ func (a *Admin) Usage(tenant string) (map[string]any, error) {
 		if plan, ok := store.Record(tenant, tokenHash("plan:"+tenant), "billing_plan"); ok && plan.Enabled {
 			counts["plan"] = plan.Status
 		}
+		ticketQuota, _ := billingQuota(store, tenant, billingTickets, now)
+		aiQuota, _ := billingQuota(store, tenant, billingAI, now)
+		counts["quota"] = map[string]BillingQuota{"tickets": ticketQuota, "ai": aiQuota}
 		return nil
 	})
 	return counts, err
@@ -247,13 +274,13 @@ func (a *Admin) Usage(tenant string) (map[string]any, error) {
 
 func (a *Admin) Export(user core.User, customerID string) (map[string]any, error) {
 	result := map[string]any{"version": 1, "generated_at": a.clock.Now(), "tenant_id": user.TenantID}
+	rows := []core.Record{}
 	err := a.repo.View(func(store core.Reader) error {
 		if customerID != "" {
 			if _, err := findOwnedRecord(store, user, customerID, core.KindCustomers); err != nil {
 				return err
 			}
 		}
-		rows := []core.Record{}
 		conversations := map[string]bool{}
 		for _, r := range store.Records(user.TenantID, core.KindConversations) {
 			if r.CustomerID == customerID {
@@ -276,8 +303,16 @@ func (a *Admin) Export(user core.User, customerID string) (map[string]any, error
 			}
 			rows = append(rows, r)
 		}
-		result["records"] = rows
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		if err := a.repo.HydrateAttachment(context.Background(), &rows[i]); err != nil {
+			return nil, err
+		}
+	}
+	result["records"] = rows
 	return result, err
 }

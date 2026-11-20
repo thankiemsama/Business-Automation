@@ -45,8 +45,17 @@ func (h *Handler) page(w http.ResponseWriter, r *http.Request, records []core.Re
 	filtered := filterRecords(records, query)
 	start := min((query.page-1)*query.limit, len(filtered))
 	end := min(start+query.limit, len(filtered))
+	items := filtered[start:end]
+	if h.workspace != nil {
+		for i := range items {
+			if err := h.workspace.HydrateAttachment(r.Context(), &items[i]); err != nil {
+				respond(w, http.StatusServiceUnavailable, nil, err)
+				return
+			}
+		}
+	}
 	respond(w, http.StatusOK, pageResponse{
-		Items: filtered[start:end],
+		Items: items,
 		Total: len(filtered),
 		Page:  query.page,
 		Limit: query.limit,

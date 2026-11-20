@@ -55,6 +55,10 @@ func (h *Handler) liveChannelRoutes(mux *http.ServeMux) {
 		_, _ = io.WriteString(w, challenge)
 	})
 	mux.HandleFunc("POST /api/v1/channel-webhooks/{tenant}/{channel}", func(w http.ResponseWriter, r *http.Request) {
+		if r.PathValue("channel") == core.ChannelSMS && (r.URL.RawQuery != "" || r.URL.ForceQuery) {
+			respond(w, 400, nil, core.Fail(400, "URL webhook SMS không hỗ trợ tham số truy vấn"))
+			return
+		}
 		if !h.acquireAuthSlot(w) {
 			return
 		}
@@ -65,6 +69,11 @@ func (h *Handler) liveChannelRoutes(mux *http.ServeMux) {
 			return
 		}
 		err = channels.Receive(r.PathValue("tenant"), r.PathValue("channel"), r.Header, body)
+		if err == nil && r.PathValue("channel") == core.ChannelSMS {
+			w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+			_, _ = io.WriteString(w, "<Response/>")
+			return
+		}
 		respond(w, http.StatusOK, map[string]bool{"received": true}, err)
 	})
 	mux.HandleFunc("POST /api/v1/channels/{channel}/test", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {

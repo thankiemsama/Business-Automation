@@ -81,6 +81,9 @@ func metricAverages(groups map[string]averageAccumulator) []MetricAverage {
 }
 
 type Analytics struct {
+	RealtimeQA       *RealtimeQAAnalytics `json:"realtime_qa,omitempty"`
+	MultimodalQA     *MultimodalCoverage  `json:"multimodal_qa,omitempty"`
+	Workforce        WorkforceAnalytics   `json:"workforce"`
 	AI               AIMetrics            `json:"ai"`
 	ChannelCSAT      []MetricAverage      `json:"csat_by_channel"`
 	PriorityResponse []MetricAverage      `json:"response_minutes_by_priority"`
@@ -128,7 +131,14 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 	histories := map[string]map[time.Time]bool{}
 	inRange := func(at time.Time) bool { return !at.Before(from) && at.Before(to) }
 	err = viewTenant(s.repo, user.TenantID, func(store core.Reader) error {
+		if user.Role == core.RoleOwner {
+			qa := realtimeQAAnalytics(store, user.TenantID, from, to)
+			result.RealtimeQA = &qa
+			multimodal := multimodalCoverage(store, user.TenantID, from, to)
+			result.MultimodalQA = &multimodal
+		}
 		conversationChannels := map[string]string{}
+		activity := newWorkforceActivity(cutoff)
 		for _, conversation := range store.Records(user.TenantID, core.KindConversations) {
 			conversationChannels[conversation.ID] = conversation.Channel
 		}
@@ -139,6 +149,7 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 			return "unknown"
 		}
 		for _, marker := range store.Records(user.TenantID, "ai_bot_markers") {
+			activity.observeBot(marker)
 			if marker.ConversationID != "" && inRange(marker.CreatedAt) {
 				botCases[marker.ConversationID] = true
 			}
@@ -164,6 +175,7 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 			}
 		}
 		for _, event := range store.Records(user.TenantID, aiTriageEventsKind) {
+			activity.observeTicket(event.ConversationID, event.CreatedAt)
 			if !inRange(event.CreatedAt) {
 				continue
 			}
@@ -191,6 +203,7 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 			}
 		}
 		for _, plan := range store.Records(user.TenantID, ticketAgentPlansKind) {
+			activity.observePlan(plan)
 			if (plan.Status == "proposed" || plan.Status == "applied") && inRange(plan.CreatedAt) {
 				result.AI.AgentProposed++
 			}
@@ -218,6 +231,8 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 			addRating(conversation, channelFor(conversation.ID))
 		}
 		for _, ticket := range store.Records(user.TenantID, core.KindTickets) {
+			activity.observeVolume(ticket.CreatedAt)
+			activity.observeResolution(ticket, channelFor(ticket.ConversationID), from)
 			if inRange(ticket.CreatedAt) {
 				byDay[ticket.CreatedAt.In(ReportZone).Format(time.DateOnly)].Tickets++
 				priorities[ticket.Priority]++
@@ -269,6 +284,7 @@ func (s *DashboardService) Analytics(user core.User, from, to, now time.Time) (A
 				}
 			}
 		}
+		result.Workforce = activity.report()
 		return nil
 	})
 	if err != nil {

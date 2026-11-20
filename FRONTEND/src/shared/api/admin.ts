@@ -1,9 +1,18 @@
 import type { HttpClient } from "./http-client";
 
 export type Settings = {
+  persona_sop?: Partial<Record<"sales" | "cs" | "ops", string>>;
   allowlist?: string[];
   flags?: Record<string, boolean>;
   daily_ai_requests?: number;
+  realtime_qa_policy?: string;
+  ai_handoff?: { enabled: boolean; minimum_confidence: number };
+  brand_card?: {
+    enabled: boolean;
+    intro: string;
+    product_url: string;
+    support_url: string;
+  };
   display_name: string;
   logo_url: string;
   accent: string;
@@ -19,6 +28,17 @@ type AuditEvent = {
   content: string;
 };
 type Usage = {
+  quota?: Record<
+    "tickets" | "ai",
+    {
+      used: number;
+      included: number;
+      credits: number;
+      overage: number;
+      limited: boolean;
+      low: boolean;
+    }
+  >;
   month: string;
   messages: number;
   tickets: number;

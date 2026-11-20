@@ -218,6 +218,43 @@ func (s *sqlStore) PendingWorkflowJobs(limit int) []core.Record {
 	return s.pendingWorkflowJobs(limit, nil)
 }
 
+func (s *sqlStore) IdleWorkflowCandidates(now time.Time, after core.IdleWorkflowCandidate, limit int) []core.IdleWorkflowCandidate {
+	return readList[core.IdleWorkflowCandidate](s, `
+		WITH rules AS MATERIALIZED (
+			SELECT tenant_id, id, data, CASE WHEN pg_input_is_valid(data->>'content', 'jsonb')
+				THEN (data->>'content')::jsonb END AS config
+			FROM platform_records
+			WHERE kind = 'workflow_rules' AND data->'enabled' = 'true'::jsonb
+			  AND COALESCE(data->>'status', '') <> 'removed'
+		)
+		SELECT jsonb_build_object('Ticket', t.data, 'Rule', r.data,
+			'Channel', COALESCE(c.data->>'channel', ''), 'Activity', t.workflow_activity_at)
+		FROM platform_records t
+		JOIN rules r ON r.tenant_id = t.tenant_id AND r.config->>'trigger' = 'ticket_idle'
+		LEFT JOIN platform_records c ON c.tenant_id = t.tenant_id
+			AND c.id = t.data->>'conversation_id' AND c.kind = 'conversations'
+		CROSS JOIN LATERAL (
+			SELECT $1::timestamptz - INTERVAL '24 hours' *
+				CASE WHEN r.config->>'idle_days' ~ '^[0-9]{1,3}$' THEN (r.config->>'idle_days')::int END AS cutoff
+		) due
+		WHERE t.kind = 'tickets' AND t.workflow_activity_at <= $1::timestamptz - INTERVAL '24 hours'
+		  AND EXISTS (SELECT 1 FROM platform_users u WHERE u.tenant_id = t.tenant_id)
+		  AND t.workflow_activity_at <= due.cutoff
+		  AND (c.workflow_activity_at IS NULL OR c.workflow_activity_at <= due.cutoff)
+		  AND (t.workflow_activity_at, t.tenant_id, t.id, r.id) > ($2::timestamptz, $3, $4, $5)
+		  AND (COALESCE(r.config #>> '{conditions,channel}', '') = '' OR r.config #>> '{conditions,channel}' = c.data->>'channel')
+		  AND (COALESCE(r.config #>> '{conditions,priority}', '') = '' OR r.config #>> '{conditions,priority}' = t.data->>'priority')
+		  AND (COALESCE(r.config #>> '{conditions,status}', '') = '' OR r.config #>> '{conditions,status}' = t.data->>'status')
+		  AND NOT EXISTS (
+			  SELECT 1 FROM platform_records job
+			  WHERE job.tenant_id = t.tenant_id AND job.kind = 'workflow_jobs'
+			    AND job.data->>'subject' = 'ticket_idle' AND COALESCE(job.data->>'status', '') <> 'postponed'
+			    AND job.data->>'automation_id' = r.id AND job.data->>'conversation_id' = t.id
+		  )
+		ORDER BY t.workflow_activity_at, t.tenant_id, t.id, r.id
+		LIMIT $6`, now, after.Activity, after.Ticket.TenantID, after.Ticket.ID, after.Rule.ID, limit)
+}
+
 func (s *sqlStore) PendingAIWorkflowJobs(limit int, now time.Time) []core.Record {
 	return s.pendingWorkflowJobs(limit, &now)
 }
@@ -228,11 +265,11 @@ func (s *sqlStore) pendingWorkflowJobs(limit int, due *time.Time) []core.Record 
 	}
 	return readList[core.Record](s, `SELECT job.data FROM platform_records AS job
 		WHERE job.pending_workflow_at IS NOT NULL
-		  AND (COALESCE(job.data->>'subject', '') IN ($2, $3, $4)) = ($5::timestamptz IS NOT NULL)
-		  AND ($5::timestamptz IS NULL OR job.pending_workflow_at <= $5::timestamptz)
+		  AND (COALESCE(job.data->>'subject', '') IN ($2, $3, $4, $5, $6, $7, $8, $9)) = ($10::timestamptz IS NOT NULL)
+		  AND ($10::timestamptz IS NULL OR job.pending_workflow_at <= $10::timestamptz)
 		  AND EXISTS (SELECT 1 FROM platform_users WHERE tenant_id = job.tenant_id)
 		ORDER BY job.pending_workflow_at, job.id, job.tenant_id
-		LIMIT $1`, limit, core.WorkflowAIReview, core.WorkflowAIKnowledgeDraft, core.WorkflowAIExtractFields, due)
+		LIMIT $1`, limit, core.WorkflowAIReview, core.WorkflowAIKnowledgeDraft, core.WorkflowAIExtractFields, core.WorkflowSparringAssessment, core.WorkflowRealtimeQA, core.WorkflowMultimodalQA, core.WorkflowSalesReview, core.WorkflowOpsReview, due)
 }
 
 func (s *sqlStore) LockWorkflowJob(tenantID, id string) (core.Record, bool) {

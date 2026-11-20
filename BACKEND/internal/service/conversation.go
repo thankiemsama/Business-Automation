@@ -73,9 +73,21 @@ func (s *ConversationService) SendMessage(user core.User, conversationID, conten
 		if external && (s.channels == nil || attachment != "") {
 			return core.Fail(400, "Kênh này hiện hỗ trợ gửi tin văn bản")
 		}
+		var card *core.BrandCard
+		if sender == core.SenderAgent {
+			card = firstReplyBrandCard(store, conversation)
+		}
 		result = s.storeMessage(store, user, conversation, content, sender)
+		result.BrandCard = card
 		if external {
-			if err := s.channels.enqueueReply(store, conversation, result); err != nil {
+			delivery := result
+			if card != nil {
+				delivery.Content += "\n\n" + brandCardText(card)
+				if !validChannelText(conversation.Channel, delivery.Content) {
+					delivery.Content, result.BrandCard = content, nil
+				}
+			}
+			if err := s.channels.enqueueReply(store, conversation, delivery); err != nil {
 				return err
 			}
 			result.Status = "pending"
@@ -90,7 +102,7 @@ func (s *ConversationService) SendMessage(user core.User, conversationID, conten
 			inbound := latestInboundBefore(store, conversation, result)
 			result.EmailInReplyTo, result.EmailReferences = inbound.EmailInReplyTo, inbound.EmailReferences
 		}
-		if attachment != "" || recipient != "" || external {
+		if attachment != "" || recipient != "" || external || result.BrandCard != nil {
 			store.PutRecord(result)
 		}
 		if sender == core.SenderCustomer {
@@ -199,7 +211,7 @@ func validateAttachment(name, attachment string) error {
 	if name != "" || attachment != "" {
 		data, err := base64.StdEncoding.DecodeString(attachment)
 		mime := http.DetectContentType(data)
-		if err != nil || len(data) == 0 || len(data) > 32*1024 || len(name) == 0 || len(name) > 200 ||
+		if err != nil || len(data) == 0 || len(data) > maxAttachmentBytes || len(name) == 0 || len(name) > 200 ||
 			strings.ContainsAny(name, "/\\\r\n") || (mime != "image/png" && mime != "image/jpeg" && mime != "application/pdf") {
 			return core.Fail(400, "Tệp phải là PNG, JPEG hoặc PDF, tối đa 32 KiB")
 		}

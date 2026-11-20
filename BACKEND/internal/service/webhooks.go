@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -45,9 +46,79 @@ type Webhook struct {
 
 const maximumWebhookURLBytes = 2048
 const maximumWebhooksPerTenant = 20
+const webhookFailureRetention = 30 * 24 * time.Hour
+const webhookDeliveryLease = 30 * time.Second
+
+type WebhookDeadLetter struct {
+	ID          string    `json:"id"`
+	WebhookName string    `json:"webhook_name"`
+	Event       string    `json:"event"`
+	Attempts    uint64    `json:"attempts"`
+	FailedAt    time.Time `json:"failed_at"`
+	Replayable  bool      `json:"replayable"`
+}
+
+func (s *WebhookService) DeadLetters(user core.User) ([]WebhookDeadLetter, error) {
+	items := []WebhookDeadLetter{}
+	if user.Role != core.RoleOwner {
+		return nil, core.Fail(403, "Chỉ owner quản lý webhook lỗi")
+	}
+	cutoff := s.clock.Now().Add(-webhookFailureRetention)
+	err := s.repo.View(func(store core.Reader) error {
+		for _, record := range store.Records(user.TenantID, core.KindWebhookDeliveries) {
+			if record.Status != "failed" || !record.UpdatedAt.After(cutoff) {
+				continue
+			}
+			hook, exists := store.Record(user.TenantID, record.ConversationID, core.KindWebhooks)
+			var subscription Webhook
+			var body struct{ Event string }
+			_ = json.Unmarshal([]byte(hook.Content), &subscription)
+			_ = json.Unmarshal([]byte(record.Content), &body)
+			items = append(items, WebhookDeadLetter{
+				ID: record.ID, WebhookName: subscription.Name, Event: body.Event,
+				Attempts: record.Sequence, FailedAt: record.UpdatedAt,
+				Replayable: exists && hook.Enabled,
+			})
+		}
+		return nil
+	})
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].FailedAt.Equal(items[j].FailedAt) {
+			return items[i].ID < items[j].ID
+		}
+		return items[i].FailedAt.After(items[j].FailedAt)
+	})
+	return items, err
+}
+
+func (s *WebhookService) Replay(user core.User, id string) error {
+	if user.Role != core.RoleOwner {
+		return core.Fail(403, "Chỉ owner quản lý webhook lỗi")
+	}
+	return s.repo.Update(func(store core.Writer) error {
+		now := s.clock.Now().UTC()
+		record, ok := store.Record(user.TenantID, id, core.KindWebhookDeliveries)
+		if !ok || (record.Status == "failed" && !record.UpdatedAt.After(now.Add(-webhookFailureRetention))) {
+			return core.Fail(404, "Không tìm thấy lượt gửi webhook lỗi")
+		}
+		if record.Status != "failed" {
+			return core.Fail(409, "Lượt gửi webhook không ở trạng thái lỗi")
+		}
+		hook, ok := store.Record(user.TenantID, record.ConversationID, core.KindWebhooks)
+		if !ok || !hook.Enabled {
+			return core.Fail(409, "Webhook đã bị tắt")
+		}
+		record.Status = "retry"
+		record.Sequence = 0
+		record.Enabled = true
+		record.UpdatedAt = now
+		store.PutRecord(record)
+		return nil
+	})
+}
 
 var allWebhookEvents = []string{
-	core.EventTicketCreated, core.EventMessageNew, core.EventSLABreached, core.EventCSATSubmitted,
+	core.EventTicketCreated, core.EventMessageNew, core.EventSLABreached, core.EventCSATSubmitted, core.EventBillingQuotaLow,
 }
 
 // List returns the tenant's webhooks.
@@ -200,31 +271,24 @@ func (s *WebhookService) Run(ctx context.Context) {
 
 // dispatch delivers a bounded batch of pending webhooks.
 func (s *WebhookService) dispatch(ctx context.Context) {
-	type job struct {
-		hook   Webhook
-		record core.Record
-	}
-	var jobs []job
+	var jobs []core.Record
+	now := s.clock.Now().UTC()
 	_ = s.repo.View(func(store core.Reader) error {
 		for _, tenant := range store.Tenants() {
-			hooks := map[string]Webhook{}
+			hooks := map[string]bool{}
 			for _, record := range store.Records(tenant, core.KindWebhooks) {
 				if record.Enabled {
-					var item Webhook
-					if json.Unmarshal([]byte(record.Content), &item) == nil {
-						hooks[item.ID] = item
-					}
+					hooks[record.ID] = true
 				}
 			}
 			for _, record := range store.Records(tenant, core.KindWebhookDeliveries) {
-				if !record.Enabled || record.Status == "sent" || record.UpdatedAt.After(s.clock.Now()) {
+				if !record.Enabled || record.Status == "sent" || record.UpdatedAt.After(now) {
 					continue
 				}
-				hook, ok := hooks[record.ConversationID]
-				if !ok {
+				if !hooks[record.ConversationID] {
 					continue
 				}
-				jobs = append(jobs, job{hook, record})
+				jobs = append(jobs, record)
 				if len(jobs) >= 8 {
 					return nil
 				}
@@ -233,18 +297,43 @@ func (s *WebhookService) dispatch(ctx context.Context) {
 		return nil
 	})
 	for _, item := range jobs {
-		err := s.deliver(ctx, item.hook, item.record.Content, item.record.ID)
+		if ctx.Err() != nil {
+			return
+		}
+		var lease time.Time
+		var hook Webhook
+		claimErr := s.repo.Update(func(store core.Writer) error {
+			current, ok := store.Record(item.TenantID, item.ID, core.KindWebhookDeliveries)
+			now := s.clock.Now().UTC()
+			if !ok || !current.Enabled || current.Status == "sent" || current.UpdatedAt.After(now) {
+				return nil
+			}
+			subscription, ok := store.Record(current.TenantID, current.ConversationID, core.KindWebhooks)
+			if !ok || !subscription.Enabled || json.Unmarshal([]byte(subscription.Content), &hook) != nil {
+				return nil
+			}
+			lease = now.Add(webhookDeliveryLease).Truncate(time.Microsecond)
+			current.UpdatedAt = lease
+			store.PutRecord(current)
+			item = current
+			return nil
+		})
+		if claimErr != nil || lease.IsZero() {
+			continue
+		}
+		err := s.deliver(ctx, hook, item.Content, item.ID)
 		if ctx.Err() != nil {
 			return
 		}
 		_ = s.repo.Update(func(store core.Writer) error {
-			current, ok := store.Record(item.record.TenantID, item.record.ID, core.KindWebhookDeliveries)
-			if !ok {
+			current, ok := store.Record(item.TenantID, item.ID, core.KindWebhookDeliveries)
+			if !ok || !current.UpdatedAt.Equal(lease) {
 				return nil
 			}
 			if err == nil {
 				current.Status = "sent"
 				current.Enabled = false
+				current.UpdatedAt = s.clock.Now().UTC()
 			} else {
 				current.Sequence++
 				current.Status = "retry"
@@ -252,6 +341,7 @@ func (s *WebhookService) dispatch(ctx context.Context) {
 				if current.Sequence >= 8 {
 					current.Status = "failed"
 					current.Enabled = false
+					current.UpdatedAt = s.clock.Now().UTC()
 				}
 			}
 			store.PutRecord(current)

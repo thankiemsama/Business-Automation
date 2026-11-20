@@ -103,6 +103,7 @@ func TestPostgresImportAndConcurrentTransactions(t *testing.T) {
 	}
 
 	checkIdleTickets(t, second)
+	checkIndexedIdleWorkflowCandidates(t, second)
 	checkTenantRecordKey(t, first)
 	checkWorkflowQueue(t, first)
 	checkLockedWorkflowJob(t, first, second)

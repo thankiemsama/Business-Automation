@@ -26,6 +26,12 @@ export const navigation: {
     group: "Hỗ trợ",
   },
   {
+    href: "/sparring",
+    title: "AI Sparring",
+    icon: "chat",
+    group: "Công cụ",
+  },
+  {
     href: "/knowledge",
     title: "Kho kiến thức",
     icon: "book",

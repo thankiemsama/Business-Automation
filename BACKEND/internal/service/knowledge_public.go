@@ -20,10 +20,12 @@ func NewKnowledge(repo core.Repository, ids IDGenerator) *KnowledgeService {
 
 // PublicArticle is the sanitized shape exposed on /kb routes.
 type PublicArticle struct {
-	Slug    string `json:"slug"`
-	Subject string `json:"subject"`
-	Content string `json:"content"`
-	Updated bool   `json:"-"`
+	VideoURL        string `json:"video_url,omitempty"`
+	VideoTranscript string `json:"video_transcript,omitempty"`
+	Slug            string `json:"slug"`
+	Subject         string `json:"subject"`
+	Content         string `json:"content"`
+	Updated         bool   `json:"-"`
 }
 
 // EnsureSlug gives a knowledge record a stable, unique, SEO-friendly slug.
@@ -65,7 +67,11 @@ func (s *KnowledgeService) PublicList(tenant, slug string) ([]PublicArticle, err
 			if slug != "" && record.Slug != slug {
 				continue
 			}
-			articles = append(articles, PublicArticle{Slug: record.Slug, Subject: record.Subject, Content: record.Content})
+			article := PublicArticle{Slug: record.Slug, Subject: record.Subject, Content: record.Content, VideoURL: record.VideoURL}
+			if slug != "" {
+				article.VideoTranscript = record.VideoTranscript
+			}
+			articles = append(articles, article)
 		}
 		return nil
 	})

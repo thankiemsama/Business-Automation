@@ -39,6 +39,7 @@ type ConversationUseCases interface {
 	Draft(core.User, string) (service.Reply, error)
 	StartChat(string, string, string, string, string) (string, error)
 	PublicChat(string, string, string, string, int) ([]service.ChatMessage, error)
+	ReadPublicChat(string) (service.PublicChatState, error)
 	SendMessage(core.User, string, string, string, string, string, string) (core.Record, error)
 	Reply(core.User, string) (service.Reply, error)
 }
@@ -74,6 +75,8 @@ type CSATUseCases interface {
 }
 
 type WebhookUseCases interface {
+	DeadLetters(core.User) ([]service.WebhookDeadLetter, error)
+	Replay(core.User, string) error
 	List(core.User) ([]service.Webhook, error)
 	Save(core.User, string, service.Webhook) (service.Webhook, error)
 	Remove(core.User, string) error

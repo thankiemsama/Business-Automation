@@ -67,6 +67,7 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
   const result = useQuery(loader, "workspace-refresh");
   const canWrite = !definition.ownerOnly || user.role === "owner";
   const isTickets = kind === "tickets";
+  const isAutomations = kind === "automations";
   const hasFilters = Boolean(
     q ||
     status ||
@@ -92,6 +93,11 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
         {(kind === "tickets" || kind === "customers") && (
           <ExportLinks kind={kind} />
         )}
+        {isAutomations && canWrite && (
+          <Link className="button secondary" href="/workflows">
+            <Icon name="bolt" size={17} /> Workflow nhiều bước
+          </Link>
+        )}
         {canWrite && (
           <button className="button primary" onClick={() => setEditor({})}>
             <Icon name="plus" size={18} />
@@ -108,11 +114,6 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
             <Icon name="close" size={16} />
           </button>
         </div>
-      )}
-      {kind === "automations" && user.role === "owner" && (
-        <Link className="button secondary" href="/workflows">
-          Mở workflow nhiều bước
-        </Link>
       )}
       {kind === "knowledge" && (
         <details className="panel knowledge-tools">
@@ -144,12 +145,18 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
         </div>
       )}
       <section
-        className={`panel resource-panel ${isTickets ? styles.tickets : ""}`}
+        className={`panel resource-panel ${isTickets ? styles.tickets : isAutomations ? styles.automations : ""}`}
       >
         <div className="panel-toolbar">
           <div className="tab-label">
-            {isTickets && <Icon name="ticket" size={18} />}
-            {isTickets ? "Danh sách phiếu" : `Tất cả ${definition.singular}`}
+            {(isTickets || isAutomations) && (
+              <Icon name={definition.icon} size={18} />
+            )}
+            {isTickets
+              ? "Danh sách phiếu"
+              : isAutomations
+                ? "Quy tắc từ khóa"
+                : `Tất cả ${definition.singular}`}
             <span className="count-pill">{result.data?.total ?? "—"}</span>
           </div>
           <div className="toolbar-controls">
@@ -493,7 +500,7 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                                 </button>
                               )}
                             {item.escalated_at ? (
-                              <p>Đã chuyển cấp</p>
+                              <p className={styles.escalated}>Đã chuyển cấp</p>
                             ) : (
                               item.overdue && (
                                 <button
@@ -515,31 +522,47 @@ export function ResourcePage<K extends Exclude<ResourceKind, "conversations">>({
                             )}
                           </div>
                         )}
-                      {"priority" in item && (
-                        <Assignment
-                          assignee={item.assignee_id}
-                          save={async (id, claim) => {
-                            await repository.assign(item.id, id, claim);
-                            result.reload();
-                          }}
-                        />
-                      )}
-                      {canWrite ? (
-                        <button
-                          className="icon-button"
-                          aria-label={`Chỉnh sửa ${"name" in item ? item.name : "subject" in item ? item.subject : ""}`}
-                          onClick={() => setEditor({ entity: item })}
-                        >
-                          <Icon name="edit" size={17} />
-                        </button>
-                      ) : (
-                        <button
-                          className="button secondary compact"
-                          onClick={() => setViewing(item)}
-                        >
-                          Xem chi tiết
-                        </button>
-                      )}
+                      <div
+                        className={
+                          isTickets
+                            ? styles.rowControls
+                            : isAutomations
+                              ? styles.ruleControls
+                              : undefined
+                        }
+                      >
+                        {"priority" in item && (
+                          <Assignment
+                            assignee={item.assignee_id}
+                            save={async (id, claim) => {
+                              await repository.assign(item.id, id, claim);
+                              result.reload();
+                            }}
+                          />
+                        )}
+                        {canWrite ? (
+                          <button
+                            className={
+                              isAutomations
+                                ? "button secondary compact"
+                                : "icon-button"
+                            }
+                            title="Chỉnh sửa"
+                            aria-label={`Chỉnh sửa ${"name" in item ? item.name : "subject" in item ? item.subject : ""}`}
+                            onClick={() => setEditor({ entity: item })}
+                          >
+                            <Icon name="edit" size={17} />
+                            {isAutomations && "Chỉnh sửa"}
+                          </button>
+                        ) : (
+                          <button
+                            className="button secondary compact"
+                            onClick={() => setViewing(item)}
+                          >
+                            Xem chi tiết
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

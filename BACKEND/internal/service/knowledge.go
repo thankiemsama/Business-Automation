@@ -71,7 +71,7 @@ func searchTokens(question string) map[string]struct{} {
 }
 
 func scoreArticle(article core.Record, tokens map[string]struct{}) int {
-	searchableText := strings.ToLower(article.Subject + " " + article.Content)
+	searchableText := strings.ToLower(article.Subject + " " + article.Content + " " + article.VideoTranscript)
 	score := 0
 	for token := range tokens {
 		if strings.Contains(searchableText, token) {

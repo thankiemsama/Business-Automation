@@ -29,6 +29,9 @@ var tenantRecordKeySchema string
 //go:embed migrations/004_pending_workflow_jobs.sql
 var pendingWorkflowSchema string
 
+//go:embed migrations/005_idle_workflow_candidates.sql
+var idleWorkflowCandidatesSchema string
+
 // Write callbacks can enforce invariants across several rows. Serialize those callbacks
 // across processes until the repository contract supports narrower locks.
 const compatibilityWriteLock = 771144931
@@ -56,7 +59,7 @@ func (p *Postgres) Ping(ctx context.Context) error { return p.db.PingContext(ctx
 func (p *Postgres) migrate(ctx context.Context) error {
 	return p.transaction(ctx, false, "", func(s *sqlStore) error {
 		s.exec("CREATE TABLE IF NOT EXISTS platform_schema_migrations (version integer PRIMARY KEY)")
-		for index, migration := range []string{initialSchema, workflowActivitySchema, tenantRecordKeySchema, pendingWorkflowSchema} {
+		for index, migration := range []string{initialSchema, workflowActivitySchema, tenantRecordKeySchema, pendingWorkflowSchema, idleWorkflowCandidatesSchema} {
 			version := index + 1
 			exists, _ := scanOne[bool](s, "SELECT EXISTS (SELECT 1 FROM platform_schema_migrations WHERE version = $1)", version)
 			if !exists {

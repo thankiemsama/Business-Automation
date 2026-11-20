@@ -327,9 +327,57 @@ input[type="checkbox"] {
 }
 .platform-dialog-panel {
   width: min(100%, 520px);
-  max-height: 90vh;
+  max-height: 90dvh;
   overflow: auto;
-  padding: 20px;
+  display: grid;
+  gap: 14px;
+  padding: clamp(14px, 3vw, 24px);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px #0005;
+}
+.platform-dialog-title,
+.platform-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.platform-dialog-title h2 {
+  font-size: 1.125rem;
+  font-weight: 750;
+}
+.platform-dialog-title .icon-button {
+  border: 1px solid var(--line);
+}
+.platform-shortcuts {
+  display: grid;
+  gap: 7px;
+}
+.platform-shortcuts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.platform-shortcuts kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 2px 5px;
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  background: var(--surface);
+  text-align: center;
+  font-size: 0.75rem;
+}
+.platform-dialog-actions {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
 }
 .workspace .button.primary,
 .auth-page .button.primary {
@@ -1548,6 +1596,42 @@ tbody tr:hover {
 .form-stack label select {
   font-size: 12px;
   font-weight: 400;
+}
+label.check-row,
+.form-stack label.check-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--ink);
+  text-align: start;
+  line-height: 1.4;
+  cursor: pointer;
+}
+label.check-row > input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  margin: 0;
+  accent-color: light-dark(#147d70, #95e0d5);
+}
+label.check-row:has(> input:checked) {
+  border-color: light-dark(#92bfb7, #487c76);
+  background: light-dark(#edf8f5, #1c3539);
+}
+label.check-row:focus-within {
+  outline: 2px solid light-dark(#147d70, #95e0d5);
+  outline-offset: -2px;
+}
+label.check-row:has(> input:disabled) {
+  cursor: default;
+  opacity: 0.7;
 }
 .required {
   color: light-dark(#b37a61, color-mix(in srgb, #b37a61 35%, #edf4f5));

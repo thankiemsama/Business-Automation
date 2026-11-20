@@ -165,10 +165,20 @@ export function PlatformTools({ user }: { user: string }) {
         onClose={close}
         className="platform-dialog"
       >
-        <DialogPanel className="panel platform-dialog-panel form-stack">
-          <DialogTitle>
-            {t(dialog === "tour" ? "tour" : "shortcuts")}
-          </DialogTitle>
+        <DialogPanel className="panel platform-dialog-panel">
+          <header className="platform-dialog-title">
+            <DialogTitle as="h2">
+              {t(dialog === "tour" ? "tour" : "shortcuts")}
+            </DialogTitle>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={t("close")}
+              onClick={close}
+            >
+              <Icon name="close" size={18} />
+            </button>
+          </header>
           {dialog === "tour" ? (
             <>
               <p aria-live="polite">
@@ -185,37 +195,42 @@ export function PlatformTools({ user }: { user: string }) {
             </>
           ) : (
             <>
-              <dl>
-                <dt>
-                  <kbd>?</kbd>
-                </dt>
-                <dd>{t("shortcuts")}</dd>
-                <dt>
-                  <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>K</kbd>
-                </dt>
-                <dd>{locale === "en" ? "Quick search" : "Tìm nhanh"}</dd>
-                <dt>
-                  <kbd>Esc</kbd>
-                </dt>
-                <dd>{t("close")}</dd>
+              <dl className="platform-shortcuts">
+                <div>
+                  <dt>
+                    <kbd>?</kbd>
+                  </dt>
+                  <dd>{t("shortcuts")}</dd>
+                </div>
+                <div>
+                  <dt>
+                    <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>K</kbd>
+                  </dt>
+                  <dd>{locale === "en" ? "Quick search" : "Tìm nhanh"}</dd>
+                </div>
+                <div>
+                  <dt>
+                    <kbd>Esc</kbd>
+                  </dt>
+                  <dd>{t("close")}</dd>
+                </div>
               </dl>
-              <button
-                className="button secondary"
-                onClick={() => {
-                  setStep(0);
-                  setDialog("tour");
-                }}
-              >
-                {t("tour")}
-              </button>
-              <Link href="/help" onClick={close}>
-                {t("help")} · {t("release")}
-              </Link>
+              <footer className="platform-dialog-actions">
+                <button
+                  className="button secondary"
+                  onClick={() => {
+                    setStep(0);
+                    setDialog("tour");
+                  }}
+                >
+                  <Icon name="info" size={16} /> {t("tour")}
+                </button>
+                <Link className="text-link" href="/help" onClick={close}>
+                  {t("help")} · {t("release")}
+                </Link>
+              </footer>
             </>
           )}
-          <button type="button" className="text-link" onClick={close}>
-            {t("close")}
-          </button>
         </DialogPanel>
       </Dialog>
     </>

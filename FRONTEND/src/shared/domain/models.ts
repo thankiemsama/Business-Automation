@@ -51,6 +51,8 @@ export interface Ticket extends Entity {
   priority: "low" | "normal" | "high" | "urgent";
 }
 export interface Knowledge extends Entity {
+  video_url?: string;
+  video_transcript?: string;
   status?: "draft";
   public?: boolean;
   subject: string;
@@ -62,7 +64,15 @@ export interface Automation extends Entity {
   keywords: string[];
   enabled: boolean;
 }
+export type BrandCard = {
+  name: string;
+  intro?: string;
+  product_url?: string;
+  support_url?: string;
+};
+
 export interface Message extends Entity {
+  brand_card?: BrandCard;
   sentiment?: "neutral" | "negative" | "angry";
   status?: "pending" | "sending" | "sent" | "failed";
   attachment_name?: string;

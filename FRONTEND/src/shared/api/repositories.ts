@@ -128,7 +128,35 @@ export class AuthRepository {
     });
   }
 }
+export type RealtimeQA = {
+  id: string;
+  status: "pending" | "completed" | "quota" | "unavailable" | "stale";
+  labels: { kind: string; message: string }[];
+  suggestion?: string;
+};
+
 export class ConversationRepository extends ApiResourceRepository<"conversations"> {
+  realtimeQAStatus(signal: AbortSignal) {
+    return this.client.request<{ enabled: boolean }>("ai/realtime-qa/status", {
+      signal,
+    });
+  }
+  queueRealtimeQA(id: string, draft: string, signal: AbortSignal) {
+    return this.client.request<RealtimeQA>(
+      `conversations/${encodeURIComponent(id)}/realtime-qa`,
+      {
+        method: "POST",
+        body: JSON.stringify({ draft }),
+        signal,
+      },
+    );
+  }
+  realtimeQAResult(id: string, request: string, signal: AbortSignal) {
+    return this.client.request<RealtimeQA>(
+      `conversations/${encodeURIComponent(id)}/realtime-qa/${encodeURIComponent(request)}`,
+      { signal },
+    );
+  }
   constructor(private readonly client: HttpClient) {
     super(client, "conversations");
   }

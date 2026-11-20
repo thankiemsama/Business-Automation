@@ -1,0 +1,157 @@
+.profile,
+.contact {
+  --customer-accent: light-dark(#116d63, #95e0d5);
+  --customer-tint: color-mix(
+    in srgb,
+    var(--customer-accent) 8%,
+    var(--surface)
+  );
+  min-width: 0;
+}
+
+.contact,
+.card {
+  padding: clamp(14px, 2vw, 21px);
+  border-radius: 14px;
+}
+
+.contact dl,
+.columns,
+.metrics,
+.history {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contact dd,
+.history dd {
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.contact dt,
+.metrics dt,
+.history dt,
+.card label {
+  color: var(--secondary-ink);
+  font-size: 0.8125rem;
+}
+
+.contact a,
+.card li a {
+  color: var(--customer-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.columns {
+  align-items: start;
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  gap: 12px;
+}
+
+.card h3 {
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.metrics > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--customer-tint);
+}
+
+.metrics dd {
+  color: var(--ink);
+  font-size: 1.4rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.card :global(.toolbar-controls) {
+  flex-wrap: wrap;
+}
+
+.timeline,
+.notes {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.timeline li,
+.notes article {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  overflow-wrap: anywhere;
+}
+
+.timeline li {
+  border-inline-start: 3px solid var(--customer-accent);
+}
+
+.eventMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  color: var(--secondary-ink);
+  font-size: 0.75rem;
+}
+
+.eventMeta > span:first-child {
+  color: var(--customer-accent);
+  font-weight: 700;
+}
+
+.eventMeta time {
+  margin-inline-start: auto;
+}
+
+.timeline p,
+.notes p {
+  color: var(--secondary-ink);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.notes time {
+  color: var(--secondary-ink);
+  font-size: 0.75rem;
+}
+
+.card textarea {
+  min-height: 112px;
+  margin-top: 6px;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.card :global(.button) {
+  width: fit-content;
+  min-height: 38px;
+}
+
+@media (max-width: 680px) {
+  .columns,
+  .contact dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

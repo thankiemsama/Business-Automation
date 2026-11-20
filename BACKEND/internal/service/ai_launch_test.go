@@ -132,6 +132,7 @@ func TestTicketAgentRejectsStalePlanAndAppliesOnce(t *testing.T) {
 	}
 	if err := operations.repo.Update(func(store core.Writer) error {
 		store.PutRecord(core.Record{ID: settingsID(owner.TenantID), TenantID: owner.TenantID, Kind: tenantSettingsKind, Content: `{"flags":{"ai_ticket_agent":true}}`})
+		seedSparringCertificate(store, owner.TenantID, model.model, now)
 		store.PutRecord(ticket)
 		addMessage(store, "first", 1)
 		return nil
@@ -161,6 +162,10 @@ func TestTicketAgentRejectsStalePlanAndAppliesOnce(t *testing.T) {
 	}
 	if resolutions != 1 {
 		t.Fatalf("resolution hooks=%d", resolutions)
+	}
+	traces, err := ai.AgentToolTraces(owner)
+	if err != nil || len(traces) != 3 || traces[0].Outcome != "applied" || traces[0].RunID != plan.ID {
+		t.Fatalf("expected one applied trace after two proposals: %+v, %v", traces, err)
 	}
 }
 

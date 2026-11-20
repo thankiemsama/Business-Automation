@@ -10,6 +10,29 @@ import (
 
 const ticketAgentPlansKind = "ai_agent_plans"
 const ticketAgentPlanTTL = 15 * time.Minute
+const ticketActionRule = `Chỉ chọn resolve_ticket khi khách xác nhận vấn đề đã xử lý và không còn việc chờ.
+Chọn send_csat khi phiếu đã giải quyết và đủ điều kiện khảo sát. Nếu có nghi ngờ, chọn handoff.`
+const ticketAgentCRMPrompt = `Chọn công cụ đọc CRM nếu cần ngữ cảnh lịch sử hỗ trợ.
+Trả JSON tool là "read_crm" hoặc "none". Không truy vấn khách hàng khác.`
+const ticketAgentPlannerPrompt = `Đề xuất một công cụ trong Allowed cho phiếu đã cho.
+Trả JSON action và reason (tiếng Việt, tối đa 300 ký tự). Không thực hiện hành động hoặc bịa thông tin trong lý do.
+` + ticketActionRule
+
+func agentPlannerPolicyID() string {
+	return tokenHash(ticketAgentCRMPrompt + "\x00" + ticketAgentPlannerPrompt)
+}
+
+func planAgentAction(model *OpenAIKnowledge, tenant string, input ticketAgentContext) (TicketAgentPlan, error) {
+	var result TicketAgentPlan
+	if err := model.complete(tenant, ticketAgentPlannerPrompt, input, 250, &result); err != nil {
+		return TicketAgentPlan{}, err
+	}
+	result.Reason = strings.TrimSpace(result.Reason)
+	if !contains(input.Allowed, result.Action) || result.Reason == "" || len([]rune(result.Reason)) > 300 {
+		return TicketAgentPlan{}, core.Fail(502, "Đề xuất của agent không hợp lệ")
+	}
+	return result, nil
+}
 
 type TicketAgentPlan struct {
 	ID        string    `json:"id"`
@@ -48,7 +71,8 @@ func (s *AIService) ticketAgentContext(store core.Reader, ticket core.Record) ti
 			context.MessageID = msg.ID
 		}
 	}
-	if ticket.Status != core.StatusResolved && context.MessageID != "" {
+	if ticket.Status != core.StatusResolved && context.MessageID != "" &&
+		s.model != nil && sparringPermitsResolution(store, ticket.TenantID, s.model.model, s.clock.Now()) {
 		context.Allowed = append(context.Allowed, "resolve_ticket")
 	}
 	if ticket.Status == core.StatusResolved && ticket.Rating == 0 && s.channels != nil {
@@ -79,18 +103,24 @@ func agentBoundState(ticket core.Record, input ticketAgentContext) string {
 }
 
 func (s *AIService) TicketAgentEnabled(user core.User) bool {
-	var enabled bool
+	return s.TicketAgentStatus(user)["enabled"]
+}
+
+func (s *AIService) TicketAgentStatus(user core.User) map[string]bool {
+	status := map[string]bool{"enabled": false, "can_resolve": false}
 	if s.Enabled() {
 		_ = s.repo.ViewTenant(user.TenantID, func(store core.Reader) error {
-			enabled = aiOptIn(store, user.TenantID, "ai_ticket_agent")
+			status["enabled"] = aiOptIn(store, user.TenantID, "ai_ticket_agent")
+			status["can_resolve"] = status["enabled"] && sparringPermitsResolution(store, user.TenantID, s.model.model, s.clock.Now())
 			return nil
 		})
 	}
-	return enabled
+	return status
 }
 
 func (s *AIService) PlanTicketAction(user core.User, id string) (TicketAgentPlan, error) {
 	result := TicketAgentPlan{}
+	run := s.repo.IDs.NewID()
 	if !s.TicketAgentEnabled(user) {
 		return result, core.Fail(403, "Doanh nghiệp chưa bật agent xử lý phiếu")
 	}
@@ -108,13 +138,12 @@ func (s *AIService) PlanTicketAction(user core.User, id string) (TicketAgentPlan
 	}
 	if ticket.CustomerID != "" {
 		var lookup struct{ Tool string }
-		err := s.model.complete(user.TenantID, `Chọn công cụ đọc CRM nếu cần ngữ cảnh lịch sử hỗ trợ.
-Trả JSON tool là "read_crm" hoặc "none". Không truy vấn khách hàng khác.`, input, 100, &lookup)
+		err := s.model.complete(user.TenantID, ticketAgentCRMPrompt, input, 100, &lookup)
 		if err != nil {
 			return result, err
 		}
 		if lookup.Tool == "read_crm" {
-			if err := s.repo.ViewTenant(user.TenantID, func(store core.Reader) error {
+			err := s.repo.ViewTenant(user.TenantID, func(store core.Reader) error {
 				current, err := findOwnedRecord(store, user, id, core.KindTickets)
 				if err != nil || current.CustomerID != ticket.CustomerID {
 					return core.Fail(409, "Hồ sơ gắn với phiếu đã thay đổi")
@@ -130,27 +159,27 @@ Trả JSON tool là "read_crm" hoặc "none". Không truy vấn khách hàng kh�
 					}
 				}
 				return nil
-			}); err != nil {
+			})
+			outcome := "completed"
+			if err != nil {
+				outcome = "failed"
+			}
+			s.appendAgentToolTrace(user.TenantID, run, "read_crm", outcome)
+			if err != nil {
 				return result, err
 			}
 		}
 	}
-	if err := s.model.complete(user.TenantID, `Đề xuất một công cụ trong Allowed cho phiếu đã cho.
-Trả JSON action và reason (tiếng Việt, tối đa 300 ký tự). Chỉ chọn resolve_ticket khi khách xác nhận vấn đề đã xử lý
-và không còn việc chờ. Chọn send_csat khi phiếu đã giải quyết và đủ điều kiện khảo sát.
-Nếu có nghi ngờ, chọn handoff. Không thực hiện hành động hoặc bịa thông tin trong lý do.`, input, 250, &result); err != nil {
+	result, err := planAgentAction(s.model, user.TenantID, input)
+	if err != nil {
 		return TicketAgentPlan{}, err
 	}
-	result.Reason = strings.TrimSpace(result.Reason)
-	if !contains(input.Allowed, result.Action) || result.Reason == "" || len([]rune(result.Reason)) > 300 {
-		return TicketAgentPlan{}, core.Fail(502, "Đề xuất của agent không hợp lệ")
-	}
 	now := s.clock.Now().UTC()
-	result.ID, result.Status, result.ExpiresAt = s.repo.IDs.NewID(), "proposed", now.Add(ticketAgentPlanTTL)
+	result.ID, result.Status, result.ExpiresAt = run, "proposed", now.Add(ticketAgentPlanTTL)
 	if result.Action == "handoff" {
 		result.Status = "handed_off"
 	}
-	err := updateAsTenant(s.repo, user, func(store core.Writer) error {
+	err = updateAsTenant(s.repo, user, func(store core.Writer) error {
 		if !aiOptIn(store, user.TenantID, "ai_ticket_agent") {
 			return core.Fail(403, "Agent đã tắt cho doanh nghiệp")
 		}
@@ -170,15 +199,17 @@ Nếu có nghi ngờ, chọn handoff. Không thực hiện hành động hoặc 
 		store.PutRecord(core.Record{
 			ID: result.ID, TenantID: user.TenantID, Kind: ticketAgentPlansKind, Name: result.Action, CustomerID: ticket.CustomerID,
 			ConversationID: ticket.ID, AuthorID: user.ID, Subject: state, Content: string(data), Status: result.Status,
+			Slug: agentPlannerPolicyID(), AutomationID: s.model.model,
 			Enabled: input.CRM != nil, CreatedAt: now, UpdatedAt: now,
 		})
-		return nil
+		return writeAgentToolTrace(store, user.TenantID, run, result.Action, result.Status, s.model.model, now)
 	})
 	return result, err
 }
 
 func (s *AIService) ApplyTicketAction(user core.User, ticketID, planID string) (TicketAgentPlan, error) {
 	result := TicketAgentPlan{}
+	failedTool := ""
 	err := updateAsTenant(s.repo, user, func(store core.Writer) error {
 		if !aiOptIn(store, user.TenantID, "ai_ticket_agent") {
 			return core.Fail(403, "Agent đã tắt cho doanh nghiệp")
@@ -195,7 +226,8 @@ func (s *AIService) ApplyTicketAction(user core.User, ticketID, planID string) (
 			return nil
 		}
 		now := s.clock.Now().UTC()
-		if plan.Status != "proposed" || !now.Before(result.ExpiresAt) {
+		if plan.Status != "proposed" || plan.Slug != agentPlannerPolicyID() ||
+			s.model == nil || plan.AutomationID != s.model.model || !now.Before(result.ExpiresAt) {
 			return core.Fail(409, "Đề xuất đã hết hiệu lực")
 		}
 		ticket, err := findOwnedRecord(store, user, ticketID, core.KindTickets)
@@ -203,6 +235,9 @@ func (s *AIService) ApplyTicketAction(user core.User, ticketID, planID string) (
 			return err
 		}
 		input := s.ticketAgentContext(store, ticket)
+		if plan.Name == "resolve_ticket" && (s.model == nil || !sparringPermitsResolution(store, user.TenantID, s.model.model, now)) {
+			return core.Fail(403, "AI agent cần chứng chỉ Sparring còn hiệu lực để giải quyết phiếu")
+		}
 		if plan.Subject != agentBoundState(ticket, input) || !contains(input.Allowed, plan.Name) {
 			return core.Fail(409, "Trạng thái phiếu đã đổi. Hãy tạo đề xuất mới")
 		}
@@ -213,6 +248,7 @@ func (s *AIService) ApplyTicketAction(user core.User, ticketID, planID string) (
 		case "send_csat":
 			thread, _ := store.Record(user.TenantID, ticket.ConversationID, core.KindConversations)
 			if err := s.channels.queueChannelSurvey(store, thread); err != nil {
+				failedTool = plan.Name
 				return err
 			}
 		default:
@@ -220,8 +256,15 @@ func (s *AIService) ApplyTicketAction(user core.User, ticketID, planID string) (
 		}
 		result.Status, plan.Status, plan.UpdatedAt = "applied", "applied", now
 		store.PutRecord(plan)
-		return nil
+		model := ""
+		if s.model != nil {
+			model = s.model.model
+		}
+		return writeAgentToolTrace(store, user.TenantID, planID, plan.Name, "applied", model, now)
 	})
+	if err != nil && failedTool != "" {
+		s.appendAgentToolTrace(user.TenantID, planID, failedTool, "failed")
+	}
 	return result, err
 }
 
@@ -247,12 +290,22 @@ func resolveOnCustomerConfirmation(store core.Writer, conversation, previous, me
 		return false
 	}
 	now := message.CreatedAt.UTC()
+	model := ""
+	if writer, ok := store.(*workspaceWriter); ok {
+		model = writer.workspace.sparringModel
+	}
+	if !sparringPermitsResolution(store, tenant, model, now) {
+		return false
+	}
 	ticket.Status, ticket.UpdatedAt, ticket.ResolvedAt = core.StatusResolved, now, &now
 	store.PutRecord(ticket)
+	run := tokenHash("agent-confirmed-resolution:" + message.ID)
 	store.PutRecord(core.Record{
-		ID: tokenHash("agent-confirmed-resolution:" + message.ID), TenantID: tenant, Kind: ticketAgentPlansKind,
+		ID: run, TenantID: tenant, Kind: ticketAgentPlansKind,
 		Name: "resolve_ticket", Status: "auto_applied", ConversationID: ticket.ID, CustomerID: ticket.CustomerID,
 		MessageID: message.ID, CreatedAt: now, UpdatedAt: now,
 	})
+	// Resolution is already safe to apply when an older trace buffer is unreadable.
+	_ = writeAgentToolTrace(store, tenant, run, "resolve_ticket", "auto_applied", model, now)
 	return true
 }

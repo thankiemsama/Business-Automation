@@ -58,8 +58,9 @@ var PublicChannels = []string{
 
 // webhook event names emitted to outgoing integrations.
 const (
-	EventTicketCreated = "ticket.created"
-	EventMessageNew    = "message.new"
-	EventSLABreached   = "sla.breached"
-	EventCSATSubmitted = "csat.submitted"
+	EventTicketCreated   = "ticket.created"
+	EventMessageNew      = "message.new"
+	EventSLABreached     = "sla.breached"
+	EventCSATSubmitted   = "csat.submitted"
+	EventBillingQuotaLow = "credit_balance.low"
 )

@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
 import { errorMessage } from "@/shared/api/http-client";
+import { ErrorState, Loading } from "@/shared/ui/primitives";
 
 export function ApiKeys() {
   const { platform } = useServices();
@@ -40,10 +41,21 @@ export function ApiKeys() {
 
   return (
     <div className="integrations-grid">
-      <div className="form-stack">
+      <form
+        className="form-stack"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void create();
+        }}
+      >
+        <h3>Tạo khóa API</h3>
         <label>
           Tên key
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </label>
         <div className="field-row">
           <label>
@@ -63,17 +75,24 @@ export function ApiKeys() {
             />
           </label>
         </div>
-        <button className="button primary" disabled={busy} onClick={create}>
-          Tạo API key
+        <button className="button primary" disabled={busy || !name.trim()}>
+          Tạo khóa
         </button>
         {created && (
-          <p role="status">
-            Key (hiển thị một lần): <code>nexa_{created}</code>
+          <p className="integration-secret" role="status">
+            Lưu khóa ngay. Khóa chỉ hiển thị một lần.{" "}
+            <code>nexa_{created}</code>
           </p>
         )}
-        {(error || keys.error) && <p role="alert">{error || keys.error}</p>}
-      </div>
-      <div className="workspace-results">
+        {error && <p role="alert">{error}</p>}
+      </form>
+      <section className="workspace-results">
+        <h3>Khóa đã cấp</h3>
+        {keys.error ? (
+          <ErrorState message={keys.error} retry={keys.reload} />
+        ) : keys.loading ? (
+          <Loading />
+        ) : null}
         {(keys.data ?? []).map((key) => (
           <div key={key.id} className="integration-item">
             <strong>{key.name}</strong>
@@ -82,17 +101,28 @@ export function ApiKeys() {
               {key.rate_per_min} req/phút
             </span>
             <button
-              className="text-link"
-              onClick={() => {
-                void platform.revokeApiKey(key.id).then(() => keys.reload());
+              type="button"
+              className="button secondary compact"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                try {
+                  await platform.revokeApiKey(key.id);
+                  keys.reload();
+                } catch (err) {
+                  setError(errorMessage(err));
+                } finally {
+                  setBusy(false);
+                }
               }}
             >
               Thu hồi
             </button>
           </div>
         ))}
-        {!keys.data?.length && <p className="muted">Chưa có API key nào.</p>}
-      </div>
+        {keys.data?.length === 0 && <p className="muted">Chưa có khóa API.</p>}
+      </section>
     </div>
   );
 }

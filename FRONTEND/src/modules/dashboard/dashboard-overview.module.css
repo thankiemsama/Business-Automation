@@ -1,0 +1,115 @@
+.overview {
+  --overview-accent: light-dark(#116d63, #95e0d5);
+  --overview-tint: color-mix(
+    in srgb,
+    var(--overview-accent) 8%,
+    var(--surface)
+  );
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+}
+
+.overview :global(.overview-toolbar) {
+  margin: 0;
+}
+
+.overview :global(.overview-toolbar) h2,
+.overview :global(.section-title) h2 {
+  color: var(--ink);
+  font-size: 1.0625rem;
+  font-weight: 750;
+}
+
+.overview :global(.metric-grid) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.overview :global(.metric-card),
+.overview :global(.dashboard-columns) > section,
+.overview :global(.quick-card) {
+  min-width: 0;
+  border-radius: 14px;
+}
+
+.overview :global(.metric-card) {
+  min-height: 0;
+  padding: 13px;
+}
+
+.overview :global(.metric-card) > strong {
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.overview :global(.metric-top),
+.overview :global(.metric-bottom) {
+  color: var(--secondary-ink);
+  font-size: 0.75rem;
+}
+
+.overview :global(.dashboard-columns) {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+}
+
+.overview :global(.dashboard-ticket) {
+  min-width: 0;
+  gap: 8px;
+}
+
+.overview :global(.dashboard-ticket) > div {
+  min-width: 0;
+}
+
+.overview :global(.dashboard-ticket) strong {
+  overflow-wrap: anywhere;
+}
+
+.overview :global(.quick-section) {
+  margin: 0;
+}
+
+.overview :global(.quick-card) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 0;
+  padding: 12px;
+}
+
+.overview :global(.quick-card) :is(h3, p) {
+  margin: 0;
+}
+
+.overview :global(.quick-card) > svg {
+  color: var(--overview-accent);
+}
+
+.overview :global(.quick-icon) {
+  margin: 0;
+  background: var(--overview-tint);
+  color: var(--overview-accent);
+}
+
+.overview a:focus-visible {
+  outline: 2px solid var(--overview-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .overview :global(.metric-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 740px) {
+  .overview :global(.dashboard-columns),
+  .overview :global(.quick-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

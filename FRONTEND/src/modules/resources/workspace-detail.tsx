@@ -16,6 +16,7 @@ import { TicketAgent } from "../ai/ticket-agent";
 import { CustomValues } from "../admin/custom-values";
 import { Assignment } from "../team/assignment";
 import type { ResourceMap } from "@/shared/domain/models";
+import customerStyles from "../customers/customer-profile.module.css";
 
 export function ConversationDetail({ id }: { id: string }) {
   const { conversations } = useServices();
@@ -42,6 +43,7 @@ export function ConversationDetail({ id }: { id: string }) {
       </PageHeading>
       <div className="panel workspace-detail-thread has-selection">
         <ConversationThread
+          showDetails={false}
           conversation={item}
           onEdit={() => setEditing(true)}
           onChanged={result.reload}
@@ -102,7 +104,13 @@ export function WorkspaceDetail<K extends "customers" | "tickets">({
         </button>
       </PageHeading>
       <CustomValues kind={kind} id={id} />
-      <section className="panel team-form form-stack">
+      <section
+        className={
+          customer
+            ? `panel ${customerStyles.contact}`
+            : "panel team-form form-stack"
+        }
+      >
         {ticket && (
           <>
             <div className="toolbar-controls">
@@ -164,11 +172,25 @@ export function WorkspaceDetail<K extends "customers" | "tickets">({
           </>
         )}
         {customer && (
-          <dl>
-            <dt>Email</dt>
-            <dd>{customer.email || "Chưa cung cấp"}</dd>
-            <dt>Điện thoại</dt>
-            <dd>{customer.phone || "Chưa cung cấp"}</dd>
+          <dl aria-label="Thông tin liên hệ">
+            <div>
+              <dt>Email</dt>
+              <dd>
+                {customer.email ? (
+                  <a
+                    href={`mailto:${encodeURIComponent(customer.email).replace(/%40/g, "@")}`}
+                  >
+                    {customer.email}
+                  </a>
+                ) : (
+                  "Chưa cung cấp"
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Điện thoại</dt>
+              <dd>{customer.phone || "Chưa cung cấp"}</dd>
+            </div>
           </dl>
         )}
       </section>

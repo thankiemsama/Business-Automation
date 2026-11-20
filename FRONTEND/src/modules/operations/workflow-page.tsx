@@ -5,6 +5,7 @@ import { useUser } from "@/shared/providers/workspace-provider";
 import { ErrorState, PageHeading } from "@/shared/ui/primitives";
 import { WorkflowPanel } from "./workflow-panel";
 import { SchedulePanel } from "./schedule-panel";
+import { SkillRoutingPanel } from "./skill-routing-panel";
 
 export function WorkflowPage() {
   const user = useUser();
@@ -26,6 +27,11 @@ export function WorkflowPage() {
         label="Tự động hóa"
         sections={[
           { id: "rules", label: "Workflow", content: <WorkflowPanel /> },
+          {
+            id: "routing",
+            label: "Định tuyến theo kỹ năng",
+            content: <SkillRoutingPanel />,
+          },
           {
             id: "schedules",
             label: "Lịch gửi báo cáo",

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ func generalPublicIntent(value string) bool {
 func (s *AIService) runChatbot() {
 	var conversation, message core.Record
 	var articles []core.Record
+	var profile AIHandoffPolicy
+	var csSOP string
 	recent := s.clock.Now().Add(-20 * time.Minute)
 	_ = s.repo.View(func(store core.Reader) error {
 		for _, tenant := range store.Tenants() {
@@ -52,6 +55,11 @@ func (s *AIService) runChatbot() {
 					continue
 				}
 				conversation, message = candidate, current
+				settings, _ := tenantSettings(store, tenant)
+				profile = settings.AIHandoff
+				if aiOptIn(store, tenant, "ai_cs_persona") {
+					csSOP = settings.PersonaSOP["cs"]
+				}
 				for _, article := range store.Records(tenant, core.KindKnowledge) {
 					if article.Public {
 						articles = append(articles, article)
@@ -67,10 +75,24 @@ func (s *AIService) runChatbot() {
 	}
 	answer := Answer{NeedsHuman: true}
 	knowledgeGap := false
-	if message.Sentiment != "angry" && message.AttachmentData == "" && message.AttachmentName == "" {
-		generated, err := s.model.answer(conversation.TenantID, message.Content, articles)
+	lowerBound := 0.0
+	handoffReason := "confidence_or_grounding"
+	switch {
+	case profile.Enabled && requestsHuman(message.Content):
+		handoffReason = "customer_requested_human"
+	case message.Sentiment == "angry":
+		handoffReason = "customer_distress"
+	case message.AttachmentData != "" || message.AttachmentName != "":
+		handoffReason = "attachment_requires_review"
+	default:
+		generated, err := s.model.answerWithSOP(conversation.TenantID, message.Content, articles, csSOP)
 		knowledgeGap = err == nil && generated.knowledgeGap && !generalPublicIntent(message.Content)
-		_, lowerBound := s.chatCalibration.probability(generated.Confidence)
+		_, lowerBound = s.chatCalibration.probability(generated.Confidence)
+		if err != nil {
+			handoffReason = "model_unavailable"
+		} else if generated.Sentiment == "angry" {
+			handoffReason = "customer_distress"
+		}
 		if err == nil && validSentiment(generated.Sentiment) && generated.Sentiment != "angry" &&
 			s.chatThreshold >= .7 && lowerBound >= s.chatThreshold &&
 			(generated.SourceID != "" || generalPublicIntent(message.Content)) {
@@ -107,15 +129,32 @@ func (s *AIService) runChatbot() {
 		if currentMessage.Sentiment == "angry" || currentMessage.AttachmentData != "" || currentMessage.AttachmentName != "" {
 			answer.NeedsHuman = true
 		}
+		settings, _ := tenantSettings(store, tenant)
+		profile = settings.AIHandoff
+		if profile.Enabled {
+			switch {
+			case requestsHuman(currentMessage.Content):
+				answer.NeedsHuman, handoffReason = true, "customer_requested_human"
+			case currentMessage.Sentiment == "angry":
+				answer.NeedsHuman, handoffReason = true, "customer_distress"
+			case currentMessage.AttachmentData != "" || currentMessage.AttachmentName != "":
+				answer.NeedsHuman, handoffReason = true, "attachment_requires_review"
+			case !answer.NeedsHuman && lowerBound < max(s.chatThreshold, profile.MinimumConfidence):
+				answer.NeedsHuman, handoffReason = true, "below_handoff_threshold"
+			}
+		}
 		now := s.clock.Now().UTC()
 		if answer.SourceID != "" {
 			current, available := store.Record(tenant, answer.SourceID, core.KindKnowledge)
 			if !available || !current.Public || !current.Enabled {
 				answer.NeedsHuman = true
+				handoffReason = "knowledge_changed"
 			}
 			for _, article := range articles {
-				if article.ID == current.ID && (article.Content != current.Content || article.Subject != current.Subject) {
+				if article.ID == current.ID && (article.Content != current.Content || article.Subject != current.Subject ||
+					article.VideoTranscript != current.VideoTranscript) {
 					answer.NeedsHuman = true
+					handoffReason = "knowledge_changed"
 				}
 			}
 		}
@@ -130,6 +169,7 @@ func (s *AIService) runChatbot() {
 		if !answer.NeedsHuman && isLiveChannel(fresh.Channel) {
 			if s.channels == nil || s.channels.enqueueReply(store, fresh, reply) != nil {
 				answer.NeedsHuman = true
+				handoffReason = "channel_unavailable"
 			} else {
 				reply.Status = "pending"
 			}
@@ -140,6 +180,15 @@ func (s *AIService) runChatbot() {
 				marker.Name, marker.MessageID = "knowledge_gap", message.ID
 			}
 			botHandoff(store, s.repo.IDs, fresh, message, now)
+			if profile.Enabled {
+				marker.Subject, marker.MessageID = handoffReason, message.ID
+				threshold := strconv.FormatFloat(max(s.chatThreshold, profile.MinimumConfidence), 'f', -1, 64)
+				marker.Slug = tokenHash("chatbot-handoff-v1:" + threshold)[:12]
+				if err := writeAgentTrace(store, tenant, AgentToolTrace{RunID: fresh.ID, Tool: "chatbot_handoff",
+					Outcome: handoffReason, Model: s.model.model, Policy: marker.Slug, At: now}); err != nil {
+					return err
+				}
+			}
 		} else {
 			marker.Status = "answered"
 			store.PutRecord(reply)
@@ -172,7 +221,8 @@ func botHandoff(store core.Writer, ids IDGenerator, conversation, inbound core.R
 		}
 	}
 	ticket := core.Record{ID: ids.NewID(), TenantID: conversation.TenantID, Kind: core.KindTickets, ConversationID: conversation.ID,
-		CustomerID: conversation.CustomerID, AssigneeID: conversation.AssigneeID, Subject: "Cần nhân viên hỗ trợ: " + conversation.Subject,
+		AutomationID: "ai_handoff",
+		CustomerID:   conversation.CustomerID, AssigneeID: conversation.AssigneeID, Subject: "Cần nhân viên hỗ trợ: " + conversation.Subject,
 		Content: inbound.Content, Status: core.StatusOpen, Priority: core.PriorityNormal, CreatedAt: now, UpdatedAt: now}
 	response, resolution := ticketDeadlines(ticket)
 	ticket.ResponseDueAt, ticket.ResolutionDueAt = &response, &resolution
@@ -183,7 +233,7 @@ func botHandoff(store core.Writer, ids IDGenerator, conversation, inbound core.R
 }
 
 func botChannel(channel string) bool {
-	return channel == core.ChannelWeb || isLiveChannel(channel)
+	return channel == core.ChannelWeb || channel == core.ChannelZalo || channel == core.ChannelWhatsApp
 }
 
 func confirmBotResolution(store core.Writer, conversation, previous, customer core.Record) bool {

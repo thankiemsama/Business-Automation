@@ -35,7 +35,7 @@ func (h *Handler) allowAI(w http.ResponseWriter, key string, limit int, period t
 }
 
 func (h *Handler) guestVoice(w http.ResponseWriter, r *http.Request) {
-	enabled := h.ai.Enabled() && os.Getenv("AI_CHAT_WIDGET_VOICE") == "true" && (h.admin == nil || h.admin.Feature(r.PathValue("tenant"), "ai"))
+	enabled := h.ai.TranscriptionEnabled() && os.Getenv("AI_CHAT_WIDGET_VOICE") == "true" && (h.admin == nil || h.admin.Feature(r.PathValue("tenant"), "ai"))
 	if r.Method == http.MethodGet {
 		respond(w, 200, map[string]bool{"enabled": enabled}, nil)
 		return
@@ -63,8 +63,31 @@ func (h *Handler) aiRoutes(mux *http.ServeMux) {
 	if h.ai == nil {
 		return
 	}
+	mux.HandleFunc("GET /api/v1/ai/realtime-qa/status", h.protected(func(w http.ResponseWriter, _ *http.Request, user core.User, _ string) {
+		enabled, err := h.ai.RealtimeQAEnabled(user)
+		respond(w, 200, map[string]bool{"enabled": enabled}, err)
+	}))
+	mux.HandleFunc("POST /api/v1/conversations/{id}/realtime-qa", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		if !h.allowAI(w, "realtime-qa:"+user.ID, 8, time.Minute) {
+			return
+		}
+		var input struct {
+			Draft string `json:"draft"`
+		}
+		if err := decode(w, r, &input); err != nil {
+			respond(w, 400, nil, err)
+			return
+		}
+		result, err := h.ai.QueueRealtimeQA(user, r.PathValue("id"), input.Draft)
+		respond(w, 202, result, err)
+	}))
+	mux.HandleFunc("GET /api/v1/conversations/{id}/realtime-qa/{request}", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		result, err := h.ai.RealtimeQAResult(user, r.PathValue("id"), r.PathValue("request"))
+		respond(w, 200, result, err)
+	}))
 	mux.HandleFunc("GET /api/v1/ai/status", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
-		respond(w, 200, map[string]bool{"enabled": h.ai.Enabled() && (h.admin == nil || h.admin.Feature(user.TenantID, "ai"))}, nil)
+		enabled := h.ai.Enabled() && (h.admin == nil || h.admin.Feature(user.TenantID, "ai"))
+		respond(w, 200, map[string]bool{"enabled": enabled, "transcription": enabled && h.ai.TranscriptionEnabled()}, nil)
 	}))
 	mux.HandleFunc("GET /api/v1/ai/search", h.protected(h.aiSearch))
 	mux.HandleFunc("POST /api/v1/ai/summary/{kind}/{id}", h.protected(h.aiSummary))
@@ -79,10 +102,21 @@ func (h *Handler) aiRoutes(mux *http.ServeMux) {
 		respond(w, 200, map[string]bool{"enabled": h.ai.VoiceImportEnabled(user)}, nil)
 	}))
 	mux.HandleFunc("GET /api/v1/ai/ticket-agent/status", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
-		respond(w, 200, map[string]bool{"enabled": h.ai.TicketAgentEnabled(user)}, nil)
+		respond(w, 200, h.ai.TicketAgentStatus(user), nil)
 	}))
 	mux.HandleFunc("POST /api/v1/ai/ticket-agent/{id}/plan", h.protected(h.planTicketAction))
 	mux.HandleFunc("POST /api/v1/ai/ticket-agent/{id}/apply", h.protected(h.applyTicketAction))
+	mux.HandleFunc("GET /api/v1/ai/ticket-agent/traces", h.protected(func(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+		rows, err := h.ai.AgentToolTraces(user)
+		respond(w, 200, rows, err)
+	}))
+	mux.HandleFunc("GET /api/v1/ai/sparring", h.protected(h.sparringOverview))
+	mux.HandleFunc("GET /api/v1/ai/sparring/preview/{id}", h.protected(h.sparringPreview))
+	mux.HandleFunc("POST /api/v1/ai/sparring/scenarios", h.protected(h.sparringScenario))
+	mux.HandleFunc("POST /api/v1/ai/sparring/scenarios/{id}/archive", h.protected(h.sparringArchive))
+	mux.HandleFunc("POST /api/v1/ai/sparring/sessions", h.protected(h.sparringStart))
+	mux.HandleFunc("POST /api/v1/ai/sparring/sessions/{id}/turn", h.protected(h.sparringTurn))
+	mux.HandleFunc("POST /api/v1/ai/sparring/sessions/{id}/end", h.protected(h.sparringEnd))
 	mux.HandleFunc("POST /api/v1/ai/voice-inbox/transcribe", h.protected(h.importVoiceRecording))
 	mux.HandleFunc("GET /api/v1/chat/{tenant}/voice-status", h.guestVoice)
 	mux.HandleFunc("POST /api/v1/chat/{tenant}/transcribe", h.guestVoice)

@@ -11,6 +11,7 @@ import {
 } from "./admin-panels";
 import { FieldsAdmin } from "./custom-values";
 import { FieldExtractionPanel } from "./field-extraction";
+import { AgentTraces } from "./agent-traces";
 
 export function AdminPage() {
   const user = useUser();
@@ -44,6 +45,11 @@ export function AdminPage() {
             content: <FieldExtractionPanel />,
           },
           { id: "audit", label: "Nhật ký thay đổi", content: <AuditPanel /> },
+          {
+            id: "agent-traces",
+            label: "Dấu vết AI agent",
+            content: <AgentTraces />,
+          },
         ]}
       />
     </>

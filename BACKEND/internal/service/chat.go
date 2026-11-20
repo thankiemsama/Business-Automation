@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"sort"
 	"strings"
 
@@ -8,11 +9,18 @@ import (
 )
 
 type ChatMessage struct {
-	AttachmentName string `json:"attachment_name,omitempty"`
-	AttachmentData string `json:"attachment_data,omitempty"`
-	ID             string `json:"id"`
-	Content        string `json:"content"`
-	Sender         string `json:"sender"`
+	BrandCard      *core.BrandCard `json:"brand_card,omitempty"`
+	AttachmentName string          `json:"attachment_name,omitempty"`
+	AttachmentData string          `json:"attachment_data,omitempty"`
+	ID             string          `json:"id"`
+	Content        string          `json:"content"`
+	Sender         string          `json:"sender"`
+}
+
+type PublicChatState struct {
+	Messages []ChatMessage `json:"messages"`
+	CanRate  bool          `json:"can_rate"`
+	Rated    bool          `json:"rated"`
 }
 
 func (s *ConversationService) StartChat(tenant, name, content, fileName, fileData string) (string, error) {
@@ -46,19 +54,29 @@ func (s *ConversationService) StartChat(tenant, name, content, fileName, fileDat
 }
 
 func (s *ConversationService) PublicChat(token, content, fileName, fileData string, rating int) ([]ChatMessage, error) {
-	result := []ChatMessage{}
+	state, err := s.publicChat(token, content, fileName, fileData, rating)
+	return state.Messages, err
+}
+
+func (s *ConversationService) ReadPublicChat(token string) (PublicChatState, error) {
+	return s.publicChat(token, "", "", "", 0)
+}
+
+func (s *ConversationService) publicChat(token, content, fileName, fileData string, rating int) (PublicChatState, error) {
+	result := PublicChatState{Messages: []ChatMessage{}}
 	// The public token embeds a tenant identifier plus an independently generated secret.
 	tenant, secret, ok := strings.Cut(token, ".")
 	if !ok || secret == "" {
-		return nil, core.Fail(401, "Phiên chat không hợp lệ")
+		return PublicChatState{}, core.Fail(401, "Phiên chat không hợp lệ")
 	}
 	content = strings.TrimSpace(content)
 	if err := validateAttachment(fileName, fileData); err != nil {
-		return nil, err
+		return PublicChatState{}, err
 	}
 	if len(content) > maximumMessageBytes || rating < 0 || rating > 5 || ((content != "" || fileData != "") && rating > 0) {
-		return nil, core.Fail(400, "Dữ liệu không hợp lệ")
+		return PublicChatState{}, core.Fail(400, "Dữ liệu không hợp lệ")
 	}
+	var selected []core.Record
 	run := func(store core.Reader, writer core.Writer) error {
 		session, ok := store.Record(tenant, tokenHash(secret), "chat_sessions")
 		if !ok {
@@ -95,6 +113,8 @@ func (s *ConversationService) PublicChat(token, content, fileName, fileData stri
 			conversation.Rating, conversation.RatedAt = rating, &now
 			writer.PutRecord(conversation)
 		}
+		result.Rated = conversation.Rating != 0
+		result.CanRate = conversation.Status == core.StatusClosed && !result.Rated
 		var messages []core.Record
 		for _, message := range store.Records(tenant, core.KindMessages) {
 			if message.ConversationID == conversation.ID && message.Sender != "note" {
@@ -102,15 +122,26 @@ func (s *ConversationService) PublicChat(token, content, fileName, fileData stri
 			}
 		}
 		sort.Slice(messages, func(i, j int) bool { return laterMessage(messages[j], messages[i]) })
-		for _, message := range messages[max(0, len(messages)-30):] {
-			result = append(result, ChatMessage{ID: message.ID, Content: message.Content, Sender: message.Sender, AttachmentName: message.AttachmentName, AttachmentData: message.AttachmentData})
-		}
+		selected = messages[max(0, len(messages)-30):]
 		return nil
 	}
+	var err error
 	if content == "" && fileData == "" && rating == 0 {
-		err := s.repo.View(func(store core.Reader) error { return run(store, nil) })
-		return result, err
+		err = s.repo.View(func(store core.Reader) error { return run(store, nil) })
+	} else {
+		err = s.repo.Update(func(store core.Writer) error { return run(store, store) })
 	}
-	err := s.repo.Update(func(store core.Writer) error { return run(store, store) })
-	return result, err
+	if err != nil {
+		return PublicChatState{}, err
+	}
+	for _, message := range selected {
+		if workspace, ok := s.repo.(*Workspace); ok {
+			if err := workspace.HydrateAttachment(context.Background(), &message); err != nil &&
+				content == "" && fileData == "" && rating == 0 {
+				return PublicChatState{}, err
+			}
+		}
+		result.Messages = append(result.Messages, ChatMessage{ID: message.ID, Content: message.Content, Sender: message.Sender, AttachmentName: message.AttachmentName, AttachmentData: message.AttachmentData, BrandCard: message.BrandCard})
+	}
+	return result, nil
 }

@@ -33,13 +33,22 @@ func (p *OpenAIKnowledge) ConfigureUsage(repo core.Repository, clock Clock, ids 
 		day := reportDay(now).Format("2006-01-02")
 		return updateTenant(repo, tenant, func(store core.Writer) error {
 			settings, err := tenantSettings(store, tenant)
-			if err != nil || settings.DailyAIRequests <= 0 {
+			if err != nil {
 				return err
 			}
-			id := tokenHash("ai-quota:" + day)
+			if err := reserveBillingQuota(store, tenant, billingAI, now); err != nil {
+				return err
+			}
+			if settings.DailyAIRequests <= 0 {
+				return nil
+			}
+			id := tokenHash("ai-quota:" + tenant + ":" + day)
 			record, found := store.Record(tenant, id, aiQuotaKind)
 			if !found {
 				record = core.Record{ID: id, TenantID: tenant, Kind: aiQuotaKind, CreatedAt: now}
+				if legacy, exists := store.Record(tenant, tokenHash("ai-quota:"+day), aiQuotaKind); exists {
+					record.Sequence, record.CreatedAt = legacy.Sequence, legacy.CreatedAt
+				}
 			}
 			if record.Sequence >= uint64(settings.DailyAIRequests) {
 				return errAIQuota

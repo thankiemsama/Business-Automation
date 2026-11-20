@@ -73,15 +73,17 @@ func (s *PlatformService) CreatePortalTicket(tenant, token, subject, content, pr
 		conversation := core.Record{
 			ID: s.ids.NewID(), TenantID: tenant, Kind: core.KindConversations,
 			CustomerID: customer.ID, Channel: core.ChannelWeb, Status: core.StatusOpen,
-			Subject: subject, CreatedAt: now, UpdatedAt: now,
+			Subject: subject, Priority: priority, CreatedAt: now, UpdatedAt: now,
 		}
 		store.PutRecord(conversation)
+		routed, _ := store.Record(tenant, conversation.ID, core.KindConversations)
 		store.PutRecord(core.Record{ID: s.ids.NewID(), TenantID: tenant, Kind: core.KindMessages, ConversationID: conversation.ID, Content: content, Sender: core.SenderCustomer, Sequence: 1, AttachmentName: fileName, AttachmentData: fileData, CreatedAt: now, UpdatedAt: now})
 		ticket := core.Record{
 			ID: s.ids.NewID(), TenantID: tenant, Kind: core.KindTickets,
 			CustomerID: customer.ID, ConversationID: conversation.ID,
 			Subject: subject, Content: content, Status: core.StatusOpen,
 			Priority: priority, Tags: append([]string{}, customer.Tags...),
+			AssigneeID: routed.AssigneeID,
 			CreatedAt: now, UpdatedAt: now,
 		}
 		response, resolution := ticketDeadlines(ticket)

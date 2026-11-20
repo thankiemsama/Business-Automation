@@ -33,6 +33,24 @@ export default async function KnowledgeArticlePage({
         {article.subject}
       </p>
       <h1>{article.subject}</h1>
+      {article.video_url && (
+        <p>
+          <a href={article.video_url} target="_blank" rel="noreferrer">
+            Mở video hướng dẫn
+          </a>
+        </p>
+      )}
+      {article.video_transcript && (
+        <details className="kb-content">
+          <summary>Bản chép lời video</summary>
+          {article.video_transcript
+            .split("\n")
+            .filter(Boolean)
+            .map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+        </details>
+      )}
       <div
         className="kb-content"
         dangerouslySetInnerHTML={{

@@ -1,9 +1,53 @@
-.tickets {
+.tickets,
+.automations {
   --ticket-accent: light-dark(#116f64, #8eddd0);
   --ticket-tint: color-mix(in srgb, var(--ticket-accent) 8%, var(--surface));
   overflow: hidden;
   border-radius: 16px;
   box-shadow: 0 8px 28px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.automations :global(.panel-toolbar) {
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 18px;
+}
+
+.automations :global(.tab-label) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+
+.automations table {
+  min-width: 560px;
+}
+
+.automations :is(th, td) {
+  padding: 10px 12px;
+  font-size: 0.8125rem;
+}
+
+.automations :global(.keywords) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.automations :global(.keywords) span,
+.escalated {
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--ticket-tint);
+  color: var(--ticket-accent);
+}
+
+.ruleControls {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .tickets :global(.panel-toolbar) {
@@ -187,6 +231,29 @@
 
 .actions:not(:empty) {
   margin-bottom: 6px;
+}
+
+.rowControls {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.rowControls > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowControls :global(.icon-button) {
+  flex: none;
+  min-width: 36px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.rowControls select {
+  width: 100%;
 }
 
 .tickets :global(.pagination) {

@@ -21,6 +21,8 @@ const paths = {
   send: "m22 2-7 20-4-9-9-4z M22 2 11 13",
   shield: "M12 22s9-4 9-11V4l-9-3-9 3v7c0 7 9 11 9 11 M8 11l3 3 5-5",
   menu: "M3 6h18 M3 12h18 M3 18h18",
+  sidebarCollapse: "M3 5h18v14H3z M9 5v14 M16 9l-3 3 3 3",
+  sidebarExpand: "M3 5h18v14H3z M9 5v14 M13 9l3 3-3 3",
   globe:
     "M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M3 12h18 M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18",
   info: "M12 11v6 M12 7h.01 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",

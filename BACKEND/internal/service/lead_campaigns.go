@@ -22,17 +22,20 @@ var campaignPhone = regexp.MustCompile(`^[1-9][0-9]{7,14}$`)
 var campaignCode = regexp.MustCompile(`^[a-zA-Z0-9_-]{12,80}$`)
 
 type LeadCampaign struct {
-	ID        string   `json:"id,omitempty"`
-	Name      string   `json:"name"`
-	Channel   string   `json:"channel"`
-	Phone     string   `json:"phone"`
-	Welcome   string   `json:"welcome"`
-	FollowUps []string `json:"follow_ups"`
-	Enabled   bool     `json:"enabled"`
-	URL       string   `json:"url,omitempty"`
-	Visits    uint64   `json:"visits,omitempty"`
-	Leads     int      `json:"leads,omitempty"`
-	Engaged   int      `json:"engaged,omitempty"`
+	FollowUpTickets bool     `json:"follow_up_tickets,omitempty"`
+	Accepted        int      `json:"accepted,omitempty"`
+	Replied         int      `json:"replied,omitempty"`
+	ID              string   `json:"id,omitempty"`
+	Name            string   `json:"name"`
+	Channel         string   `json:"channel"`
+	Phone           string   `json:"phone"`
+	Welcome         string   `json:"welcome"`
+	FollowUps       []string `json:"follow_ups"`
+	Enabled         bool     `json:"enabled"`
+	URL             string   `json:"url,omitempty"`
+	Visits          uint64   `json:"visits,omitempty"`
+	Leads           int      `json:"leads,omitempty"`
+	Engaged         int      `json:"engaged,omitempty"`
 }
 
 type LeadLanding struct {
@@ -44,6 +47,8 @@ type LeadLanding struct {
 }
 
 type CampaignLead struct {
+	SalesAdvice    string `json:"sales_advice,omitempty"`
+	Intent         string `json:"intent,omitempty"`
 	ConversationID string `json:"conversation_id"`
 	Name           string `json:"name"`
 	Score          uint64 `json:"score"`
@@ -69,7 +74,14 @@ func (m *ChannelManager) CampaignLeads(user core.User, id string) ([]CampaignLea
 			seen[lead.CustomerID] = true
 			customer, _ := store.Record(user.TenantID, lead.CustomerID, core.KindCustomers)
 			_, optedOut := store.Record(user.TenantID, campaignOptOutID(lead), "campaign_opt_outs")
+			var review ConversationReview
+			if !optedOut && aiOptIn(store, user.TenantID, "ai_sales_persona") {
+				if job, ok := store.Record(user.TenantID, tokenHash(core.WorkflowSalesReview+":"+user.TenantID+":"+lead.ID), workflowJobsKind); ok && job.Status == "completed" {
+					_ = json.Unmarshal([]byte(job.Content), &review)
+				}
+			}
 			items = append(items, CampaignLead{
+				Intent: lead.Name, SalesAdvice: review.Advice,
 				ConversationID: lead.ConversationID, Name: customer.Name, Score: lead.Sequence, Unsubscribed: optedOut,
 			})
 			if len(items) == 50 {
@@ -103,7 +115,7 @@ func (m *ChannelManager) SaveLeadCampaign(user core.User, input LeadCampaign) (L
 		return LeadCampaign{}, core.Fail(503, "Hãy cấu hình APP_ORIGIN để tạo mã chiến dịch")
 	}
 	input.Name, input.Phone, input.Welcome = strings.TrimSpace(input.Name), strings.TrimSpace(input.Phone), strings.TrimSpace(input.Welcome)
-	if !isLiveChannel(input.Channel) || input.Name == "" || len([]rune(input.Name)) > 80 ||
+	if (input.Channel != core.ChannelZalo && input.Channel != core.ChannelWhatsApp) || input.Name == "" || len([]rune(input.Name)) > 80 ||
 		input.Channel == core.ChannelWhatsApp && !campaignPhone.MatchString(input.Phone) ||
 		len([]rune(input.Welcome)) > 500 || input.Welcome == "" || len(input.FollowUps) > 2 {
 		return LeadCampaign{}, core.Fail(400, "Tên, kênh, số điện thoại hoặc lời chào không hợp lệ")
@@ -117,7 +129,7 @@ func (m *ChannelManager) SaveLeadCampaign(user core.User, input LeadCampaign) (L
 	if input.Channel == core.ChannelZalo {
 		input.Phone = ""
 	}
-	input.URL, input.Visits, input.Leads, input.Engaged = "", 0, 0, 0
+	input.URL, input.Visits, input.Leads, input.Engaged, input.Accepted, input.Replied = "", 0, 0, 0, 0, 0
 	err := updateAsTenant(m.repo, user, func(store core.Writer) error {
 		_, account, _, err := m.providerAccount(store, user.TenantID, input.Channel)
 		if err != nil && input.Enabled {
@@ -163,12 +175,21 @@ func (m *ChannelManager) LeadCampaigns(user core.User) ([]LeadCampaign, error) {
 	}
 	err := viewTenant(m.repo, user.TenantID, func(store core.Reader) error {
 		scores := map[string]map[string]uint64{}
+		accepted, replied := map[string]map[string]bool{}, map[string]map[string]bool{}
 		for _, lead := range store.Records(user.TenantID, campaignLeadKind) {
 			if scores[lead.AutomationID] == nil {
 				scores[lead.AutomationID] = map[string]uint64{}
+				accepted[lead.AutomationID] = map[string]bool{}
+				replied[lead.AutomationID] = map[string]bool{}
 			}
 			byCustomer := scores[lead.AutomationID]
 			byCustomer[lead.CustomerID] = max(byCustomer[lead.CustomerID], lead.Sequence)
+			if lead.FirstResponseAt != nil {
+				accepted[lead.AutomationID][lead.CustomerID] = true
+			}
+			if lead.RatedAt != nil {
+				replied[lead.AutomationID][lead.CustomerID] = true
+			}
 		}
 		records := store.Records(user.TenantID, leadCampaignKind)
 		sort.Slice(records, func(i, j int) bool { return records[i].CreatedAt.After(records[j].CreatedAt) })
@@ -179,6 +200,7 @@ func (m *ChannelManager) LeadCampaigns(user core.User) ([]LeadCampaign, error) {
 			}
 			item.Visits = record.Sequence
 			item.Leads = len(scores[record.ID])
+			item.Accepted, item.Replied = len(accepted[record.ID]), len(replied[record.ID])
 			for _, score := range scores[record.ID] {
 				if score >= 70 {
 					item.Engaged++
@@ -277,6 +299,12 @@ func (m *ChannelManager) handleCampaignMessage(store core.Writer, conversation, 
 			} else {
 				lead.Sequence = min(100, lead.Sequence+20)
 				lead.Enabled = false
+				if lead.FirstResponseAt != nil && lead.RatedAt == nil && !now.Before(*lead.FirstResponseAt) {
+					lead.RatedAt = &now
+				}
+				if isText {
+					m.recordCampaignIntent(store, &lead, conversation, inbound, now)
+				}
 			}
 			lead.UpdatedAt = now
 			store.PutRecord(lead)
@@ -333,6 +361,38 @@ func (m *ChannelManager) handleCampaignMessage(store core.Writer, conversation, 
 	return true
 }
 
+func (m *ChannelManager) recordCampaignIntent(store core.Writer, lead *core.Record, conversation, inbound core.Record, now time.Time) {
+	text := normalizeDiacritics(strings.Trim(strings.TrimSpace(inbound.Content), ".!?"))
+	var intent string
+	switch text {
+	case "can tu van", "toi can tu van", "muon duoc tu van":
+		intent = "Tư vấn"
+	case "can bao gia", "toi can bao gia", "gui bao gia":
+		intent = "Báo giá"
+	case "can ho tro", "toi can ho tro", "can nhan vien ho tro":
+		intent = "Hỗ trợ"
+	default:
+		return
+	}
+	lead.Name = intent
+	campaignRecord, found := store.Record(lead.TenantID, lead.AutomationID, leadCampaignKind)
+	var campaign LeadCampaign
+	if !found || !campaignRecord.Enabled || json.Unmarshal([]byte(campaignRecord.Content), &campaign) != nil || !campaign.FollowUpTickets {
+		return
+	}
+	id := tokenHash("campaign-followup-ticket:" + lead.ID)
+	if _, exists := store.Record(lead.TenantID, id, core.KindTickets); exists {
+		return
+	}
+	ticket := core.Record{ID: id, TenantID: lead.TenantID, Kind: core.KindTickets, CustomerID: lead.CustomerID,
+		ConversationID: conversation.ID, AutomationID: "campaign_followup", AssigneeID: conversation.AssigneeID,
+		Subject: "Theo dõi chiến dịch · " + intent, Content: clipped(inbound.Content, 800),
+		Status: core.StatusOpen, Priority: core.PriorityNormal, CreatedAt: now, UpdatedAt: now}
+	response, resolution := ticketDeadlines(ticket)
+	ticket.ResponseDueAt, ticket.ResolutionDueAt = &response, &resolution
+	store.PutRecord(ticket)
+}
+
 func campaignOptOutID(conversation core.Record) string {
 	return tokenHash("campaign-opt-out:" + conversation.Channel + ":" + conversation.CustomerID)
 }
@@ -357,11 +417,47 @@ func (m *ChannelManager) prepareCampaignDelivery(store core.Writer, job *core.Re
 	thread, exists := store.Record(job.TenantID, job.ConversationID, core.KindConversations)
 	_, optedOut := store.Record(job.TenantID, campaignOptOutID(thread), "campaign_opt_outs")
 	if !found || !active || !campaign.Enabled || campaign.Subject != job.Subject || !exists ||
-		thread.Status != core.StatusOpen || optedOut || job.Sequence > 0 && !lead.Enabled ||
-		now.After(lead.CreatedAt.Add(23*time.Hour)) {
+		thread.Channel != job.Channel || thread.Status != core.StatusOpen || optedOut || job.Sequence > 0 && !lead.Enabled {
 		job.Status, job.EmailLastError, job.EmailRetryAt = "cancelled", "campaign_inactive", nil
 		m.saveDelivery(store, *job, now)
 		return false
+	}
+	deadline := campaignServiceDeadline(job.Channel, lead.CreatedAt)
+	if !now.Before(deadline) {
+		job.Status, job.EmailLastError, job.EmailRetryAt = "cancelled", "campaign_window_expired", nil
+		m.saveDelivery(store, *job, now)
+		return false
+	}
+	if job.Sequence > 0 {
+		local := now.In(ReportZone)
+		open := reportDay(local).Add(8 * time.Hour)
+		if local.Hour() >= 20 {
+			open = open.AddDate(0, 0, 1)
+		}
+		if local.Before(open) {
+			if !open.Before(deadline) {
+				job.Status, job.EmailLastError, job.EmailRetryAt = "cancelled", "campaign_window_expired", nil
+				m.saveDelivery(store, *job, now)
+				return false
+			}
+			job.EmailRetryAt, job.UpdatedAt = &open, now
+			store.PutRecord(*job)
+			return false
+		}
+		count := 0
+		for _, prior := range store.Records(job.TenantID, channelOutbox) {
+			if prior.ID != job.ID && prior.Channel == job.Channel && prior.Subject == job.Subject &&
+				prior.Name == job.Name && prior.Sequence > 0 && strings.HasPrefix(prior.AutomationID, leadDeliveryPrefix) &&
+				(prior.Status == "sent" || prior.Status == "sending" || prior.EmailLastError == "delivery_unknown") &&
+				prior.UpdatedAt.After(now.Add(-24*time.Hour)) {
+				count++
+			}
+		}
+		if count >= 2 {
+			job.Status, job.EmailLastError, job.EmailRetryAt = "cancelled", "campaign_frequency_cap", nil
+			m.saveDelivery(store, *job, now)
+			return false
+		}
 	}
 	if job.MessageID == "" {
 		message := core.Record{
@@ -373,4 +469,15 @@ func (m *ChannelManager) prepareCampaignDelivery(store core.Writer, job *core.Re
 		job.MessageID = message.ID
 	}
 	return true
+}
+
+func campaignServiceDeadline(channel string, interaction time.Time) time.Time {
+	switch channel {
+	case core.ChannelZalo:
+		return interaction.Add(48 * time.Hour)
+	case core.ChannelWhatsApp:
+		return interaction.Add(24 * time.Hour)
+	default:
+		return interaction
+	}
 }

@@ -36,7 +36,44 @@ func (o *Operations) scheduleIdle() {
 	}
 	jobs := []candidate{}
 	if err := o.repo.View(func(store core.Reader) error {
+		if indexed, ok := store.(interface {
+			IdleWorkflowCandidates(time.Time, core.IdleWorkflowCandidate, int) []core.IdleWorkflowCandidate
+		}); ok {
+			enabled := map[string]bool{}
+			const batchSize = 256
+			for range 8 {
+				page := indexed.IdleWorkflowCandidates(now, o.idleAfter, batchSize)
+				for _, item := range page {
+					o.idleAfter = core.IdleWorkflowCandidate{Activity: item.Activity, Ticket: core.Record{ID: item.Ticket.ID, TenantID: item.Ticket.TenantID}, Rule: core.Record{ID: item.Rule.ID}}
+					tenant := item.Ticket.TenantID
+					active, checked := enabled[tenant]
+					if !checked {
+						active = featureEnabled(store, tenant, "workflows")
+						enabled[tenant] = active
+					}
+					if !active {
+						continue
+					}
+					var rule WorkflowRule
+					if json.Unmarshal([]byte(item.Rule.Content), &rule) == nil &&
+						conditionsMatch(rule.Conditions, item.Channel, item.Ticket.Priority, item.Ticket.Status, item.Ticket.Content) {
+						jobs = append(jobs, candidate{rule, item.Ticket})
+						if len(jobs) == 100 {
+							return nil
+						}
+					}
+				}
+				if len(page) < batchSize {
+					o.idleAfter = core.IdleWorkflowCandidate{}
+					return nil
+				}
+			}
+			return nil
+		}
 		for _, tenant := range store.Tenants() {
+			if !featureEnabled(store, tenant, "workflows") {
+				continue
+			}
 			rules := workflowConfig[WorkflowRule](store, tenant, workflowRulesKind)
 			for _, rule := range rules {
 				if !rule.Enabled || rule.Trigger != "ticket_idle" {
@@ -67,7 +104,19 @@ func (o *Operations) scheduleIdle() {
 	if err := o.repo.Update(func(store core.Writer) error {
 		writer := store.(*workspaceWriter)
 		for _, job := range jobs {
-			writer.queueRule(job.rule, job.ticket, now)
+			tenant := job.ticket.TenantID
+			ticket, found := store.Record(tenant, job.ticket.ID, core.KindTickets)
+			config, exists := store.Record(tenant, job.rule.ID, workflowRulesKind)
+			var rule WorkflowRule
+			if !found || !exists || !config.Enabled || config.Status == "removed" ||
+				!featureEnabled(store, tenant, "workflows") || json.Unmarshal([]byte(config.Content), &rule) != nil || rule.Trigger != "ticket_idle" {
+				continue
+			}
+			conversation, _ := store.Record(tenant, ticket.ConversationID, core.KindConversations)
+			if idleEligible(ticket, conversation, rule, now) &&
+				conditionsMatch(rule.Conditions, conversation.Channel, ticket.Priority, ticket.Status, ticket.Content) {
+				writer.queueRule(rule, ticket, now)
+			}
 		}
 		return nil
 	}); err != nil {
@@ -102,9 +151,18 @@ func (o *Operations) runJobs() {
 					return nil
 				}
 			}
-			o.runJob(store.(*workspaceWriter), current)
+			err := store.Savepoint(func(inner core.Writer) error {
+				o.runJob(inner.(*workspaceWriter), current)
+				return nil
+			})
+			if err != nil && !errors.Is(err, errBillingQuota) {
+				return err
+			}
 			current.Enabled = false
 			current.Status = "processed"
+			if err != nil {
+				current.Status = "blocked_quota"
+			}
 			current.UpdatedAt = o.clock.Now().UTC()
 			store.PutRecord(current)
 			return nil
@@ -134,6 +192,12 @@ func (o *Operations) runAIJobs() {
 			ran = o.runFieldExtraction(job)
 		case core.WorkflowAIReview:
 			ran = o.runResolvedReview(job)
+		case core.WorkflowSparringAssessment:
+			ran = o.runSparringAssessment(job)
+		case core.WorkflowRealtimeQA:
+			ran = o.runRealtimeQA(job)
+		case core.WorkflowMultimodalQA, core.WorkflowSalesReview, core.WorkflowOpsReview:
+			ran = o.runConversationReview(job)
 		}
 		if ran {
 			return
@@ -153,6 +217,9 @@ func (o *Operations) deferAIJobForQuota(job core.Record, attempt uint64, cause e
 		now := o.clock.Now().UTC()
 		nextDay := reportDay(now).AddDate(0, 0, 1)
 		current.Sequence--
+		if current.Subject == core.WorkflowSparringAssessment && current.EmailAttempts > 0 {
+			current.EmailAttempts--
+		}
 		current.EmailRetryAt = &nextDay
 		current.Status, current.UpdatedAt = "pending", now
 		store.PutRecord(current)

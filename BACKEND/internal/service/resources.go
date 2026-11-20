@@ -57,6 +57,11 @@ func (s *ResourceService) Save(user core.User, kind, recordID string, input core
 		input.Overdue = false
 		store.PutRecord(input)
 		result = input
+		if kind == core.KindConversations && recordID == "" {
+			if stored, ok := store.Record(user.TenantID, input.ID, kind); ok {
+				result.AssigneeID = stored.AssigneeID
+			}
+		}
 		return nil
 	})
 	return result, err

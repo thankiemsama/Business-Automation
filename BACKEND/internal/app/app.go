@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"businessautomation/internal/api"
@@ -21,6 +22,14 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 	storage := repo
 	clock := service.SystemClock{}
 	workspace := service.NewWorkspace(repo, clock, service.RandomIDs{})
+	attachments, err := service.AttachmentStoreFromEnvironment()
+	if err != nil {
+		slog.Error("Không thể cấu hình kho tệp đính kèm", "error", err)
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "Kho tệp đính kèm cấu hình sai", http.StatusServiceUnavailable)
+		})
+	}
+	workspace.ConfigureAttachments(attachments)
 	repo = workspace
 	admin := service.NewAdmin(workspace, clock)
 	ids := service.RandomIDs{}
@@ -30,12 +39,28 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 	resources := service.NewResources(repo, clock, ids, service.DefaultPolicies())
 	conversations := service.NewConversations(repo, clock, ids, service.LocalKnowledgeProvider{}, service.NewKeywordAutomation(ids, clock))
 	var model *service.OpenAIKnowledge
-	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
-		model = service.NewOpenAIKnowledge(key, os.Getenv("OPENAI_CHAT_MODEL"))
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("LLM_PROVIDER")))
+	switch provider {
+	case "", "openai":
+		if key := os.Getenv("OPENAI_API_KEY"); key != "" {
+			model = service.NewOpenAIKnowledge(key, os.Getenv("OPENAI_CHAT_MODEL"))
+		}
+	default:
+		key := os.Getenv("LLM_API_KEY")
+		if provider == "deepseek" {
+			key = os.Getenv("DEEPSEEK_API_KEY")
+		}
+		var err error
+		model, err = service.NewCompatibleKnowledge(provider, os.Getenv("LLM_BASE_URL"), key, os.Getenv("LLM_CHAT_MODEL"), os.Getenv("LLM_EMBEDDING_MODEL"))
+		if err != nil {
+			slog.Error("Cấu hình nhà cung cấp AI không hợp lệ", "error", err)
+		}
+	}
+	if model != nil {
 		if db, ok := storage.(interface {
 			core.KnowledgeVectors
 			EnableKnowledgeVectors(context.Context) error
-		}); ok {
+		}); ok && (provider == "" || provider == "openai") {
 			setup, cancel := context.WithTimeout(ctx, 10*time.Second)
 			err := db.EnableKnowledgeVectors(setup)
 			cancel()

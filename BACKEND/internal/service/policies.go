@@ -1,6 +1,7 @@
 package service
 
 import (
+	"net/url"
 	"strings"
 
 	"businessautomation/internal/core"
@@ -110,6 +111,14 @@ func (KnowledgePolicy) CanWrite(user core.User) bool { return user.Role == core.
 func (KnowledgePolicy) Validate(store core.Reader, user core.User, record *core.Record) error {
 	if record.Subject == "" || record.Content == "" {
 		return core.Fail(400, "Tiêu đề và nội dung kiến thức là bắt buộc")
+	}
+	record.VideoURL, record.VideoTranscript = strings.TrimSpace(record.VideoURL), strings.TrimSpace(record.VideoTranscript)
+	if record.VideoURL != "" || record.VideoTranscript != "" {
+		video, err := url.Parse(record.VideoURL)
+		if err != nil || video.Scheme != "https" || video.Hostname() == "" || video.User != nil ||
+			len(record.VideoURL) > 2048 || record.VideoTranscript == "" || len([]rune(record.VideoTranscript)) > 12000 {
+			return core.Fail(400, "Video cần URL HTTPS và bản chép lời tối đa 12.000 ký tự")
+		}
 	}
 	assignKnowledgeSlug(store, record)
 	return nil

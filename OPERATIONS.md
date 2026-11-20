@@ -13,11 +13,18 @@
 - **Allowlist** áp dụng với phiên nhân viên và API công khai có khóa. Khi chạy qua Next.js trên loopback, đặt cùng `NEXA_PROXY_SECRET` (ít nhất 32 ký tự) cho frontend và backend. Chỉ bật `NEXA_TRUST_INGRESS_IP=true` khi ingress tin cậy đã ghi đè `X-Nexa-Ingress-IP` và chặn truy cập công khai trực tiếp vào frontend/backend nội bộ. Dùng CIDR bao gồm IP hiện tại.
 - **SSO** dùng `OIDC_GOOGLE_ISSUER`, `OIDC_OKTA_ISSUER` hoặc `OIDC_MICROSOFT_ISSUER`, cùng cặp `*_CLIENT_ID` và `*_CLIENT_SECRET`. Google có issuer mặc định. Microsoft cần issuer cụ thể của directory. Đăng ký callback `APP_ORIGIN/api/oidc/{google|okta|microsoft}/callback`. Liên kết chủ thể nhà cung cấp với tài khoản đã có bằng `NEXA_OIDC_BINDINGS={"https://accounts.google.com|SUB":"agent@example.com"}`. Tài khoản đã bật TOTP vẫn cần mã sau SSO.
 - **White-label** hỗ trợ tên, logo HTTPS, màu và ánh xạ tên miền. Cần tự trỏ DNS, cài TLS và chuyển tiếp host tại ingress. Callback SSO dùng `APP_ORIGIN` chuẩn.
-- **Stripe** dùng `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE`, `STRIPE_ENTERPRISE_PRICE` và `APP_ORIGIN`. Trỏ webhook tới `POST /api/v1/stripe/webhook` trên backend, bật các sự kiện subscription created/updated/deleted và cấu hình Billing Portal. Gói mặc định là Free. Số liệu theo tháng gồm tin nhắn, phiếu và yêu cầu đã xác thực. Bộ đếm yêu cầu ghi theo lô; chưa áp hạn mức gói.
+- **Stripe** dùng `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE`, `STRIPE_ENTERPRISE_PRICE` và `APP_ORIGIN`. Trỏ webhook tới `POST /api/v1/stripe/webhook` trên backend, bật `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` và `invoice.paid`, rồi cấu hình Billing Portal.
+- Cấu hình hạn mức bằng `NEXA_BILLING_<FREE|PRO|ENTERPRISE>_<TICKETS|AI>_LIMIT`. Biến rỗng hoặc 0 nghĩa là không giới hạn. Hạn mức tính theo tháng dương lịch, giờ Việt Nam. Tạo phiếu và giữ lượt gọi AI dùng chung giao dịch với bộ đếm tương ứng. Vượt mức trả HTTP 402. Hạn mức AI theo ngày của tenant vẫn áp dụng.
+- Đặt `NEXA_BILLING_<PRO|ENTERPRISE>_<TICKETS|AI>_INVOICE_CREDITS` để cấp thêm lượt trong tháng khi Stripe xác nhận hóa đơn đăng ký mới hoặc gia hạn đã thanh toán, khớp subscription, customer và price. Mỗi hóa đơn được cấp một lần. Phần vượt mức cơ bản tiêu thụ lượt đã cấp. Nexa không phát sinh khoản thu theo lượt. Owner xem số dùng và lượt còn lại trong bảng mức sử dụng, hoặc đăng ký webhook Nexa `credit_balance.low` để nhận cảnh báo ở ngưỡng 80%.
 - **CRM** chỉ bật cho `NEXA_CRM_TENANT` đã cấu hình. HubSpot dùng `HUBSPOT_TOKEN`. Salesforce dùng `SALESFORCE_ORIGIN`, `SALESFORCE_TOKEN` và `SALESFORCE_EXTERNAL_ID_FIELD`. Odoo JSON-2 dùng `ODOO_ORIGIN`, `ODOO_API_KEY`, `ODOO_EXTERNAL_ID_FIELD` và tùy chọn `ODOO_DATABASE`. Tạo trường external ID duy nhất trên hệ thống đích. Màn hình Quản trị đồng bộ một chiều từng liên hệ.
 - **Giao diện** dùng next-intl cho shell, đăng nhập cơ bản, phím tắt và trợ giúp. Các màn hình nghiệp vụ vẫn có nội dung tiếng Việt. Dùng `?` để mở phím tắt. PWA chỉ lưu trang ngoại tuyến tĩnh, không cache dữ liệu khách hàng.
 
 ## Analytics và workflow
+
+- Trong **Tự động hóa → Định tuyến theo kỹ năng**, owner thêm nhóm, thành viên và giới hạn số hội thoại đang xử lý trên mỗi thành viên. Bật tự động phân công sau khi thêm quy tắc. Nexa dùng quy tắc khớp đầu tiên theo kênh, mức ưu tiên và nhãn hội thoại hoặc khách hàng. Đưa quy tắc nhãn VIP lên trước quy tắc chung.
+- Với hội thoại mới, Nexa chọn thành viên có ít hội thoại đang xử lý nhất trong nhóm chính. Khi tải bằng nhau, ưu tiên người lâu nhất chưa được hệ thống phân công. Khi nhóm chính hết chỗ, Nexa xét nhóm dự phòng. Nếu cả hai nhóm hết chỗ, hội thoại xuất hiện trong danh sách chưa phân công để đội hỗ trợ nhận việc.
+- Trong **Quản trị → Truy cập và thương hiệu**, owner có thể bật danh thiếp và dùng tên hiển thị hiện có, lời giới thiệu và liên kết HTTPS. Nexa gắn một danh thiếp vào phản hồi của nhân viên trong mỗi hội thoại. Widget hiển thị liên kết bấm được, Zalo OA và WhatsApp nhận chữ ký văn bản trong giới hạn độ dài của kênh.
+- Trong cùng trang, owner có thể bật quy tắc bàn giao chatbot. Khi khách yêu cầu gặp nhân viên, chatbot bàn giao qua phiếu hỗ trợ. Cấu hình có thể nâng ngưỡng tin cậy tối thiểu. Dấu vết ghi lý do, mã chính sách, mô hình và mã hội thoại để phục vụ đối soát nội bộ.
 
 - **Báo cáo hỗ trợ** dùng ngày Việt Nam và tuần bắt đầu thứ Hai. Biểu đồ dùng phiếu tạo trong kỳ. SLA tính trên các hạn phản hồi và xử lý đã đến trong kỳ, ghi nhận người thực hiện khi có và người đang phụ trách khi còn chờ. Kỳ lịch sử được dựng lại từ dữ liệu hiện có, bao gồm ưu tiên hiện tại. Phiếu cũ thiếu mốc giải quyết có thể thiếu dữ liệu SLA.
 - Cohort nhóm khách theo tuần mở phiếu đầu tiên và đo tỷ lệ mở lại phiếu trong W1–W8. Các tuần chưa kết thúc để trống. PDF tải từ dashboard và dùng cùng khoảng ngày.
@@ -39,8 +46,9 @@
 - Bật **Xuất bản trong trung tâm trợ giúp công khai** cho bài được phép chia sẻ. Đường dẫn đa doanh nghiệp là `/kb/{tenant}` và `/kb/{tenant}/{slug}`. Bài nội bộ có thể tiếp tục dùng để soạn nháp.
 - Cổng khách dùng `/portal/{tenant}`. Mã email chỉ dùng một lần. Cổng cho gửi PNG, JPEG hoặc PDF tối đa 32 KiB khi tạo phiếu. Email đăng nhập và khảo sát CSAT cần cấu hình Resend và `APP_ORIGIN`.
 - Webhook hỗ trợ `ticket.created`, `message.new`, `sla.breached` và `csat.submitted`. Đích phải là máy chủ công khai. Xác thực HMAC-SHA256 qua `X-Nexa-Signature`, dùng `X-Nexa-Delivery` để khử trùng lặp. Phản hồi ngoài 2xx được thử lại với giãn cách.
+- Sau 8 lần gửi không thành công, owner có thể mở **Tích hợp → Webhook → DLQ / Thử lại** trong 30 ngày. Lượt gửi lại dùng URL hiện tại của webhook, giữ nguyên nội dung và mã `X-Nexa-Delivery`, rồi bắt đầu lại chu kỳ thử. Sau 30 ngày, lượt gửi lỗi hết hạn hiển thị và gửi lại.
 - API công khai có quyền đọc khách hàng, phiếu và hội thoại. Dùng `Authorization: Bearer nexa_…`. Mở Swagger UI tại `/api-docs` trên frontend để thử API. Tài liệu OpenAPI trực tiếp nằm ở `/api/public/openapi.json` trên backend.
-- Zalo OA và WhatsApp có adapter nhận tin qua webhook và gửi qua hàng đợi. Messenger, SMS và Instagram có màn hình lưu cấu hình. Hồ sơ 360° hiển thị lịch sử hỗ trợ và các kênh đã có dữ liệu. LTV theo doanh thu cần nguồn dữ liệu giao dịch.
+- Zalo OA, WhatsApp và SMS qua Twilio nhận tin qua webhook và gửi qua hàng đợi. Messenger và Instagram có màn hình lưu cấu hình. Hồ sơ 360° hiển thị lịch sử hỗ trợ và các kênh đã có dữ liệu. LTV theo doanh thu cần nguồn dữ liệu giao dịch.
 
 ## Chat trên website
 
@@ -93,6 +101,35 @@ Gửi email trong hội thoại trả HTTP `202` và trạng thái `pending` sau
 
 Đặt `OPENAI_API_KEY` và tùy chọn `OPENAI_CHAT_MODEL` trên backend. Model soạn nháp mặc định là `gpt-4.1-mini`.
 
+### Nhà cung cấp mô hình
+
+Chọn một nhà cung cấp cho mỗi bản triển khai bằng `LLM_PROVIDER`. Mặc định là `openai` với các biến hiện có.
+
+| Giá trị | Cấu hình backend | Khả năng |
+| --- | --- | --- |
+| `openai` | `OPENAI_API_KEY`, tùy chọn `OPENAI_CHAT_MODEL` | Chat, vector, chép lời |
+| `deepseek` | `DEEPSEEK_API_KEY`, `LLM_CHAT_MODEL` | Chat và JSON. Các tính năng cần vector hoặc chép lời yêu cầu nhà cung cấp hỗ trợ. |
+| `ollama` | `LLM_CHAT_MODEL`, tùy chọn `LLM_BASE_URL` và `LLM_API_KEY` | Chat và JSON. Có thể đặt `LLM_EMBEDDING_MODEL` nếu model hỗ trợ 256 chiều. |
+
+Ollama mặc định dùng `http://127.0.0.1:11434/v1`. Với Docker, đặt URL có thể truy cập từ container backend, gồm hậu tố `/v1`. Ollama dùng vector trong bộ nhớ của backend. Khi đổi model, hiệu chuẩn lại ngưỡng trước khi bật quyết định tự động.
+
+### QA thực thời
+
+Owner bật **Bật QA thực thời cho bản nháp phản hồi** trong **Quản trị → Truy cập và thương hiệu** và có thể nhập quy trình, từ cấm để mô hình đối chiếu. Trong hội thoại, nhân viên chọn cho phép kiểm tra trước khi bản nháp và ngữ cảnh được gửi đến nhà cung cấp AI. Trình soạn xếp hàng sau khi người dùng ngừng nhập và vẫn cho phép gửi tin trong lúc chờ. Worker dùng quota AI theo doanh nghiệp. Kết quả là gợi ý để nhân viên cân nhắc. Owner xem tổng số nhãn cảnh báo theo loại, nhân viên và ngày trong **Phân tích → Kiểm tra chất lượng**.
+
+Trong **Quản trị → Truy cập và thương hiệu**, bật **QA tự động cho văn bản, ảnh và bản chép lời** để xếp hàng từng tin nhắn mới và từng đoạn chép lời cuộc gọi nhập vào Nexa. Quản trị viên nên chọn model hỗ trợ ảnh PNG/JPEG qua Chat Completions. Khi dùng kho object, worker đọc ảnh qua khóa tệp đã xác minh. Ghi âm nhập vào Nexa đi qua bước chép lời trước khi được đánh giá rủi ro. Nội dung ảnh chỉ được gửi khi mô hình được cấu hình và tính năng được bật. [Giao diện ảnh trong Chat Completions](https://developers.openai.com/api/docs/guides/images-vision?api-mode=chat)
+
+Trong **Phân tích → Kiểm tra chất lượng**, owner xem trạng thái, loại dữ liệu, nhãn và đường dẫn hội thoại có cảnh báo. Các lượt hết quota sẽ chờ kỳ kế tiếp. Tệp ngoài PNG/JPEG và nội dung ngoài kênh mà Nexa chỉ có tên tệp được đánh dấu chưa hỗ trợ hoặc đánh giá một phần. Phiên bản hiện tại xếp hàng dữ liệu được ghi từ lúc bật.
+
+### AI Sales, CS và Ops
+
+Trong **Quản trị → Truy cập và thương hiệu → Tính năng**, bật từng vai trò và nhập SOP riêng, tối đa 2.000 ký tự mỗi vai trò.
+
+- **AI Sales** đề xuất một bước tư vấn khi có lead QR mới. Owner đọc gợi ý trong kết quả chiến dịch. Gợi ý dùng cho nhân viên duyệt và bị ẩn sau khi khách ngừng nhận lời nhắc.
+- **AI CS** áp SOP nhóm hỗ trợ trong câu trả lời của chatbot hiện có. Quy tắc nguồn tri thức, ngưỡng tin cậy và bàn giao theo cấu hình vẫn áp dụng. Bật AI CS cùng luồng chatbot hiện có để đưa SOP vào sử dụng.
+- **AI Ops** đề xuất bước xử lý nội bộ khi dự báo phát hiện rủi ro SLA mới. AI Ops dùng SOP và số liệu dự báo, gửi gợi ý qua thông báo nội bộ nếu phiếu còn rủi ro.
+
+
 - RAG xếp hạng theo cosine tối đa 5 bài từ 100 bài đang bật cập nhật gần nhất. `text-embedding-3-small` tạo 256 chiều. Khi mở tìm kiếm hoặc tạo bản nháp lần đầu, backend tự tạo vector còn thiếu và lưu theo tenant, ID bài viết và nội dung. PostgreSQL cần pgvector và quyền tạo hoặc sử dụng extension. Backend dùng bảng có RLS theo tenant và chỉ mục IVFFlat. File store hoặc PostgreSQL thiếu pgvector dùng cosine trong bộ nhớ. Trình soạn nháp giữ link tới bài được dùng làm nguồn.
 - Triage tự lưu nhãn, ưu tiên và cảm xúc khi kết quả đạt ngưỡng. Các gợi ý chưa đạt ngưỡng chờ nhân viên duyệt trong chi tiết phiếu. `AI_TRIAGE_CONFIDENCE_THRESHOLD` mặc định 0,85.
 - `AI_CHATBOT_AUTO_REPLY=true` bật bot cho widget web, Zalo OA và WhatsApp ở hội thoại chưa phân công. `AI_CHATBOT_CONFIDENCE_THRESHOLD` mặc định 0,70. Bot dùng bài đã bật và công khai để trả lời câu hỏi nghiệp vụ. Thiếu căn cứ, khách tức giận hoặc có tệp sẽ tạo phiếu bàn giao. Sau câu trả lời có nguồn, khách có thể trả lời **Đã giải quyết** để bot đóng hội thoại. Khách dùng Zalo hoặc WhatsApp sẽ nhận tin mời chấm CSAT từ 1 đến 5.
@@ -112,12 +149,30 @@ Gửi email trong hội thoại trả HTTP `202` và trạng thái `pending` sau
 - Quota theo lượt gọi OpenAI được đặt theo từng doanh nghiệp và đặt lại vào 00:00 giờ Việt Nam. Giá trị 0 cho phép không giới hạn. Quota đếm lượt gọi, kể cả lượt đã gửi mà nhà cung cấp trả lỗi. Job kiểm tra, trích xuất và soạn bài chuyển sang ngày tiếp theo khi hết quota. Một tác vụ có thể dùng nhiều lượt nếu vừa tạo vector vừa gọi mô hình.
 - Owner có thể xuất **Câu trả lời mẫu** bằng mật khẩu và nhập mã ở doanh nghiệp khác. Mã chứa tiêu đề và nội dung đã mã hóa. Nhập lại cùng mã trong cùng doanh nghiệp dùng lại bản đã nhập.
 
+### AI Sparring
+
+- Owner bật **AI Sparring** trong **Quản trị → Truy cập và thương hiệu**. Tại **AI Sparring → Ngân hàng kịch bản**, chọn hội thoại nguồn và xem trước tối đa 24 lượt thoại. Nexa che các định danh phổ biến và các tên đã biết ngay trên máy chủ. Owner cần bỏ các chi tiết có thể nhận dạng còn sót, kể cả tên tự do, địa chỉ hoặc dữ kiện hiếm, trước khi duyệt. Bản xem trước không gọi OpenAI. Chỉ đưa vào ngân hàng các hội thoại mà doanh nghiệp có quyền sử dụng cho đào tạo.
+- Mỗi phiên 1v1 có tối đa 8 lượt trả lời của học viên. AI đóng vai khách khó tính. Khi nộp bài, chọn giải quyết hoặc chuyển người xử lý. Hàng đợi dùng quota AI của doanh nghiệp và trả điểm cùng coaching. Phiên nằm riêng khỏi inbox và kết quả chỉ hiển thị cho học viên.
+- Owner chọn **Kiểm định AI agent** sau khi tạo ít nhất một kịch bản khách đã xác nhận giải quyết và một kịch bản cần chuyển người xử lý. Model làm hai bài mô phỏng tự động. Mỗi bài cần ít nhất 80/100, đúng hành động và không bị đánh dấu xử lý thiếu an toàn. Điểm của học viên không được dùng để cấp chứng chỉ.
+- Chứng chỉ nội bộ có hiệu lực 30 ngày và gắn với doanh nghiệp, model và phiên bản quy tắc giải quyết. Lưu trữ một kịch bản mà chứng chỉ dựa vào hoặc kiểm định lại không đạt sẽ khiến chứng chỉ mất hiệu lực. Kiểm định lại khi đổi phiên bản model. Cả đề xuất agent có người duyệt và luồng agent tự giải quyết đều yêu cầu chứng chỉ. Quyền xử lý thủ công của nhân viên tiếp tục theo phân quyền phiếu.
+
+- Ngân hàng gợi ý hội thoại từ QA, sự kiện phân loại AI và các lượt agent có kết quả. Owner duyệt ẩn danh và gán quyết định chuẩn. Mỗi đợt kiểm định lưu bộ case trong `eval_sets` và chạy lại prompt ra quyết định trên dữ liệu mô phỏng. Khi ứng dụng khởi động sau khi đổi prompt, tenant từng chứng nhận model đó sẽ được xếp hàng kiểm định lại với bộ case cũ còn hoạt động. Giảm quá 5 điểm ở một case so với lần đạt gần nhất trên cùng bộ case sẽ chặn cấp chứng chỉ.
+- **Quản trị → Dấu vết AI agent** hiển thị tối đa 200 sự kiện trong 7 ngày. Bản ghi chỉ gồm mã lượt, công cụ, kết quả, model, phiên bản prompt và thời điểm. Bộ đệm loại sự kiện hết hạn khi ghi tiếp. Chi phí AI tiếp tục tính theo metering của tenant.
+
+### WFM và Video KB
+
+- **Tổng quan → Phân tích** dự báo 7 ngày đầy đủ tiếp theo từ mốc báo cáo, dùng tối đa tám ngày cùng thứ và tối thiểu hai mẫu. Ngày chưa kết thúc không được dùng làm mẫu. Báo cáo lịch sử dự báo tại mốc cuối kỳ.
+- Tỷ lệ phiếu AI chạm rồi nhân viên giải quyết dùng các phiếu đã giải quyết trong kỳ có dấu vết triage, agent hoặc bot trước lúc giải quyết. Phân nhóm theo kênh và ưu tiên. Phiếu áp dụng đề xuất của AI được tính cho AI dù có người duyệt. Phiếu thiếu nguồn xác định người giải quyết hiển thị riêng.
+- Bài kiến thức hỗ trợ liên kết video HTTPS và bản chép lời. Tìm ngữ nghĩa đưa phần đầu bản chép lời vào chỉ mục và trả liên kết video cùng bài. Bài công khai hiển thị liên kết và bản chép lời.
+
 ### Ghi âm cuộc gọi và QR chiến dịch
 
 - Khi bật **Nhập ghi âm và chép lời cuộc gọi**, owner chọn hồ sơ khách hàng và xác nhận quyền xử lý trước khi gửi tệp tối đa 4 MiB tới OpenAI. Bản chép lời nằm dưới dạng ghi chú nội bộ trong hội thoại Điện thoại. Nexa lưu bản chép lời và không lưu tệp âm thanh.
 - Với dữ liệu ghi âm và hội thoại gửi tới nhà cung cấp, xác định căn cứ xử lý, thông báo cho người liên quan, thời hạn lưu, quyền tiếp cận và nghĩa vụ chuyển dữ liệu cá nhân ra nước ngoài nếu áp dụng. Đối chiếu [Luật Bảo vệ dữ liệu cá nhân](https://vanban.chinhphu.vn/?classid=1&docid=214590&pageid=27160&typegroupid=) và [Nghị định 356/2025/NĐ-CP](https://vanban.chinhphu.vn/?classid=1&docid=216387&pageid=27160).
 - Tạo mã tại **Tích hợp → QR thu hút khách hàng** sau khi cấu hình kênh và `APP_ORIGIN`. Trang đích mở tài khoản kênh đã kết nối. Với Zalo, khách sao chép và gửi mã trong chat. Với WhatsApp, nội dung mã được điền sẵn. Lượt mở trang có thể bao gồm truy cập lặp. Lead được ghi khi Nexa nhận mã qua webhook.
-- Lời nhắc tư vấn ở mốc 1 và 8 giờ cần sự đồng ý của khách, dừng khi khách nhắn thêm hoặc gửi STOP và chỉ được gửi trong tối đa 23 giờ từ lúc ghi nhận lead. Đối chiếu quyền gửi và nội dung với [chính sách Zalo OA](https://oa.zalo.me/home/documents/vie/policy/tuong-tac-cua-oa-voi-nguoi-dung) và [chính sách WhatsApp Business](https://business.whatsapp.com/policy). Với cuộc gọi, SMS hoặc email quảng cáo, đối chiếu thêm [Nghị định 91/2020/NĐ-CP](https://vanban.chinhphu.vn/?docid=200773&pageid=27160).
+- Lời nhắc tư vấn ở mốc 1 và 8 giờ cần sự đồng ý của khách và dừng khi khách nhắn thêm hoặc gửi STOP. Nexa kiểm tra lại hạn khi gửi và khi dời qua giờ yên lặng. Cửa sổ tính từ lần khách gửi mã xác thực là 48 giờ trên Zalo OA và 24 giờ với tin văn bản thường trên WhatsApp. Với cuộc gọi, SMS hoặc email quảng cáo, đối chiếu thêm Nghị định 91/2020/NĐ-CP. [Tin tư vấn Zalo OA](https://oa.zalo.me/home/documents/guides/tin-tu-van) · [Chính sách WhatsApp Business](https://whatsappbusiness.com/policy/) · [Nghị định 91/2020/NĐ-CP](https://vanban.chinhphu.vn/?docid=200773&pageid=27160)
+
+- Lời nhắc từ QR gửi 08:00–20:00 giờ Việt Nam, tối đa hai tin trong 24 giờ trên cùng tài khoản kênh và người nhận. Tin chờ qua cửa sổ tương tác bị hủy. Tỷ lệ phản hồi lấy số khách có phản hồi chia cho số khách có tin được nhà cung cấp nhận gửi. Có tùy chọn tạo một phiếu theo dõi từ yêu cầu tư vấn, báo giá hoặc hỗ trợ. Chỉ số này chưa bao gồm xác nhận đã đọc.
 
 ## Zalo OA, WhatsApp và Resend inbound
 
@@ -151,6 +206,24 @@ Gửi email trong hội thoại trả HTTP `202` và trạng thái `pending` sau
 
 Tham khảo [kiến trúc OA OpenAPI](https://oa.zalo.me/home/documents/guides/Khoi-tao-ung-dung-va-cap-quyen_117071366476220195), [WhatsApp Business Platform](https://developers.facebook.com/documentation/business-messaging/whatsapp/overview) và [Resend Receiving API](https://resend.com/docs/api-reference/emails/retrieve-received-email).
 
+### SMS qua Twilio
+
+1. Chọn số Twilio có khả năng gửi và nhận SMS. Trong **Tích hợp → Kênh → SMS**, bật kênh và lưu `{"account_id":"+12025550123"}` với số thật ở dạng E.164.
+2. Thêm đối tượng `sms` dưới khóa tenant trong `NEXA_CHANNEL_CREDENTIALS` trên backend. Đặt cả `access_token` và `webhook_secret` bằng Auth Token của tài khoản Twilio tương ứng.
+
+   ```json
+   {
+     "account_id": "+12025550123",
+     "twilio_sid": "<Twilio Account SID>",
+     "access_token": "<Twilio Auth Token>",
+     "webhook_secret": "<Twilio Auth Token>",
+     "callback_url": "https://api.example.com/api/v1/channel-webhooks/<tenant>/sms"
+   }
+   ```
+
+3. Trong Twilio, cấu hình **A message comes in** dùng HTTP POST đến đúng URL HTTPS đó, không thêm query string. Proxy chuyển nguyên body và header `X-Twilio-Signature`. Nexa dùng Message SID để bỏ qua callback trùng lặp.
+4. Gửi SMS vào số đã cấu hình và phản hồi trong hội thoại Nexa. Owner cũng có thể gửi tin kiểm thử và xem hàng đợi lỗi trong **Tích hợp → Kênh → SMS**. Trạng thái đã gửi ghi nhận Twilio tiếp nhận yêu cầu. Twilio quản lý STOP/START. Phạm vi adapter là SMS văn bản hai chiều, gồm tin kiểm thử và phản hồi hỗ trợ.
+
 ## Quan sát backend và workflow nền
 
 Đặt `METRICS_TOKEN` bằng bí mật ngẫu nhiên ít nhất 32 byte để bật `GET /metrics` trên backend. Cấu hình Prometheus gửi header `Authorization: Bearer …` từ mạng nội bộ. Endpoint mặc định trả 404 khi chưa cấu hình hoặc thiếu quyền.
@@ -161,6 +234,24 @@ Tham khảo [kiến trúc OA OpenAPI](https://oa.zalo.me/home/documents/guides/K
 - Migration `004_pending_workflow_jobs.sql` lập chỉ mục job đang chờ. PostgreSQL trả tối đa 25 job mỗi lượt theo thứ tự tạo; worker lấy khóa row bằng `FOR UPDATE SKIP LOCKED` rồi ghi kết quả và cập nhật nghiệp vụ trong cùng transaction. Lịch sử job hoàn thành nằm ngoài chỉ mục hàng chờ. Worker workflow, API danh sách/chi tiết, dashboard, đọc ngữ cảnh cho bản nháp, lưu tài nguyên, gửi tin và các thao tác phân công/SLA trên phiếu đã dùng transaction theo tenant. Đọc có phạm vi không lấy advisory lock ghi. PostgreSQL giữ khóa riêng của tenant cùng một khóa tương thích dùng chung ở chế độ shared; các luồng ghi cũ vẫn lấy khóa tương thích ở chế độ exclusive. Schema `platform_v2` và role RLS thuộc bước cutover riêng.
 
 ## Docker Compose và kiểm tra tích hợp
+
+### Nexa Private ngoại tuyến
+
+Trên máy chuẩn bị có mạng và cùng kiến trúc với máy đích, chạy `bash scripts/nexa-private.sh pack /duong-dan/nexa-bundle`. Thêm `--with-ai` để kèm image Ollama. Chuyển cả thư mục qua kênh phân phối nội bộ đã xác thực. Image và manifest có checksum để kiểm tra hỏng dữ liệu khi chuyển.
+
+Trên máy đích có Docker Compose, Bash và OpenSSL, chạy `bash /duong-dan/nexa-bundle/nexa-private.sh install /duong-dan/nexa-bundle`. Lệnh kiểm tra checksum, load image, tạo mật khẩu cục bộ ở lần đầu và khởi động với `--pull never --no-build`. Giao diện mặc định ở `http://127.0.0.1:3000`. Backend, Postgres, bucket và Ollama chỉ tham gia mạng Docker nội bộ. Để phục vụ qua reverse proxy nội bộ, đặt `NEXA_PRIVATE_ORIGIN` đúng origin công khai của proxy và cấu hình TLS tại proxy.
+
+Để dùng AI cục bộ, chép model có giấy phép phù hợp và Modelfile vào thư mục `models` của bundle. Thêm `COMPOSE_PROFILES=local-ai`, `NEXA_PRIVATE_LLM_PROVIDER=ollama` và `NEXA_PRIVATE_CHAT_MODEL=<tên-model>` vào `private.env`. Sau khi khởi động, chạy `docker compose --env-file private.env -f compose.private.yaml exec ollama ollama create <tên-model> -f /models/Modelfile` từ thư mục bundle. Trong Modelfile, dùng đường dẫn model dưới `/models`. Ollama chạy với cloud tắt. [Ollama trong Docker](https://docs.ollama.com/docker) · [Chế độ local-only](https://docs.ollama.com/faq)
+
+Giữ lại `private.env` qua các lần nâng cấp và sao lưu Postgres, kho object cùng cấu hình trước khi nạp phiên bản mới. Bộ cài này dành cho mạng riêng. Phát hành appliance sản xuất còn cần diễn tập khôi phục, kiểm thử môi trường cách ly và chốt cơ chế license.
+
+### Kho tệp tương thích MinIO/S3
+
+Compose mặc định dùng Silo, nhánh tương thích MinIO, cùng volume `minio-data` và dịch vụ khởi tạo bucket riêng tư `nexa-attachments`. Đặt `NEXA_MINIO_IMAGE` và `NEXA_MINIO_CLIENT_IMAGE` nếu dùng image MinIO và client trong registry nội bộ. Đặt `NEXA_MINIO_USER` và `NEXA_MINIO_PASSWORD` trước khi chạy ngoài môi trường local.
+
+Triển khai backend riêng có thể đặt `ATTACHMENT_S3_ENDPOINT`, `ATTACHMENT_S3_BUCKET`, `ATTACHMENT_S3_ACCESS_KEY`, `ATTACHMENT_S3_SECRET_KEY` và tùy chọn `ATTACHMENT_S3_REGION` trên bucket đã tạo. Dùng tài khoản được phép đọc và ghi object trong bucket. Khi không đặt endpoint, backend lưu base64 như trước. Khi đã dùng kho object, sao lưu bucket hoặc volume cùng cơ sở dữ liệu, rồi phục hồi cả hai trước khi mở backend.
+
+Đặt `ATTACHMENT_MIGRATE_ON_READ=true` để chuyển từng tệp cũ khi được đọc qua luồng đã xác thực. Nexa ghi object, đọc lại để kiểm tra nội dung và chỉ thay bản ghi nếu base64 gốc vẫn khớp. Tệp cũ tiếp tục đọc được nếu lần chuyển thất bại. Giới hạn tải lên và định dạng API hiện giữ nguyên.
 
 Từ thư mục gốc, dùng Docker với Compose v2 và chạy:
 

@@ -7,8 +7,21 @@ import { useCallback, useState } from "react";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
 import { errorMessage } from "@/shared/api/http-client";
-import { Badge } from "@/shared/ui/primitives";
+import { Badge, ErrorState, Loading } from "@/shared/ui/primitives";
 import { Icon } from "@/shared/ui/icon";
+import styles from "./customer-profile.module.css";
+
+const eventLabels: Record<string, string> = {
+  message: "Tin nhắn",
+  ticket: "Phiếu hỗ trợ",
+  conversation: "Hội thoại",
+  note: "Ghi chú nội bộ",
+};
+const dateTime = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "Asia/Ho_Chi_Minh",
+});
 
 // Customer 360°: a cross-channel, cross-record view of one customer with a
 // full activity timeline, lifetime-value signals, notes, and quick actions.
@@ -76,16 +89,12 @@ export function CustomerProfilePanel({ id }: { id: string }) {
   }
 
   if (profile.error)
-    return (
-      <p role="alert">
-        Không tải được hồ sơ khách hàng: {errorMessage(profile.error)}
-      </p>
-    );
+    return <ErrorState message={profile.error} retry={profile.reload} />;
   const data = profile.data;
-  if (!data) return <p>Đang tải hồ sơ 360°…</p>;
+  if (!data) return <Loading />;
 
   return (
-    <div className="customer-360">
+    <div className={styles.profile}>
       <FeatureSections
         label="Hồ sơ khách hàng"
         sections={[
@@ -93,10 +102,10 @@ export function CustomerProfilePanel({ id }: { id: string }) {
             id: "profile",
             label: "Tổng quan",
             content: (
-              <div className="customer-360-grid">
-                <section className="panel c360-metric">
-                  <h3>Chỉ số nhanh</h3>
-                  <dl className="c360-stats">
+              <div className={styles.columns}>
+                <section className={`panel ${styles.card}`}>
+                  <h3>Chỉ số hỗ trợ</h3>
+                  <dl className={styles.metrics}>
                     <div>
                       <dt>Phiếu hỗ trợ</dt>
                       <dd>{data.total_tickets}</dd>
@@ -106,7 +115,7 @@ export function CustomerProfilePanel({ id }: { id: string }) {
                       <dd>{data.open_tickets}</dd>
                     </div>
                     <div>
-                      <dt>Đánh giá TB</dt>
+                      <dt>Hài lòng / 5</dt>
                       <dd>
                         {data.average_rating
                           ? data.average_rating.toFixed(1)
@@ -120,19 +129,28 @@ export function CustomerProfilePanel({ id }: { id: string }) {
                   </dl>
                 </section>
 
-                <section className="panel c360-metric">
+                <section className={`panel ${styles.card}`}>
                   <h3>Lịch sử hỗ trợ</h3>
-                  <p>
-                    Đã xử lý <strong>{data.ltv.resolved}</strong>/
-                    {data.ltv.tickets} phiếu · Hoạt động cuối cùng:{" "}
-                    <strong>
-                      {data.ltv.last_active
-                        ? new Date(data.ltv.last_active).toLocaleDateString(
-                            "vi-VN",
-                          )
-                        : "chưa rõ"}
-                    </strong>
-                  </p>
+                  <dl className={styles.history}>
+                    <div>
+                      <dt>Phiếu đã xử lý</dt>
+                      <dd>
+                        {data.ltv.resolved} / {data.ltv.tickets}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Hoạt động gần nhất</dt>
+                      <dd>
+                        {data.ltv.last_active ? (
+                          <time dateTime={data.ltv.last_active}>
+                            {dateTime.format(new Date(data.ltv.last_active))}
+                          </time>
+                        ) : (
+                          "—"
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
                   <div className="toolbar-controls">
                     <span>Kênh:</span>
                     {data.channels.map((channel) => (
@@ -174,29 +192,27 @@ export function CustomerProfilePanel({ id }: { id: string }) {
             id: "activity",
             label: "Hoạt động",
             content: (
-              <section className="panel">
+              <section className={`panel ${styles.card}`}>
                 <h3>Nhật ký hoạt động đa kênh</h3>
-                <ol className="c360-timeline">
-                  {data.timeline?.map((event, index) => (
-                    <li key={index} className={`c360-event ${event.kind}`}>
-                      <span className="c360-dot" />
-                      <div>
-                        <strong>
-                          {event.kind}
-                          {event.channel ? ` · ${event.channel}` : ""}
-                        </strong>{" "}
-                        — {event.subject}
+                {!data.timeline?.length ? (
+                  <p className="muted">Chưa có hoạt động.</p>
+                ) : (
+                  <ol className={styles.timeline}>
+                    {data.timeline?.map((event, index) => (
+                      <li key={index}>
+                        <div className={styles.eventMeta}>
+                          <span>{eventLabels[event.kind] ?? event.kind}</span>
+                          {event.channel && <Badge value={event.channel} />}
+                          <time dateTime={event.created_at}>
+                            {dateTime.format(new Date(event.created_at))}
+                          </time>
+                        </div>
+                        {event.subject && <strong>{event.subject}</strong>}
                         {event.content && <p>{event.content}</p>}
-                        <small>
-                          {new Date(event.created_at).toLocaleString("vi-VN")}
-                        </small>
-                      </div>
-                    </li>
-                  ))}
-                  {!data.timeline?.length && (
-                    <p className="muted">Chưa có hoạt động.</p>
-                  )}
-                </ol>
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </section>
             ),
           },
@@ -204,37 +220,49 @@ export function CustomerProfilePanel({ id }: { id: string }) {
             id: "notes",
             label: "Ghi chú nội bộ",
             content: (
-              <section className="panel">
-                <h3>Ghi chú nội bộ</h3>
-                <div className="c360-notes">
-                  {data.notes?.map((item) => (
-                    <div key={item.id} className="c360-note">
-                      <p>{item.content}</p>
-                      <small>
-                        {new Date(item.created_at).toLocaleString("vi-VN")}
-                      </small>
-                    </div>
-                  ))}
-                  {!data.notes?.length && (
-                    <p className="muted">Chưa có ghi chú nào.</p>
-                  )}
-                </div>
-                <div className="form-stack c360-note-form">
-                  <textarea
-                    value={note}
-                    onChange={(event) => setNote(event.target.value)}
-                    placeholder="Thêm ghi chú cho nhân viên (không gửi khách)…"
-                  />
+              <div className={styles.columns}>
+                <form
+                  className={`panel ${styles.card}`}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void addNote();
+                  }}
+                >
+                  <h3>Thêm ghi chú</h3>
+                  <label>
+                    Nội dung nội bộ
+                    <textarea
+                      value={note}
+                      onChange={(event) => setNote(event.target.value)}
+                      placeholder="Ghi lại thông tin để đội ngũ theo dõi…"
+                    />
+                  </label>
                   <button
-                    className="button secondary"
-                    disabled={busy}
-                    onClick={addNote}
+                    className="button primary"
+                    disabled={busy || !note.trim()}
                   >
-                    <Icon name="plus" size={15} /> Thêm ghi chú
+                    <Icon name="plus" size={15} />{" "}
+                    {busy ? "Đang lưu…" : "Thêm ghi chú"}
                   </button>
                   {error && <p role="alert">{error}</p>}
-                </div>
-              </section>
+                </form>
+                <section className={`panel ${styles.card}`}>
+                  <h3>Ghi chú nội bộ</h3>
+                  <div className={styles.notes}>
+                    {data.notes?.map((item) => (
+                      <article key={item.id}>
+                        <p>{item.content}</p>
+                        <time dateTime={item.created_at}>
+                          {dateTime.format(new Date(item.created_at))}
+                        </time>
+                      </article>
+                    ))}
+                    {!data.notes?.length && (
+                      <p className="muted">Chưa có ghi chú nào.</p>
+                    )}
+                  </div>
+                </section>
+              </div>
             ),
           },
           ...(role === "owner" && candidates.length
@@ -243,7 +271,7 @@ export function CustomerProfilePanel({ id }: { id: string }) {
                   id: "merge",
                   label: "Gộp hồ sơ",
                   content: (
-                    <section className="panel">
+                    <section className={`panel ${styles.card}`}>
                       <h3>Nhận diện &amp; gộp hồ sơ</h3>
                       <p className="muted">
                         Các hồ sơ khác cùng email hoặc trùng danh bạ. Gộp sẽ

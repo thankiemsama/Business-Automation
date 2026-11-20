@@ -15,7 +15,7 @@ func voiceImportEnabled(store core.Reader, tenant string) bool {
 
 func (s *AIService) VoiceImportEnabled(user core.User) bool {
 	enabled := false
-	if s.Enabled() && user.Role == core.RoleOwner {
+	if s.TranscriptionEnabled() && user.Role == core.RoleOwner {
 		_ = s.repo.ViewTenant(user.TenantID, func(store core.Reader) error {
 			enabled = voiceImportEnabled(store, user.TenantID)
 			return nil
@@ -28,8 +28,8 @@ func (s *AIService) ImportVoice(user core.User, customerID string, data []byte) 
 	if user.Role != core.RoleOwner {
 		return core.Record{}, core.Fail(403, "Chỉ owner được nhập ghi âm cuộc gọi")
 	}
-	if !s.Enabled() {
-		return core.Record{}, core.Fail(503, "Chưa cấu hình OpenAI")
+	if !s.TranscriptionEnabled() {
+		return core.Record{}, core.Fail(503, "Nhà cung cấp AI chưa hỗ trợ chép lời")
 	}
 	fingerprint := sha256.Sum256(data)
 	id := tokenHash("voice-import:" + user.TenantID + ":" + customerID + ":" + hex.EncodeToString(fingerprint[:]))
@@ -81,6 +81,7 @@ func (s *AIService) ImportVoice(user core.User, customerID string, data []byte) 
 			store.PutRecord(core.Record{
 				ID: s.repo.IDs.NewID(), TenantID: user.TenantID, Kind: core.KindMessages,
 				ConversationID: id, Sender: "note", AuthorID: user.ID, Content: text[:end],
+				AutomationID: voiceTranscriptMarker,
 				Sequence: sequence, CreatedAt: now, UpdatedAt: now,
 			})
 			text = text[end:]

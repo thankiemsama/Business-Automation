@@ -134,6 +134,9 @@ func (s *AIService) predict() {
 				if agentPresetEnabled(store, current.TenantID, "sla_watch") {
 					category, title = "ai_sla_watch", current.RiskReason
 				}
+				if s.repo.aiJobsEnabled && aiOptIn(store, current.TenantID, "ai_ops_persona") {
+					store.(*workspaceWriter).queueConversationReview(current, core.WorkflowOpsReview)
+				}
 				store.(*workspaceWriter).notify(current, category, title)
 			}
 		}

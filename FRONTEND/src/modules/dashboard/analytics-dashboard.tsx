@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import {
   Bar,
@@ -29,6 +30,24 @@ const colors = [
   "#336a79",
 ];
 const display: Record<string, string> = {
+  completed: "Đã đánh giá",
+  partial: "Đánh giá một phần",
+  unsupported: "Tệp chưa hỗ trợ",
+  pending: "Đang chờ",
+  quota_wait: "Đang chờ quota",
+  running: "Đang xử lý",
+  failed: "Đánh giá thất bại",
+  cancelled: "Đã hủy",
+  image: "Ảnh",
+  text: "Văn bản",
+  attachment: "Tệp đính kèm",
+  voice_transcript: "Bản chép lời",
+  cancellation: "Nguy cơ hủy",
+  unfulfilled_promise: "Cam kết chưa được xử lý",
+  procedure: "Quy trình",
+  prohibited_language: "Ngôn từ",
+  complaint: "Nguy cơ khiếu nại",
+  unaddressed_emotion: "Cảm xúc chưa được xử lý",
   unknown: "Chưa rõ",
   web: "Website",
   email: "Email",
@@ -57,6 +76,7 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
   );
   const analysis = useQuery(load);
   const [ranking, setRanking] = useState<Ranking>("resolved");
+  const [showQA, setShowQA] = useState(false);
   if (analysis.error)
     return <ErrorState message={analysis.error} retry={analysis.reload} />;
   if (!analysis.data) return <Loading />;
@@ -68,9 +88,90 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
     cohorts,
     leaderboard,
     ai,
+    workforce,
+    realtime_qa,
+    multimodal_qa,
     csat_by_channel,
     response_minutes_by_priority,
   } = analysis.data;
+  const tabs = realtime_qa ? (
+    <div
+      className="toolbar-controls"
+      role="group"
+      aria-label="Báo cáo phân tích"
+    >
+      <button
+        type="button"
+        className="button secondary compact"
+        aria-pressed={!showQA}
+        onClick={() => setShowQA(false)}
+      >
+        Tổng quan
+      </button>
+      <button
+        type="button"
+        className="button secondary compact"
+        aria-pressed={showQA}
+        onClick={() => setShowQA(true)}
+      >
+        Kiểm tra chất lượng
+      </button>
+    </div>
+  ) : null;
+  if (showQA && realtime_qa) {
+    return (
+      <div className="analytics-content">
+        {tabs}
+        <div className="analytics-grid">
+          <QABreakdown
+            heading="Theo loại rủi ro"
+            counts={realtime_qa.by_kind}
+          />
+          <QABreakdown heading="Theo nhân viên" counts={realtime_qa.by_agent} />
+          <QABreakdown heading="Theo ngày (ICT)" counts={realtime_qa.by_day} />
+        </div>
+        {multimodal_qa && (
+          <section>
+            <h2>QA tự động theo dữ liệu</h2>
+            <div className="analytics-grid">
+              <QABreakdown
+                heading="Lượt đánh giá theo trạng thái"
+                counts={multimodal_qa.statuses}
+                countLabel="Lượt"
+              />
+              <QABreakdown
+                heading="Lượt đánh giá theo dữ liệu"
+                counts={multimodal_qa.modalities}
+                countLabel="Lượt"
+              />
+              <QABreakdown
+                heading="Rủi ro từ QA tự động"
+                counts={multimodal_qa.risks}
+              />
+            </div>
+            {multimodal_qa.alerts.length > 0 && (
+              <ul className="form-stack">
+                {multimodal_qa.alerts.map((alert) => (
+                  <li key={alert.message_id}>
+                    <Link
+                      href={`/conversations/${encodeURIComponent(alert.conversation_id)}`}
+                    >
+                      Mở hội thoại
+                    </Link>
+                    {alert.labels.map((label) => (
+                      <p key={label.kind}>
+                        {display[label.kind] ?? label.kind} · {label.message}
+                      </p>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+      </div>
+    );
+  }
   const ranked = [...leaderboard].sort((a, b) => {
     if (ranking === "response")
       return (
@@ -98,6 +199,83 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
   }));
   return (
     <div className="analytics-content">
+      {tabs}
+      {workforce && (
+        <div className="analytics-grid">
+          <section className="panel analytics-card">
+            <h3>Dự báo phiếu mới · 7 ngày</h3>
+            <p>
+              Trung bình theo cùng thứ trong tuần, dùng tối đa 8 tuần lịch sử.
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày (ICT)</th>
+                  <th>Phiếu dự kiến</th>
+                  <th>Ngày mẫu</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workforce.forecast.map((item) => (
+                  <tr key={item.day}>
+                    <th scope="row">
+                      {item.day.slice(8)}/{item.day.slice(5, 7)}
+                    </th>
+                    <td>
+                      {item.expected == null
+                        ? "Chưa đủ dữ liệu"
+                        : vn.format(item.expected)}
+                    </td>
+                    <td>{vn.format(item.samples)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+          <section className="panel analytics-card">
+            <h3>Phiếu AI chạm rồi nhân viên giải quyết</h3>
+            <p>
+              {workforce.ai_to_human.touched_resolved
+                ? `${rate(workforce.ai_to_human.human_resolved, workforce.ai_to_human.touched_resolved)} · ${workforce.ai_to_human.human_resolved}/${workforce.ai_to_human.touched_resolved} phiếu`
+                : "Chưa có phiếu đã giải quyết có dấu vết AI trong kỳ."}
+            </p>
+            <p>
+              Mẫu số gồm các phiếu đã giải quyết có dấu vết AI trước lúc đóng.
+              Phân nhóm theo kênh và ưu tiên.
+            </p>
+            {!!workforce.by_queue_type.length && (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Kênh / ưu tiên</th>
+                      <th>Nhân viên / tổng</th>
+                      <th>AI</th>
+                      <th>Chưa rõ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {workforce.by_queue_type.map((row) => (
+                      <tr key={`${row.channel}:${row.priority}`}>
+                        <th scope="row">
+                          {display[row.channel ?? "unknown"] ?? row.channel} ·{" "}
+                          {display[row.priority ?? "unknown"] ?? row.priority}
+                        </th>
+                        <td>
+                          {row.human_resolved}/{row.touched_resolved} ·{" "}
+                          {rate(row.human_resolved, row.touched_resolved)}
+                        </td>
+                        <td>{row.agent_resolved}</td>
+                        <td>{row.unknown_resolver}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
       <div className="analytics-grid">
         <section className="panel analytics-card">
           <h3>Phiếu mới theo ngày</h3>
@@ -428,5 +606,44 @@ export function AnalyticsDashboard({ from, to }: { from: string; to: string }) {
         )}
       </section>
     </div>
+  );
+}
+
+function QABreakdown({
+  heading,
+  counts,
+  countLabel = "Cảnh báo",
+}: {
+  heading: string;
+  counts: Record<string, number>;
+  countLabel?: string;
+}) {
+  const rows = Object.entries(counts).sort(([a], [b]) =>
+    a.localeCompare(b, "vi"),
+  );
+  return (
+    <section className="panel analytics-card">
+      <h3>{heading}</h3>
+      {rows.length === 0 ? (
+        <p>Chưa có cảnh báo trong kỳ.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{heading}</th>
+              <th scope="col">{countLabel}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([name, count]) => (
+              <tr key={name}>
+                <th scope="row">{display[name] ?? name}</th>
+                <td>{vn.format(count)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }

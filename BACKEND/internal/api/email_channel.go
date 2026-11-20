@@ -34,6 +34,9 @@ func (h *Handler) deliverEmail(w http.ResponseWriter, r *http.Request, user core
 	}
 	defer h.releaseAuthSlot()
 	message, err := h.conversations.DeliverEmail(r.Context(), user, r.PathValue("id"), r.PathValue("message"))
+	if err == nil && h.workspace != nil {
+		err = h.workspace.HydrateAttachment(r.Context(), &message)
+	}
 	status := http.StatusOK
 	if message.Status == "pending" {
 		status = http.StatusAccepted

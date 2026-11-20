@@ -15,18 +15,24 @@ const notificationKind = "notifications"
 
 type Workspace struct {
 	core.Repository
-	Clock         Clock
-	IDs           IDGenerator
-	mu            sync.Mutex
-	epoch         string
-	revision      uint64
-	onResolved    func(core.Record)
-	aiJobsEnabled bool
-	watchers      map[string]map[chan string]struct{}
+	Clock           Clock
+	IDs             IDGenerator
+	mu              sync.Mutex
+	epoch           string
+	revision        uint64
+	onResolved      func(core.Record)
+	aiJobsEnabled   bool
+	sparringModel   string
+	realtimeQAReady chan core.Record
+	attachments     AttachmentStore
+	watchers        map[string]map[chan string]struct{}
 }
 
 func NewWorkspace(repo core.Repository, clock Clock, ids IDGenerator) *Workspace {
-	return &Workspace{Repository: repo, Clock: clock, IDs: ids, epoch: ids.NewID(), watchers: make(map[string]map[chan string]struct{})}
+	return &Workspace{
+		Repository: repo, Clock: clock, IDs: ids, epoch: ids.NewID(),
+		watchers: make(map[string]map[chan string]struct{}), realtimeQAReady: make(chan core.Record, 64),
+	}
 }
 
 // SetOnResolved registers a callback fired when a ticket transitions to resolved.
@@ -89,7 +95,13 @@ func (s *Workspace) updateAs(actor string, run func(core.Writer) error) error {
 
 func (s *Workspace) updateAsTenant(tenantID, actor string, run func(core.Writer) error) error {
 	tracked := &workspaceWriter{workspace: s, actor: actor, changed: make(map[string]bool)}
-	apply := func(store core.Writer) error { tracked.Writer = store; return run(tracked) }
+	apply := func(store core.Writer) error {
+		tracked.Writer = store
+		if err := run(tracked); err != nil {
+			return err
+		}
+		return tracked.writeErr
+	}
 	var err error
 	if tenantID == "" {
 		err = s.Repository.Update(apply)
@@ -127,6 +139,7 @@ type workspaceWriter struct {
 	workspace *Workspace
 	actor     string
 	changed   map[string]bool
+	writeErr  error
 	// pendingResolved collects tickets that transitioned to resolved during this
 	// transaction. They are emitted after the commit so the hook can open its own
 	// nested transaction without deadlocking on the outer write lock.
@@ -137,7 +150,10 @@ func (w *workspaceWriter) Savepoint(run func(core.Writer) error) error {
 	sub := &workspaceWriter{workspace: w.workspace, actor: w.actor, changed: make(map[string]bool)}
 	if err := w.Writer.Savepoint(func(store core.Writer) error {
 		sub.Writer = store
-		return run(sub)
+		if err := run(sub); err != nil {
+			return err
+		}
+		return sub.writeErr
 	}); err != nil {
 		return err
 	}
@@ -160,7 +176,25 @@ func (w *workspaceWriter) PutUser(user core.User) {
 }
 
 func (w *workspaceWriter) PutRecord(record core.Record) {
+	if w.writeErr != nil {
+		return
+	}
 	previous, exists := w.Writer.Record(record.TenantID, record.ID, record.Kind)
+	if !exists && record.Kind == core.KindConversations && record.Status == core.StatusOpen && record.AssigneeID == "" {
+		routeNewConversation(w.Writer, &record, w.workspace.Clock.Now().UTC())
+	}
+	if record.AttachmentData != previous.AttachmentData {
+		if err := w.workspace.offloadAttachment(&record); err != nil {
+			w.writeErr = err
+			return
+		}
+	}
+	if !exists && record.Kind == core.KindTickets {
+		if err := reserveBillingQuota(w.Writer, record.TenantID, billingTickets, w.workspace.Clock.Now()); err != nil {
+			w.writeErr = err
+			return
+		}
+	}
 	reviewResolution := record.Kind == core.KindTickets && record.Status == core.StatusResolved &&
 		previous.Status != core.StatusResolved && w.workspace.aiJobsEnabled && reviewEnabled(w, record.TenantID)
 	if reviewResolution && record.ResolvedAt == nil {
@@ -168,6 +202,14 @@ func (w *workspaceWriter) PutRecord(record core.Record) {
 		record.ResolvedAt = &now
 	}
 	w.Writer.PutRecord(record)
+	if !exists && w.workspace.aiJobsEnabled {
+		if record.Kind == core.KindMessages && (record.Sender != "note" || record.AutomationID == voiceTranscriptMarker) && aiOptIn(w, record.TenantID, "ai_multimodal_qa") {
+			w.queueConversationReview(record, core.WorkflowMultimodalQA)
+		}
+		if record.Kind == campaignLeadKind && aiOptIn(w, record.TenantID, "ai_sales_persona") {
+			w.queueConversationReview(record, core.WorkflowSalesReview)
+		}
+	}
 	if auditedKinds[record.Kind] {
 		w.audit(record.TenantID, w.actor, record.Kind, record.ID, exists, auditRecord(previous), auditRecord(record))
 	}
@@ -177,13 +219,19 @@ func (w *workspaceWriter) PutRecord(record core.Record) {
 	if !exists && record.Kind == core.KindMessages && record.Sender == core.SenderCustomer {
 		w.queueWorkflow("message_received", record)
 	}
-	if record.Kind == core.KindConversations && (!exists || record.Status != previous.Status) {
+	if record.Kind == core.KindConversations && (!exists || record.Status != previous.Status || record.Rating != previous.Rating) {
 		w.changed[guestScope(record.TenantID, record.ID)] = true
 	}
 	if record.Kind == core.KindMessages && record.Sender != "note" {
 		w.changed[guestScope(record.TenantID, record.ConversationID)] = true
 	}
 	switch record.Kind {
+	case workflowJobsKind:
+		if record.Subject == core.WorkflowSalesReview && record.Status == "completed" {
+			w.changed[record.TenantID] = true
+		}
+	case realtimeQAResultKind:
+		w.changed[record.TenantID] = true
 	case "ai_suggestions", qaReviewsKind, core.KindCustomers, core.KindTickets, core.KindConversations, core.KindKnowledge, core.KindAutomations, core.KindMessages, notificationKind, "read_markers", "templates", "views":
 		w.changed[record.TenantID] = true
 	}

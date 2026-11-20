@@ -8,6 +8,8 @@ export const knowledge: ModuleDefinition<"knowledge"> = {
   description: "Nguồn thông tin tin cậy cho những câu trả lời nhất quán.",
   defaults: { subject: "", content: "", enabled: true, public: false },
   fields: [
+    { name: "video_url", label: "Liên kết video HTTPS" },
+    { name: "video_transcript", label: "Bản chép lời video", type: "textarea" },
     {
       name: "public",
       label: "Xuất bản trong trung tâm trợ giúp công khai",
@@ -35,6 +37,8 @@ export const knowledge: ModuleDefinition<"knowledge"> = {
   serialize: (values) => ({
     subject: text(values, "subject"),
     content: text(values, "content"),
+    video_url: text(values, "video_url"),
+    video_transcript: text(values, "video_transcript"),
     enabled: !!values.enabled,
     public: !!values.public,
   }),

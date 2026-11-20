@@ -29,6 +29,8 @@ type channelCredentials struct {
 	WebhookSecret string `json:"webhook_secret"`
 	VerifyToken   string `json:"verify_token"`
 	GraphVersion  string `json:"graph_version"`
+	TwilioSID     string `json:"twilio_sid"`
+	CallbackURL   string `json:"callback_url"`
 }
 
 type liveChannel struct {
@@ -46,9 +48,9 @@ func parseChannelAccount(name, content string) (channelAccount, error) {
 	var account channelAccount
 	decoder := json.NewDecoder(strings.NewReader(content))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&account) != nil || decoder.Decode(new(any)) != io.EOF || !channelID.MatchString(account.AccountID) ||
+	if decoder.Decode(&account) != nil || decoder.Decode(new(any)) != io.EOF || !validChannelAddress(name, account.AccountID) ||
 		(name == core.ChannelZalo && !channelID.MatchString(account.AppID)) {
-		return channelAccount{}, core.Fail(400, "Nhập account_id dạng số và app_id dạng số cho Zalo OA")
+		return channelAccount{}, core.Fail(400, "Nhập account_id dạng số, app_id cho Zalo OA hoặc số E.164 cho SMS")
 	}
 	return account, nil
 }
@@ -69,13 +71,14 @@ func (m *ChannelManager) registerLiveChannels() {
 	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
-	for _, name := range []string{core.ChannelZalo, core.ChannelWhatsApp} {
+	for _, name := range []string{core.ChannelZalo, core.ChannelWhatsApp, core.ChannelSMS} {
 		provider := &liveChannel{name: name, credentials: map[string]channelCredentials{}, client: client}
 		for tenant, channels := range tenants {
 			credential := channels[name]
-			if !channelID.MatchString(credential.AccountID) || credential.WebhookSecret == "" || credential.AccessToken == "" ||
+			if !validChannelAddress(name, credential.AccountID) || credential.WebhookSecret == "" || credential.AccessToken == "" ||
 				(name == core.ChannelZalo && !channelID.MatchString(credential.AppID)) ||
-				(name == core.ChannelWhatsApp && (credential.VerifyToken == "" || !graphVersion.MatchString(credential.GraphVersion))) {
+				(name == core.ChannelWhatsApp && (credential.VerifyToken == "" || !graphVersion.MatchString(credential.GraphVersion))) ||
+				(name == core.ChannelSMS && !validSMSCredentials(tenant, credential)) {
 				continue
 			}
 			provider.credentials[tenant] = credential
@@ -231,7 +234,12 @@ func (m *ChannelManager) Receive(tenant, channel string, header http.Header, raw
 		if channel == core.ChannelWhatsApp {
 			parse = parseWhatsApp
 		}
-		messages, err := parse(account, credentials.WebhookSecret, header, raw)
+		var messages []inboundChannelMessage
+		if channel == core.ChannelSMS {
+			messages, err = parseSMS(account, credentials, header, raw)
+		} else {
+			messages, err = parse(account, credentials.WebhookSecret, header, raw)
+		}
 		if err != nil {
 			return err
 		}
@@ -246,7 +254,7 @@ func (m *ChannelManager) Receive(tenant, channel string, header http.Header, raw
 
 func (m *ChannelManager) ingest(store core.Writer, tenant, channel, account string, msg inboundChannelMessage) error {
 	msg.text = strings.TrimSpace(msg.text)
-	if !channelID.MatchString(msg.sender) || msg.id == "" || len(msg.id) > 512 || (msg.text == "" && msg.attachment == "") {
+	if !validChannelAddress(channel, msg.sender) || msg.id == "" || len(msg.id) > 512 || (msg.text == "" && msg.attachment == "") {
 		return core.Fail(400, "Tin nhắn ngoài không hợp lệ")
 	}
 	binding := tenant + ":" + channel + ":" + account + ":"
@@ -306,6 +314,9 @@ type channelSendResult struct {
 }
 
 func (p *liveChannel) send(ctx context.Context, account channelAccount, creds channelCredentials, to, content, delivery string) channelSendResult {
+	if p.name == core.ChannelSMS {
+		return sendSMS(ctx, p.client, account, creds, to, content)
+	}
 	endpoint := "https://openapi.zalo.me/v3.0/oa/message/cs"
 	payload := map[string]any{"recipient": map[string]string{"user_id": to}, "message": map[string]string{"text": content}}
 	if p.name == core.ChannelWhatsApp {

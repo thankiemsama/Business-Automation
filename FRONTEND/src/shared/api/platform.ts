@@ -46,6 +46,15 @@ export interface APIKey {
   enabled: boolean;
 }
 
+export interface WebhookDeadLetter {
+  id: string;
+  webhook_name: string;
+  event: string;
+  attempts: number;
+  failed_at: string;
+  replayable: boolean;
+}
+
 export interface Webhook {
   id: string;
   name: string;
@@ -73,6 +82,8 @@ export interface ChannelDelivery {
 }
 
 export interface PublicArticle {
+  video_url?: string;
+  video_transcript?: string;
   slug: string;
   subject: string;
   content: string;
@@ -94,6 +105,7 @@ export const webhookEvents = [
   "message.new",
   "sla.breached",
   "csat.submitted",
+  "credit_balance.low",
 ] as const;
 
 export const publicChannels = [
@@ -159,6 +171,17 @@ export class PlatformRepository {
   }
 
   // Webhooks
+  webhookDeadLetters(signal?: AbortSignal) {
+    return this.http.request<WebhookDeadLetter[]>("webhooks/dead-letters", {
+      signal,
+    });
+  }
+  replayWebhook(id: string) {
+    return this.post(
+      `webhooks/dead-letters/${encodeURIComponent(id)}/replay`,
+      {},
+    );
+  }
   webhooks(signal?: AbortSignal) {
     return this.http.request<Webhook[]>("webhooks", { signal });
   }

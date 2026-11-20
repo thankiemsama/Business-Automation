@@ -65,7 +65,8 @@ func (s *ConversationService) Draft(user core.User, id string) (Reply, error) {
 			}
 			current, ok := store.Record(user.TenantID, answer.SourceID, core.KindKnowledge)
 			for _, article := range articles {
-				if article.ID == answer.SourceID && ok && current.Enabled && current.Subject == article.Subject && current.Content == article.Content {
+				if article.ID == answer.SourceID && ok && current.Enabled && current.Subject == article.Subject &&
+					current.Content == article.Content && current.VideoTranscript == article.VideoTranscript {
 					return nil
 				}
 			}

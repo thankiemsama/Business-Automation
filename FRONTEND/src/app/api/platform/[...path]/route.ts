@@ -12,9 +12,11 @@ const allowedPath = new RegExp(
     `chat/${token}(?:/(?:events|voice-status|transcribe))?|` +
     `team(?:/${id})?|` +
     `ai/(?:status|search|transcribe|voice-inbox/(?:status|transcribe)|summary/(?:conversations|tickets)/${id}|(?:suggestion|review)/${id})|` +
-    `ai/ticket-agent/(?:status|${id}/(?:plan|apply))|` +
+    `ai/ticket-agent/(?:status|traces|${id}/(?:plan|apply))|` +
+    `ai/sparring(?:/preview/${id}|/scenarios(?:/${id}/archive)?|/sessions(?:/${id}/(?:turn|end))?)?|` +
     `dashboard|reports(?:/export|/analytics)?|operations/(?:workflows|schedules)(?:/remove|/migrate)?|events|push|search|` +
     `operations/field-extraction|` +
+    `operations/skill-routing|` +
     `notifications(?:/read)?|views(?:/remove)?|` +
     `lead-campaigns(?:/${id}/(?:qr|leads))?|lead/${token}/${id}|` +
     `kb/${token}(?:/${token})?|` +
@@ -25,9 +27,10 @@ const allowedPath = new RegExp(
     `customers/${id}/(?:profile|notes|merge)|` +
     `conversations/${id}/(?:messages|reply|draft|assignment|read)|` +
     `conversations/${id}/messages/${id}/deliver|` +
+    `ai/realtime-qa/status|conversations/${id}/realtime-qa(?:/${id})?|` +
     `tickets/${id}/(?:assignment|escalate|response)|` +
     `channels(?:/${id}(?:/test|/deliveries(?:/${id}/retry)?)?)?|` +
-    `webhooks(?:/${id}(?:/remove)?)?|` +
+    `webhooks(?:/${id}(?:/remove)?)?|webhooks/dead-letters/${id}/replay|` +
     `api-keys(?:/${id}/revoke)?|` +
     `public/(?:openapi\\.json|v1/(?:customers|tickets|conversations)(?:/${id})?))$`,
 );

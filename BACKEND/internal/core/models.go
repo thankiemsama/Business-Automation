@@ -27,9 +27,14 @@ const KindWorkflowJobs = "workflow_jobs"
 const WorkflowAIReview = "ai_resolved_review"
 const WorkflowAIKnowledgeDraft = "ai_knowledge_draft"
 const WorkflowAIExtractFields = "ai_extract_fields"
+const WorkflowSparringAssessment = "sparring_assessment"
+const WorkflowRealtimeQA = "realtime_qa"
+const WorkflowMultimodalQA = "multimodal_qa"
+const WorkflowSalesReview = "sales_review"
+const WorkflowOpsReview = "ops_review"
 
 func IsAIWorkflowJob(subject string) bool {
-	return subject == WorkflowAIReview || subject == WorkflowAIKnowledgeDraft || subject == WorkflowAIExtractFields
+	return subject == WorkflowAIReview || subject == WorkflowAIKnowledgeDraft || subject == WorkflowAIExtractFields || subject == WorkflowSparringAssessment || subject == WorkflowRealtimeQA || subject == WorkflowMultimodalQA || subject == WorkflowSalesReview || subject == WorkflowOpsReview
 }
 
 type Record struct {
@@ -59,11 +64,15 @@ type Record struct {
 	ResolutionP90   int        `json:"sla_resolution_p90_minutes,omitempty"`
 	RiskReason      string     `json:"sla_risk_reason,omitempty"`
 	Public          bool       `json:"public,omitempty"`
+	VideoURL        string     `json:"video_url,omitempty"`
+	VideoTranscript string     `json:"video_transcript,omitempty"`
 	RatingComment   string     `json:"rating_comment,omitempty"`
 	Tags            []string   `json:"tags,omitempty"`
 	ReadAt          *time.Time `json:"read_at,omitempty"`
 	AttachmentName  string     `json:"attachment_name,omitempty"`
 	AttachmentData  string     `json:"attachment_data,omitempty"`
+	AttachmentKey   string     `json:"attachment_key,omitempty"`
+	BrandCard       *BrandCard `json:"brand_card,omitempty"`
 	ResponseDueAt   *time.Time `json:"response_due_at,omitempty"`
 	ResolutionDueAt *time.Time `json:"resolution_due_at,omitempty"`
 	EscalatedAt     *time.Time `json:"escalated_at,omitempty"`
@@ -100,6 +109,20 @@ type Record struct {
 	Enabled         bool       `json:"enabled"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+type BrandCard struct {
+	Name       string `json:"name"`
+	Intro      string `json:"intro,omitempty"`
+	ProductURL string `json:"product_url,omitempty"`
+	SupportURL string `json:"support_url,omitempty"`
+}
+
+type IdleWorkflowCandidate struct {
+	Ticket   Record
+	Rule     Record
+	Channel  string
+	Activity time.Time
 }
 
 // Reader returns values scoped by tenant for all business records.

@@ -13,6 +13,8 @@ func (h *Handler) operationsRoutes(mux *http.ServeMux) {
 		return
 	}
 	mux.HandleFunc("GET /api/v1/reports/analytics", h.protected(h.analytics))
+	mux.HandleFunc("GET /api/v1/operations/skill-routing", h.protected(h.skillRouting))
+	mux.HandleFunc("POST /api/v1/operations/skill-routing", h.protected(h.skillRouting))
 	mux.HandleFunc("POST /api/v1/operations/workflows/migrate", h.protected(h.migrateWorkflow))
 	mux.HandleFunc("GET /api/v1/operations/field-extraction", h.protected(h.fieldExtraction))
 	mux.HandleFunc("POST /api/v1/operations/field-extraction", h.protected(h.fieldExtraction))
@@ -21,6 +23,24 @@ func (h *Handler) operationsRoutes(mux *http.ServeMux) {
 		mux.HandleFunc("POST /api/v1/operations/"+endpoint, h.protected(h.operationsConfig(endpoint)))
 		mux.HandleFunc("POST /api/v1/operations/"+endpoint+"/remove", h.protected(h.removeConfig(endpoint)))
 	}
+}
+
+func (h *Handler) skillRouting(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	if !ownerIntegration(w, user) {
+		return
+	}
+	if r.Method == http.MethodGet {
+		config, err := h.operations.SkillRouting(user)
+		respond(w, 200, config, err)
+		return
+	}
+	var config service.SkillRouting
+	if err := decode(w, r, &config); err != nil {
+		respond(w, 400, nil, err)
+		return
+	}
+	config, err := h.operations.SaveSkillRouting(user, config)
+	respond(w, 200, config, err)
 }
 
 func (h *Handler) fieldExtraction(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
