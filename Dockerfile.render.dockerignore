@@ -1,0 +1,8 @@
+.git
+.go-cache
+BACKEND/.env*
+BACKEND/data
+FRONTEND/.env*
+FRONTEND/.next
+FRONTEND/node_modules
+FRONTEND/.tmp

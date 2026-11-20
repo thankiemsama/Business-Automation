@@ -1,0 +1,32 @@
+FROM golang:1.26-bookworm AS api
+WORKDIR /src
+COPY BACKEND/go.mod BACKEND/go.sum ./
+RUN go mod download
+COPY BACKEND/cmd ./cmd
+COPY BACKEND/internal ./internal
+RUN CGO_ENABLED=0 go build -trimpath -o /out/nexa-api ./cmd/api
+
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY FRONTEND/package.json FRONTEND/package-lock.json ./
+RUN npm ci
+COPY FRONTEND/next.config.ts FRONTEND/tsconfig.json ./
+COPY FRONTEND/src ./src
+COPY FRONTEND/public ./public
+RUN npm run build && npm prune --omit=dev
+
+FROM node:24-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build --chown=node:node /app/package.json /app/next.config.ts ./
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/.next ./.next
+COPY --from=build --chown=node:node /app/public ./public
+COPY --from=api /out/nexa-api /usr/local/bin/nexa-api
+COPY scripts/render-start.sh /usr/local/bin/render-start
+USER node
+EXPOSE 10000
+CMD ["bash", "/usr/local/bin/render-start"]
