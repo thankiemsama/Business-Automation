@@ -280,3 +280,12 @@ GitHub Actions chạy kiểm thử Go với PostgreSQL/pgvector, kiểm tra lint
 - Diễn tập PITR vào một instance riêng. Tắt gửi email, webhook và các tích hợp có tác dụng bên ngoài trước khi mở bản phục hồi. Đối chiếu số lượng bản ghi theo tenant, kiểm tra đăng nhập và quyền truy cập, rồi đo thời điểm dữ liệu mới nhất đã phục hồi và tổng thời gian khôi phục để xác định RPO/RTO thực tế.
 - Chạy `k6 run BACKEND/loadtest/staging.js` với `CONFIRM_ISOLATED_STAGING=yes`, `STAGING_API_URL` trỏ backend staging, và `STAGING_API_TOKENS` gồm các session token ngắn hạn của tenant thử, phân cách bằng dấu phẩy. Nạp token từ kho bí mật hoặc biến môi trường của runner. Tắt tích hợp gửi ngoài và dùng database có thể dọn lại vì bài test có tạo ticket.
 - Mặc định bài chạy thử ở 5 RPS trong 30 giây với 10% thao tác ghi. Tăng dần bằng `STAGING_RPS` và chỉnh `STAGING_VUS`, `STAGING_DURATION`, `STAGING_WRITE_PERCENT` theo mục tiêu. Ngưỡng mặc định là p95 dưới 300 ms, p99 dưới 1.200 ms, tỷ lệ sai status dưới 0,1% và không có vòng lặp bị bỏ. Đối chiếu từng đợt với histogram chờ khóa PostgreSQL trước khi tăng tiếp. Dùng `STAGING_P95_MS=500` cho cổng cutover W2. Sau khi staging đạt các đợt ngắn, đặt `STAGING_RPS=2000`, `STAGING_VUS=1000` và `STAGING_DURATION=24h` để chạy đợt W5; bộ phát tải phải đủ năng lực để duy trì tốc độ đã đặt.
+## Triển khai lên Render
+
+`render.yaml` tạo web service `nexa-web`, private service `nexa-api` và PostgreSQL 16 ở Singapore. Cả ba dùng gói trả phí. Blueprint tạo cơ sở dữ liệu mới và backend chạy migration khi khởi động.
+
+1. Đẩy commit chứa `render.yaml` lên GitHub. Trong [Render Dashboard](https://dashboard.render.com/), chọn **New → Blueprint**, kết nối repo `thankiemsama/Business-Automation` và chọn nhánh chứa commit.
+2. Điền `APP_ORIGIN` của `nexa-api` bằng URL HTTPS của frontend, ví dụ `https://nexa-web.onrender.com`, không có dấu gạch chéo cuối. Duyệt chi phí rồi áp dụng Blueprint. Nếu Render cấp hostname khác, cập nhật biến này trong **Environment** của `nexa-api` theo URL thực tế của `nexa-web` và chọn **Save and deploy**. Frontend mặc định dùng URL do Render cấp.
+3. Khi hai service báo **Live**, mở URL của `nexa-web`, đăng ký hoặc đăng nhập, rồi tạo và tải lại một ticket để kiểm tra đường đi qua API và PostgreSQL.
+
+Khai báo khóa tích hợp trong **Environment** của API theo nhu cầu. Có thể cấu hình kho tệp S3 tương thích bằng các biến `ATTACHMENT_S3_*` trong `compose.yaml`. Các webhook đến từ Stripe, Resend và các kênh nhắn tin cần ingress công khai riêng cho các đường dẫn callback vì API nằm trong mạng riêng.

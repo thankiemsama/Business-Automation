@@ -1,0 +1,45 @@
+services:
+  - type: pserv
+    name: nexa-api
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb
+    dockerContext: ./BACKEND
+    dockerfilePath: ./BACKEND/Dockerfile
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: APP_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexa-postgres
+          property: connectionString
+
+  - type: web
+    name: nexa-web
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb
+    dockerContext: ./FRONTEND
+    dockerfilePath: ./FRONTEND/Dockerfile
+    dockerCommand: >-
+      /bin/sh -c 'export BACKEND_URL="http://${NEXA_API_HOST}:8080";
+      export APP_ORIGIN="${APP_ORIGIN:-$RENDER_EXTERNAL_URL}";
+      exec node node_modules/next/dist/bin/next start --hostname 0.0.0.0'
+    healthCheckPath: /
+    envVars:
+      - key: NEXA_API_HOST
+        fromService:
+          type: pserv
+          name: nexa-api
+          property: host
+
+databases:
+  - name: nexa-postgres
+    region: singapore
+    plan: 0.1c-256mb
+    postgresMajorVersion: "16"
+    databaseName: nexa
+    user: nexa
+    ipAllowList: []
