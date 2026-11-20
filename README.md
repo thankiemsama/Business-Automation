@@ -6,11 +6,41 @@
 
 <p align="center">Nền tảng chăm sóc khách hàng và tự động hóa quy trình cho doanh nghiệp.</p>
 
-> **Đang phát triển** · Dự án chưa có bản web công khai. Bạn có thể chạy Nexa trên máy cá nhân theo hướng dẫn bên dưới.
+<p align="center">
+  <a href="https://nexa-web-55cq.onrender.com"><strong>Mở Nexa trên web</strong></a> ·
+  <a href="#hình-ảnh-giao-diện">Hình ảnh giao diện</a> ·
+  <a href="#chạy-trên-máy-cá-nhân">Chạy local</a>
+</p>
+
+> **Đang phát triển** · Bản web dùng thử đã được triển khai trên Render. Giao diện và tính năng tiếp tục được cập nhật.
 
 ## Giới thiệu
 
 Nexa tập trung hồ sơ khách hàng, hội thoại và phiếu hỗ trợ vào một không gian làm việc. Đội ngũ hỗ trợ có thể phân công công việc, theo dõi thời hạn phản hồi và tự động hóa các thao tác lặp lại.
+
+## Hình ảnh giao diện
+
+Ảnh chụp từ bản chạy local với dữ liệu minh họa. Bấm vào ảnh để xem kích thước đầy đủ.
+
+### Tổng quan
+
+[![Tổng quan Nexa với chỉ số hỗ trợ, phiếu đang mở và tiến độ xử lý](docs/screenshots/tong-quan.webp)](docs/screenshots/tong-quan.webp)
+
+### Chăm sóc khách hàng
+
+| Hộp hội thoại | Phiếu hỗ trợ |
+| --- | --- |
+| [![Hộp hội thoại với lịch sử tin nhắn và thông tin liên hệ](docs/screenshots/hoi-thoai.webp)](docs/screenshots/hoi-thoai.webp) | [![Danh sách phiếu với trạng thái, SLA và phân công](docs/screenshots/phieu-ho-tro.webp)](docs/screenshots/phieu-ho-tro.webp) |
+| **Hồ sơ khách hàng** | **Báo cáo hỗ trợ** |
+| [![Hồ sơ khách hàng với thông tin liên hệ và chỉ số hỗ trợ](docs/screenshots/ho-so-khach-hang.webp)](docs/screenshots/ho-so-khach-hang.webp) | [![Báo cáo với bộ lọc ngày, chỉ số và dự báo](docs/screenshots/bao-cao.webp)](docs/screenshots/bao-cao.webp) |
+
+### Kho kiến thức, tự động hóa và tích hợp
+
+| Kho kiến thức | Workflow |
+| --- | --- |
+| [![Danh sách bài viết trong kho kiến thức](docs/screenshots/kho-kien-thuc.webp)](docs/screenshots/kho-kien-thuc.webp) | [![Trình thiết lập workflow theo sự kiện, điều kiện và hành động](docs/screenshots/workflow.webp)](docs/screenshots/workflow.webp) |
+| **Kênh kết nối** | **Đăng nhập** |
+| [![Cấu hình kênh và trạng thái kết nối](docs/screenshots/tich-hop.webp)](docs/screenshots/tich-hop.webp) | [![Màn hình đăng nhập Nexa](docs/screenshots/dang-nhap.webp)](docs/screenshots/dang-nhap.webp) |
 
 ## Tính năng
 
