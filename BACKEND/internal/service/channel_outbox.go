@@ -13,12 +13,12 @@ import (
 const channelOutbox = "channel_outbox"
 
 func isLiveChannel(channel string) bool {
-	return channel == core.ChannelZalo || channel == core.ChannelWhatsApp || channel == core.ChannelSMS
+	return channel == core.ChannelZalo || channel == core.ChannelMessenger || channel == core.ChannelWhatsApp || channel == core.ChannelSMS
 }
 
 func validChannelText(channel, content string) bool {
 	limit := 2000
-	if channel == core.ChannelWhatsApp {
+	if channel == core.ChannelWhatsApp || channel == core.ChannelMessenger {
 		limit = 4096
 	}
 	if channel == core.ChannelSMS {

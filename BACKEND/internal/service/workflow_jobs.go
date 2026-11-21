@@ -14,6 +14,30 @@ import (
 const aiJobLease = 2 * time.Minute
 const maxAIJobAttempts = 3
 
+// workflowJobBatch bounds how many jobs a tick claims; workflowJobsPerTenant
+// caps the share of that batch for one tenant so a noisy tenant cannot
+// starve the others. Leftover jobs remain pending and are picked up on
+// later ticks.
+const workflowJobBatch = 25
+const workflowJobsPerTenant = 5
+
+// capJobsPerTenant keeps the original due-time order while limiting how
+// many jobs from a single tenant appear in one batch.
+func capJobsPerTenant(jobs []core.Record) []core.Record {
+	if len(jobs) <= workflowJobsPerTenant {
+		return jobs
+	}
+	picked := make([]core.Record, 0, len(jobs))
+	count := map[string]int{}
+	for _, job := range jobs {
+		if count[job.TenantID] < workflowJobsPerTenant {
+			picked = append(picked, job)
+			count[job.TenantID]++
+		}
+	}
+	return picked
+}
+
 func idleEligible(ticket, conversation core.Record, rule WorkflowRule, now time.Time) bool {
 	if ticket.Status == core.StatusResolved {
 		return false
@@ -127,12 +151,13 @@ func (o *Operations) scheduleIdle() {
 func (o *Operations) runJobs() {
 	var jobs []core.Record
 	if err := o.repo.View(func(store core.Reader) error {
-		jobs = store.PendingWorkflowJobs(25)
+		jobs = store.PendingWorkflowJobs(workflowJobBatch)
 		return nil
 	}); err != nil {
 		slog.Error("workflow queue read failed", "error", err)
 		return
 	}
+	jobs = capJobsPerTenant(jobs)
 	for _, job := range jobs {
 		err := o.repo.UpdateTenant(job.TenantID, func(store core.Writer) error {
 			current, ok := store.LockWorkflowJob(job.TenantID, job.ID)
@@ -177,12 +202,13 @@ func (o *Operations) runJobs() {
 func (o *Operations) runAIJobs() {
 	var jobs []core.Record
 	if err := o.repo.View(func(store core.Reader) error {
-		jobs = store.PendingAIWorkflowJobs(25, o.clock.Now())
+		jobs = store.PendingAIWorkflowJobs(workflowJobBatch, o.clock.Now())
 		return nil
 	}); err != nil {
 		slog.Error("AI review queue read failed", "error", err)
 		return
 	}
+	jobs = capJobsPerTenant(jobs)
 	for _, job := range jobs {
 		var ran bool
 		switch job.Subject {

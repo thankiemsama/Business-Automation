@@ -60,6 +60,12 @@ func (s *AIService) runChatbot() {
 				if aiOptIn(store, tenant, "ai_cs_persona") {
 					csSOP = settings.PersonaSOP["cs"]
 				}
+				if skill, ok := MatchedSkill(store, tenant, candidate.Channel, current.Content); ok {
+					if csSOP != "" {
+						csSOP += "\n"
+					}
+					csSOP += skill.SOP()
+				}
 				for _, article := range store.Records(tenant, core.KindKnowledge) {
 					if article.Public {
 						articles = append(articles, article)
@@ -128,6 +134,10 @@ func (s *AIService) runChatbot() {
 		}
 		if currentMessage.Sentiment == "angry" || currentMessage.AttachmentData != "" || currentMessage.AttachmentName != "" {
 			answer.NeedsHuman = true
+		}
+		if !answer.NeedsHuman && !AgentCanAutoAct(store, tenant, "chatbot") {
+			answer.NeedsHuman = true
+			handoffReason = "governance_blocked"
 		}
 		settings, _ := tenantSettings(store, tenant)
 		profile = settings.AIHandoff
@@ -233,7 +243,7 @@ func botHandoff(store core.Writer, ids IDGenerator, conversation, inbound core.R
 }
 
 func botChannel(channel string) bool {
-	return channel == core.ChannelWeb || channel == core.ChannelZalo || channel == core.ChannelWhatsApp
+	return channel == core.ChannelWeb || channel == core.ChannelZalo || channel == core.ChannelMessenger || channel == core.ChannelWhatsApp
 }
 
 func confirmBotResolution(store core.Writer, conversation, previous, customer core.Record) bool {
@@ -258,5 +268,6 @@ func confirmBotResolution(store core.Writer, conversation, previous, customer co
 	store.PutRecord(conversation)
 	store.PutRecord(core.Record{ID: tokenHash("bot-resolved:" + conversation.ID), TenantID: conversation.TenantID, Kind: "ai_bot_resolutions",
 		ConversationID: conversation.ID, Channel: conversation.Channel, Enabled: avoidedTicket, CreatedAt: customer.CreatedAt})
+	meterAIResolution(store, conversation.TenantID, conversation.ID+":bot", "bot", customer.CreatedAt)
 	return true
 }

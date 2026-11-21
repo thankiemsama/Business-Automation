@@ -12,6 +12,7 @@ import (
 
 const billingAI = "ai"
 const billingTickets = "tickets"
+const billingResolutions = "resolutions"
 
 var errBillingQuota = core.Fail(402, "Đã hết hạn mức tháng của gói hiện tại")
 
@@ -46,8 +47,11 @@ func billingQuota(store core.Reader, tenant, metric string, now time.Time) (Bill
 	if !found {
 		record = core.Record{ID: tokenHash("quota:" + tenant + ":" + month + ":" + metric), TenantID: tenant, Kind: "billing_quota", CreatedAt: now}
 		kind := core.KindTickets
-		if metric == billingAI {
+		switch metric {
+		case billingAI:
 			kind = "ai_usage_samples"
+		case billingResolutions:
+			kind = "ai_resolutions"
 		}
 		for _, item := range store.Records(tenant, kind) {
 			if billingMonth(item.CreatedAt) == month {
@@ -147,7 +151,7 @@ func (a *Admin) applyPaidInvoice(body []byte, paidAt time.Time) error {
 		if subscription.CustomerID != invoice.Customer || subscription.Name != details.Subscription {
 			return nil
 		}
-		for _, metric := range []string{billingTickets, billingAI} {
+		for _, metric := range []string{billingTickets, billingAI, billingResolutions} {
 			grant := billingLimit(plan, metric, "invoice_credits")
 			if grant == 0 || billingLimit(plan, metric, "limit") == 0 {
 				continue

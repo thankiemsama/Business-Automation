@@ -3,9 +3,7 @@ package service
 import (
 	"context"
 	"sort"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"businessautomation/internal/core"
@@ -17,21 +15,26 @@ type Workspace struct {
 	core.Repository
 	Clock           Clock
 	IDs             IDGenerator
-	mu              sync.Mutex
-	epoch           string
-	revision        uint64
+	fanout          EventFanout
 	onResolved      func(core.Record)
 	aiJobsEnabled   bool
 	sparringModel   string
 	realtimeQAReady chan core.Record
 	attachments     AttachmentStore
-	watchers        map[string]map[chan string]struct{}
 }
 
 func NewWorkspace(repo core.Repository, clock Clock, ids IDGenerator) *Workspace {
 	return &Workspace{
-		Repository: repo, Clock: clock, IDs: ids, epoch: ids.NewID(),
-		watchers: make(map[string]map[chan string]struct{}), realtimeQAReady: make(chan core.Record, 64),
+		Repository: repo, Clock: clock, IDs: ids, fanout: NewMemoryFanout(),
+		realtimeQAReady: make(chan core.Record, 64),
+	}
+}
+
+// ConfigureFanout swaps in a cross-replica fanout (e.g. NATS) for the
+// in-memory default. Must be called before Watch/Publish begin.
+func (s *Workspace) ConfigureFanout(fanout EventFanout) {
+	if fanout != nil {
+		s.fanout = fanout
 	}
 }
 
@@ -40,21 +43,7 @@ func (s *Workspace) SetOnResolved(fn func(core.Record)) { s.onResolved = fn }
 
 func (s *Workspace) enableAIJobs() { s.aiJobsEnabled = true }
 func (s *Workspace) Watch(tenant string) (string, <-chan string, func()) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	channel := make(chan string, 1)
-	if s.watchers[tenant] == nil {
-		s.watchers[tenant] = make(map[chan string]struct{})
-	}
-	s.watchers[tenant][channel] = struct{}{}
-	return s.cursor(), channel, func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		delete(s.watchers[tenant], channel)
-		if len(s.watchers[tenant]) == 0 {
-			delete(s.watchers, tenant)
-		}
-	}
+	return s.fanout.Watch(tenant)
 }
 
 func guestScope(tenant, id string) string { return "chat:" + tenant + ":" + id }
@@ -73,8 +62,6 @@ func (s *Workspace) GuestScope(tenant, token string) (string, error) {
 	})
 	return scope, err
 }
-
-func (s *Workspace) cursor() string { return s.epoch + "-" + strconv.FormatUint(s.revision, 10) }
 
 func (s *Workspace) Update(run func(core.Writer) error) error { return s.updateAs("system", run) }
 
@@ -111,21 +98,12 @@ func (s *Workspace) updateAsTenant(tenantID, actor string, run func(core.Writer)
 	if err != nil {
 		return err
 	}
-	s.mu.Lock()
-	for tenant := range tracked.changed {
-		s.revision++
-		for subscriber := range s.watchers[tenant] {
-			select {
-			case <-subscriber:
-			default:
-			}
-			subscriber <- s.cursor()
-		}
+	scopes := make([]string, 0, len(tracked.changed))
+	for scope := range tracked.changed {
+		scopes = append(scopes, scope)
 	}
-	s.mu.Unlock()
-	// Emit resolved-ticket hooks only after the transaction has committed and the
-	// revision lock is released, so the hook's own nested transaction cannot
-	// deadlock on s.mu.
+	s.fanout.Publish(scopes)
+	// Emit resolved-ticket hooks only after the transaction has committed.
 	for _, ticket := range tracked.pendingResolved {
 		if s.onResolved != nil {
 			s.onResolved(ticket)

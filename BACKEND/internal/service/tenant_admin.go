@@ -14,17 +14,17 @@ import (
 )
 
 type TenantSettings struct {
-	Allowlist        []string        `json:"allowlist"`
-	Flags            map[string]bool `json:"flags"`
-	DailyAIRequests  int             `json:"daily_ai_requests,omitempty"`
-	RealtimeQAPolicy string          `json:"realtime_qa_policy,omitempty"`
+	Allowlist        []string          `json:"allowlist"`
+	Flags            map[string]bool   `json:"flags"`
+	DailyAIRequests  int               `json:"daily_ai_requests,omitempty"`
+	RealtimeQAPolicy string            `json:"realtime_qa_policy,omitempty"`
 	BrandCard        BrandCardSettings `json:"brand_card,omitempty"`
 	AIHandoff        AIHandoffPolicy   `json:"ai_handoff,omitempty"`
-	PersonaSOP      map[string]string `json:"persona_sop,omitempty"`
-	DisplayName      string          `json:"display_name"`
-	LogoURL          string          `json:"logo_url"`
-	Accent           string          `json:"accent"`
-	Host             string          `json:"host"`
+	PersonaSOP       map[string]string `json:"persona_sop,omitempty"`
+	DisplayName      string            `json:"display_name"`
+	LogoURL          string            `json:"logo_url"`
+	Accent           string            `json:"accent"`
+	Host             string            `json:"host"`
 }
 type Admin struct {
 	repo     *Workspace
@@ -79,7 +79,7 @@ var hexAccent = regexp.MustCompile("^#[a-fA-F0-9]{6}$")
 var tenantHostname = regexp.MustCompile("^[a-z0-9](?:[a-z0-9-]{0,62})(?:\\.[a-z0-9](?:[a-z0-9-]{0,62}))+\\z")
 var tenantFlags = map[string]bool{
 	"ai_multimodal_qa": true, "ai_sales_persona": true, "ai_cs_persona": true, "ai_ops_persona": true,
-	"ai": true, "ai_quality_review": true, "ai_knowledge_drafts": true, "ai_voice_import": true,
+	"ai": true, "ai_quality_review": true, "ai_knowledge_drafts": true, "ai_voice_import": true, "ai_voicebot": true,
 	"ai_ticket_agent": true, "ai_ticket_agent_auto_resolve": true,
 	"ai_sparring":    true,
 	"ai_realtime_qa": true,

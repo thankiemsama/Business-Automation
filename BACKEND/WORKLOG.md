@@ -51,3 +51,69 @@ Mục tiêu chất lượng khoảng 8/10 áp dụng cho cấu trúc MVP, không
 - Chuẩn hóa import, khoảng cách declaration và định dạng composite literals; giữ nguyên route, định dạng dữ liệu lưu và giá trị JSON nghiệp vụ.
 
 Kiểm chứng cuối: `go test ./... -count=1` PASS (13 test functions; thêm 4 subcases về phân trang/lọc), `go vet ./...` PASS, `go build` PASS, `gofmt -l` không còn file cần định dạng. Cache/binary kiểm tra đặt trong TEMP, không tạo thêm thư mục build trong dự án. Không chạy thêm demo HTTP vì bộ HTTP regression đã qua và không có tích hợp bên ngoài thay đổi.
+
+## Multi-replica hardening � 2026-11-21
+
+### Task 1 � SSE fanout multi-replica (NATS JetStream)
+
+- Moi backend replica truong co watchers SSE trong bo nho (workspace.go), chi dung
+  cho 1 process. Tach ra interface EventFanout (internal/service/fanout.go):
+  - MemoryFanout (mac dinh, giu hinh vi hien co: cursor epoch-revision, giao
+    khong block, deo mot cursor moi nhat cho watcher cham).
+  - NATSFanout (bat khi dat NEXA_NATS_URL): stream NEXA_SSE (memory, MaxAge 1h),
+    subject sse.{scope}, moi replica publish + subscribe chung mot stream,
+    cursor = stream sequence (dong tren tat ca replicas). Epoch chia se de qua
+    NEXA_FANOUT_EPOCH. Local subscription tai tung replica chuyen event vao
+    watchers (kem ca event do chinh no sinh ra), khong lan luon.
+- workspace.go doc Watch/Publish sang fanout; hoi thoei khach (guest scope
+  chat:t:c) va tenan scope deu di chung mot duong. app.go noi vao:
+  NATSFanoutFromEnvironment + Close khi ctx xong.
+- Test (fanout_test.go, fanout_stress_test.go): Watch/Publish/stop, deo watcher
+  cham khong block, cursor monoton, song song 16 watchers x 32 tenan + 8
+  publisher (250ms), round-trip NATS 2 ket noi (test NATSFanoutRoundTrip,
+  skip neu khong co NEXA_NATS_TEST_URL).
+- compose.yaml: them service nats (nats:2.10-alpine --js, volume nats-data)
+  va cac bien NEXA_NATS_URL/USER/PASSWORD + NEXA_FANOUT_EPOCH cho backend.
+
+### Task 2 � Workflow scheduler fairness
+
+- runJobs/runAIJobs lay batch 25 theo thu tu hien han (duoi) nhu cu, nhung
+  gio gi han 5 job/tenan moi batch (capJobsPerTenant, workflow_jobs.go).
+  Tenan "on" khong con chan ngat 25 slot; job con lai van pending, duoc
+  lay o tick tiep (15s). Job da claim van an toan nhieu replica vi Postgres
+  LockWorkflowJob dung FOR UPDATE SKIP LOCKED va enqueue dedup (tokenHash
+  workflow:rule:ticket) + advisory lock chung.
+- Test (workflow_fairness_test.go): cap FIFO 3 tenan x 6 job = chi giu
+  5/tenan, batch nho/ r?ng tra day du, khong doi thu tu.
+
+### Task 4 � Race detector (Windows khong chay duoc)
+
+- Go race detector can cgo + C toolchain Linux/macOS. Masine nay (Windows)
+  khong co Docker/WSL distro; MSYS2 gcc 16 (ucrt64) khong host duoc cgo
+  (b�?c -E -dM im l?ng th?t b?i khi Go cgo g?i gcc nh� ti?n tr?nh con Windows,
+  du chi -c chi dung duoc trong MSYS2). K�t luan: chay tren Linux/Docker.
+- scripts/race-detector.ps1: -NoDocker (ch?y tr�n Linux host) hoac chay
+  docker run golang:1.24-bookworm + go test -race ./... -count=1 (cache
+  go-cache volume).
+
+### Task 5 � Load test
+
+- loadtest/staging.js (k6, co san): REST read/write theo STAGING_RPS,
+  threshold p95 < STAGING_P95_MS.
+- loadtest/sse-latency.mjs (moi, Node 18+, khong thu vien): mo
+  NEXA_SSE_STREAMS luon SSE, goi NEXA_SSE_WRITES viec ghi, do thoi gian
+  ten stream nhan luot refresh (deadline NEXA_SSE_REFRESH_DEADLINE_MS).
+  Bao cao p50/p95/p99 + so stream bi do (0 refresh) = dau hieu fanout
+  chua duoc nois NATS. Exit 1 neu co miss.
+
+### Task 3 � Cutover schema v2 (k? ho?ch)
+
+- CUTOVER_SCHEMA_V2.md: dieu kien gate (Task 1-5 xong + backup drill),
+  dual-read 48h, cutover qua NEXA_USE_SCHEMA_V2, rollback 30 ngay,
+  khong tao ten hanh CRUD/kenh/LLM trong thoi gian cutover.
+
+### Kiem chung
+
+- go build ./... OK; go vet ./... OK; go test ./... -count=1 PASS
+  (api, repository, service, telemetry). go.mod nhat nats.go v1.56.0
+  (direct), go directive 1.26 (khop Dockerfile golang:1.26-bookworm).

@@ -103,6 +103,10 @@ type Dependencies struct {
 	CSAT                                   CSATUseCases
 	Webhooks                               WebhookUseCases
 	Channels                               ChannelUseCases
+	Governance                             *service.Governance
+	Actions                                *service.AIActionService
+	Skills                                 *service.AISkills
+	Voicebot                               *service.Voicebot
 }
 
 type window struct {
@@ -126,6 +130,10 @@ type Handler struct {
 	csat                                   CSATUseCases
 	webhooks                               WebhookUseCases
 	channels                               ChannelUseCases
+	governance                             *service.Governance
+	actions                                *service.AIActionService
+	skills                                 *service.AISkills
+	voicebot                               *service.Voicebot
 	mu                                     sync.Mutex
 	attempts                               map[string]window
 	aiRate                                 map[string]window
@@ -151,6 +159,10 @@ func New(d Dependencies) http.Handler {
 		csat:            d.CSAT,
 		webhooks:        d.Webhooks,
 		channels:        d.Channels,
+		governance:      d.Governance,
+		actions:         d.Actions,
+		skills:          d.Skills,
+		voicebot:        d.Voicebot,
 		attempts:        make(map[string]window),
 		keyRate:         make(map[string]window),
 		authSlots:       make(chan struct{}, maximumConcurrentAuthTasks),
@@ -199,6 +211,10 @@ func New(d Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/conversations/{id}/reply", h.protected(h.reply))
 	h.platformRoutes(mux)
 	h.liveChannelRoutes(mux)
+	h.governanceRoutes(mux)
+	h.aiActionRoutes(mux)
+	h.aiSkillRoutes(mux)
+	h.voicebotRoutes(mux)
 	h.publicRoutes(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusNotFound, nil, core.Fail(http.StatusNotFound, "Endpoint không tồn tại"))

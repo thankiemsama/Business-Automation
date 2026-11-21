@@ -183,6 +183,9 @@ func (s *AIService) PlanTicketAction(user core.User, id string) (TicketAgentPlan
 		if !aiOptIn(store, user.TenantID, "ai_ticket_agent") {
 			return core.Fail(403, "Agent đã tắt cho doanh nghiệp")
 		}
+		if !GovernanceAllows(store, user.TenantID, "ticket_agent") {
+			return core.Fail(403, "Agent đã bị dừng bởi governance")
+		}
 		fresh, err := findOwnedRecord(store, user, id, core.KindTickets)
 		if err != nil {
 			return err
@@ -213,6 +216,9 @@ func (s *AIService) ApplyTicketAction(user core.User, ticketID, planID string) (
 	err := updateAsTenant(s.repo, user, func(store core.Writer) error {
 		if !aiOptIn(store, user.TenantID, "ai_ticket_agent") {
 			return core.Fail(403, "Agent đã tắt cho doanh nghiệp")
+		}
+		if !GovernanceAllows(store, user.TenantID, "ticket_agent") {
+			return core.Fail(403, "Agent đã bị dừng bởi governance")
 		}
 		plan, found := store.Record(user.TenantID, planID, ticketAgentPlansKind)
 		if !found || plan.ConversationID != ticketID || plan.AuthorID != user.ID {
@@ -271,6 +277,7 @@ func (s *AIService) ApplyTicketAction(user core.User, ticketID, planID string) (
 func resolveOnCustomerConfirmation(store core.Writer, conversation, previous, message core.Record) bool {
 	tenant := conversation.TenantID
 	if !aiOptIn(store, tenant, "ai_ticket_agent") || !aiOptIn(store, tenant, "ai_ticket_agent_auto_resolve") ||
+		!GovernanceAllows(store, tenant, "ticket_agent") ||
 		previous.Sender != core.SenderAgent || previous.Status == "pending" || previous.Status == "failed" ||
 		message.Sender != core.SenderCustomer ||
 		normalizeDiacritics(strings.Trim(strings.TrimSpace(message.Content), ".!")) != "da giai quyet" {
@@ -307,5 +314,6 @@ func resolveOnCustomerConfirmation(store core.Writer, conversation, previous, me
 	})
 	// Resolution is already safe to apply when an older trace buffer is unreadable.
 	_ = writeAgentToolTrace(store, tenant, run, "resolve_ticket", "auto_applied", model, now)
+	meterAIResolution(store, tenant, ticket.ID+":"+message.ID+":confirm", "agent_confirm", now)
 	return true
 }

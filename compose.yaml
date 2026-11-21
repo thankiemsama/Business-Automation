@@ -75,6 +75,12 @@ services:
       ATTACHMENT_S3_ACCESS_KEY: ${NEXA_MINIO_USER:-nexa-local}
       ATTACHMENT_S3_SECRET_KEY: ${NEXA_MINIO_PASSWORD:-nexa-minio-local-only}
       ATTACHMENT_MIGRATE_ON_READ: ${ATTACHMENT_MIGRATE_ON_READ:-false}
+      # Multi-replica SSE: set NEXA_NATS_URL=nats://nats:4222 to fan events
+      # across backend replicas. Empty (default) keeps the in-process fanout.
+      NEXA_NATS_URL: ${NEXA_NATS_URL:-}
+      NEXA_NATS_USER: ${NEXA_NATS_USER:-}
+      NEXA_NATS_PASSWORD: ${NEXA_NATS_PASSWORD:-}
+      NEXA_FANOUT_EPOCH: ${NEXA_FANOUT_EPOCH:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRO_PRICE: ${STRIPE_PRO_PRICE:-}
@@ -112,6 +118,15 @@ services:
       timeout: 3s
       retries: 12
 
+  nats:
+    image: ${NEXA_NATS_IMAGE:-nats:2.10-alpine}
+    command: ["--js"]
+    volumes:
+      - nats-data:/data
+    # Khi bật multi-replica, đặt NEXA_NATS_URL cho mỗi backend.
+    # compose.private.yaml (on-prem) giữ NATS chạy ngoài container bundle.
+
 volumes:
   postgres-data:
   minio-data:
+  nats-data:

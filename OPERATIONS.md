@@ -288,3 +288,12 @@ Blueprint tạo Web Service và PostgreSQL 16 gói Free tại Singapore, trong m
 2. Khi service báo **Live**, mở URL của `nexa-web`, đăng ký hoặc đăng nhập, rồi tạo và tải lại một ticket để kiểm tra API và PostgreSQL.
 
 Render Free có thể ngủ sau 15 phút không hoạt động. PostgreSQL Free hết hạn sau 30 ngày và không có bản sao lưu do Render quản lý. Tích hợp nhận webhook bên ngoài cần ingress riêng cho các đường dẫn callback.
+
+## Multi-replica: SSE fanout qua NATS
+
+- Moi backend replica co bo phat su kien SSE rieng trong bo nho (memory fanout). Khi chi chay 1 replica, mo hinh nay duoc dung. Khi chay 2+ backend replicas, phai bat NATS de su kien duoc fan ra tat ca replicas.
+- Cau hinh (moi backend): dat NEXA_NATS_URL (vi du nats://nats:4222), tuy chon NEXA_NATS_USER / NEXA_NATS_PASSWORD, tuy chon NEXA_FANOUT_EPOCH (chung mot gia tri cho tat ca replicas de dong cursor).
+- compose.yaml da co service nats (JetStream, memory stream NEXA_SSE). Bat vi: NEXA_NATS_URL=nats://nats:4222 trong bien .env roi docker compose up -d.
+- Khong dat NEXA_NATS_URL: backend van chay binh thuong voi fanout in-memory (1 process). Chi chay nhieu replica SAU khi da bat NATS va da do load (xem CUTOVER_SCHEMA_V2.md).
+- Khoi luong: stream NEXA_SSE dung memory storage, toi da 1 gio. Khong can ban dau vao NATS.
+- Kiem chung: chay loadtest/sse-latency.mjs (node loadtest/sse-latency.mjs voi NEXA_SSE_API_URL va NEXA_SSE_TOKENS) de do muong refresh SSE sau tung viec ghi. Tat ca streams phai nhan refresh trong han; stream nao khong bao gio nhan tu nhieu la dau hieu fanout chua duoc noi NATS.

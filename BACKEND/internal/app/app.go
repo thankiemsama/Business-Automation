@@ -22,6 +22,13 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 	storage := repo
 	clock := service.SystemClock{}
 	workspace := service.NewWorkspace(repo, clock, service.RandomIDs{})
+	fanout, fanoutErr := service.NATSFanoutFromEnvironment()
+	if fanoutErr != nil {
+		slog.Error("KhA'ng nA­i vA­i hA­' NATS, dA­ng sA­i fanout nA­i bA­n", "error", fanoutErr)
+	} else if fanout != nil {
+		workspace.ConfigureFanout(fanout)
+		slog.Info("SSE fanout A­i NATS (multi-replica)")
+	}
 	attachments, err := service.AttachmentStoreFromEnvironment()
 	if err != nil {
 		slog.Error("Không thể cấu hình kho tệp đính kèm", "error", err)
@@ -95,6 +102,11 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 	dashboard := service.NewDashboard(repo)
 	operations := service.NewOperations(workspace, dashboard, mailer, clock)
 	operations.ConfigureAIJobs(model)
+	governance := service.NewGovernance(workspace, clock)
+	actions := service.NewAIActions(workspace, clock, model)
+	skills := service.NewAISkills(workspace, clock)
+	voicebotCreds := service.NewVoicebotCredStore(os.Getenv("APP_ORIGIN"))
+	voicebot := service.NewVoicebot(workspace, clock, model, voicebotCreds)
 	if ctx.Done() != nil {
 		go workspace.Run(ctx)
 		go admin.Run(ctx)
@@ -105,6 +117,12 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 		go conversations.RunEmailReplies(ctx)
 		if mailer != nil {
 			go csat.RunEmail(ctx)
+		}
+		if fanout != nil {
+			go func() {
+				<-ctx.Done()
+				fanout.Close()
+			}()
 		}
 	}
 	return api.New(api.Dependencies{
@@ -124,5 +142,9 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 		CSAT:               csat,
 		Webhooks:           webhooks,
 		Channels:           channels,
+		Governance:         governance,
+		Actions:            actions,
+		Skills:             skills,
+		Voicebot:           voicebot,
 	})
 }

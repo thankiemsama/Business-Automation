@@ -52,6 +52,43 @@ Hai file `0002_rls_partition.sql` và `0003_vector.sql` định nghĩa schema đ
 - Ba bảng phân vùng gồm `messages`, `workflow_jobs`, `audit_events`. Migration tạo partition theo tháng UTC cho tháng trước, tháng hiện tại, tháng kế tiếp và một partition mặc định cho dữ liệu lịch sử. Công việc tạo partition tiếp theo và chính sách lưu giữ thuộc phần vận hành trước cutover.
 - Dùng database kiểm thử cô lập có quyền tạo role, với `TEST_DATABASE_URL`, rồi chạy `go test -v ./internal/repository -run TestTargetSchemaRLSAndPartitions`. Ca pgvector cần máy chủ có sẵn extension `vector`. Trên máy có Docker, chạy `go test -tags testcontainers -v ./internal/repository -run TestTargetSchemaInContainer` để khởi động PostgreSQL 16 có pgvector và bắt buộc kiểm tra cả migration vector.
 
+## Chức năng AI & đa kênh nâng cao (P1–P6)
+
+Lớp tính năng mở rộng trên nền nền tảng hiện có, được nối vào composition root
+(`internal/app/app.go`) và cấu hình qua biến môi trường.
+
+| Mã | Tính năng | Module chính |
+| --- | --- | --- |
+| P1 | AI Actions — catalog hành động do agent AI đề xuất, có cổng phê duyệt theo mức rủi ro | `internal/service/ai_actions.go` |
+| P2 | Kênh Facebook Messenger (live channel: webhook ký HMAC-SHA1, gửi qua Graph API) | `internal/service/live_channels.go` |
+| P3 | Governance — kill-switch, ma trận rủi ro, agent inventory, cổng phê duyệt | `internal/service/governance.go` |
+| P4 | Voicebot — gọi điện thoại tới/đi với AI (Twilio, TwiML, STT, TTS) | `internal/service/voicebot.go` |
+| P5 | AI Skills + vòng phản hồi — kỹ năng hội thoại theo ý định/giọng điệu, chấm điểm phản hồi | `internal/service/ai_skills.go` |
+| P6 | Thanh toán theo lượt giải quyết — đếm lượt AI giải quyết để tính phí | `internal/service/resolution_meter.go` |
+
+### Cấu hình biến môi trường
+
+```powershell
+# P2/P4: thông tin kết nối kênh live (Zalo, Messenger, WhatsApp, SMS)
+$env:NEXA_CHANNEL_CREDENTIALS = '{"tenant":{"messenger":{"account_id":"555","access_token":"fb-token","webhook_secret":"fb-secret","verify_token":"verify","graph_version":"v25.0"}}}'
+
+# P4: thông tin Twilio Voice cho voicebot
+$env:NEXA_VOICEBOT_CREDENTIALS = '{"tenant":{"account_sid":"AC...","auth_token":"...","from_number":"+15550000000","max_duration":600}}'
+```
+
+Các tính năng P1/P3/P5/P6 được bật theo từng tenant bằng feature flag trong
+cấu hình tenant (ví dụ `ai_voicebot`, `ai_voice_import`) và chịu kiểm soát của
+governance (`/api/v1/ai/governance`).
+
+### Endpoint API chính
+
+- `GET/POST /api/v1/ai/actions` — catalog hành động AI
+- `GET/POST /api/v1/ai/governance` — kill-switch, rủi ro, inventory
+- `GET/POST /api/v1/ai/skills` + `POST /api/v1/ai/feedback` — kỹ năng & phản hồi
+- `POST /api/v1/voicebot/calls/{tenant}` — webhook Twilio (trả về TwiML)
+- `POST /api/v1/ai/voicebot/call` + `GET /api/v1/ai/voicebot/calls` — gọi ra & lịch sử
+- `GET/POST /api/v1/channel-webhooks/{tenant}/messenger` — webhook Messenger
+
 ## Kiến trúc
 
 | Thành phần | Vai trò tương ứng dự án mẫu |
@@ -165,3 +202,23 @@ go vet ./...
 Đây là backend MVP chạy local, chưa phải hệ thống production hoàn chỉnh. Chưa có giao diện, tích hợp mô hình AI thật, embeddings/vector search, webhook Zalo/Facebook/email, workflow nhiều bước/scheduler, queue/retry, SLA, phân công nhân viên, audit log, billing, xác minh email hay khôi phục mật khẩu. Kênh hiện là thuộc tính phân loại, chưa gửi/nhận qua nhà cung cấp thật.
 
 File repository đọc/ghi toàn bộ state và chỉ khóa trong một process; không dùng cho nhiều replica hay dữ liệu lớn. Chưa kiểm chứng mất điện, phục hồi backup hoặc tải production. Bước phát triển tiếp theo là SQL repository có transaction và migration, provider AI có timeout/giới hạn chi phí, queue/outbox và xác thực webhook. Trước khi public cần HTTPS, quy trình mời/xác minh tài khoản và cơ chế vận hành phù hợp.
+
+## Multi-replica: SSE fanout qua NATS
+
+Backend mo hinh mot process (SSE watchers trong bo nho). Khi chay 2+ replicas, su
+kien SSE phai duoc fan ra giua cac replicas, dong thoi chiem ngan hang viec
+workflow (xem duoi). Cac bien moi truong:
+
+| Bien | Tac dung |
+| --- | --- |
+| NEXA_NATS_URL | URL server NATS (vi du nats://nats:4222). Bo trong = fanout in-memory (1 process). |
+| NEXA_NATS_USER / NEXA_NATS_PASSWORD | Tin dang cap NATS (tuy chon). |
+| NEXA_FANOUT_EPOCH | Chuoi dong cursos giua replicas; chung mot gia tri (mac dinh: ten stream NEXA_SSE). |
+
+compose.yaml da co service nats (JetStream, memory stream NEXA_SSE, MaxAge 1h). Bat
+vi: dat NEXA_NATS_URL= nats://nats:4222 trong bien .env roi docker compose up -d.
+
+Kiem chung muong fanout: node loadtest/sse-latency.mjs voi NEXA_SSE_API_URL va
+NEXA_SSE_TOKENS (token cua owner). Tat ca stream SSE phai nhan luot refresh trong
+han; stream nao khong bao gio nhan tu nhieu la dau hieu fanout chua duoc noi NATS
+hoac replicas chua dung NEXA_FANOUT_EPOCH chung.

@@ -117,6 +117,27 @@ Với Docker Compose, đặt các biến trên trong tệp `.env` ở thư mục
 
 ## Tài liệu
 
+## Tài khoản demo (cố định)
+
+Bảng demo mẫu ngành **E-commerce**, chạy 1 lệnh, dữ liệu cố định, chạy lại không trùng:
+
+```powershell
+# backend đang chạy (docker compose up hoặc Render)
+cd BACKEND
+.\scripts\seed-demo.ps1
+```
+
+| Role | Email | Mật khẩu | Quyền |
+| --- | --- | --- | --- |
+| Owner | `owner@nexa.local` | `NexaDemo!2026` | Toàn quyền + dữ liệu demo |
+| Agent | `agent@nexa.local` | `NexaDemo!2026` | Nhận và xử lý đơn |
+
+Dữ liệu demo (mẫu E-commerce): 8 hồ sơ khách hàng, 5 bài KB (hoàn tiền, vận chuyển, COD, đổi hàng, khuyến mãi), 3 automation từ khóa, 5 hội thoại đơn hàng, 2 phiếu hỗ trợ (1 phiếu high priority). Đổi mật khẩu khi chạy instance công khai bằng `-Password`.
+
+Script cũ tạo email ngẫu nhiên: `scripts/demo.ps1` (không còn khuyến nghị cho demo pitch).
+
+## Cấu trúc thư mục
+
 - [Backend](BACKEND/README.md) — cấu hình lưu trữ, API và kiểm thử.
 - [Frontend](FRONTEND/README.md) — cấu hình môi trường và kiểm tra giao diện.
 - [Vận hành và tích hợp](OPERATIONS.md) — chat, email, OpenAI, workflow và các tùy chọn quản trị.

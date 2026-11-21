@@ -16,6 +16,7 @@ var auditedKinds = map[string]bool{
 	skillRoutingKind: true,
 	ticketAgentPlansKind: true, leadCampaignKind: true, qaReviewsKind: true,
 	trainingScenariosKind: true, sparringCertificatesKind: true, evalSetsKind: true,
+	governanceKind: true,
 }
 
 type auditChange struct {

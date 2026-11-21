@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -71,13 +72,13 @@ func (m *ChannelManager) registerLiveChannels() {
 	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
-	for _, name := range []string{core.ChannelZalo, core.ChannelWhatsApp, core.ChannelSMS} {
+	for _, name := range []string{core.ChannelZalo, core.ChannelMessenger, core.ChannelWhatsApp, core.ChannelSMS} {
 		provider := &liveChannel{name: name, credentials: map[string]channelCredentials{}, client: client}
 		for tenant, channels := range tenants {
 			credential := channels[name]
 			if !validChannelAddress(name, credential.AccountID) || credential.WebhookSecret == "" || credential.AccessToken == "" ||
 				(name == core.ChannelZalo && !channelID.MatchString(credential.AppID)) ||
-				(name == core.ChannelWhatsApp && (credential.VerifyToken == "" || !graphVersion.MatchString(credential.GraphVersion))) ||
+				((name == core.ChannelWhatsApp || name == core.ChannelMessenger) && (credential.VerifyToken == "" || !graphVersion.MatchString(credential.GraphVersion))) ||
 				(name == core.ChannelSMS && !validSMSCredentials(tenant, credential)) {
 				continue
 			}
@@ -109,7 +110,7 @@ func (m *ChannelManager) providerAccount(store core.Reader, tenant, channel stri
 
 func (m *ChannelManager) VerifyChallenge(tenant, channel, mode, candidate string) bool {
 	var verified bool
-	if channel != core.ChannelWhatsApp || mode != "subscribe" || candidate == "" {
+	if !isFacebookGraph(channel) || mode != "subscribe" || candidate == "" {
 		return false
 	}
 	err := viewTenant(m.repo, tenant, func(store core.Reader) error {
@@ -120,6 +121,10 @@ func (m *ChannelManager) VerifyChallenge(tenant, channel, mode, candidate string
 		return err
 	})
 	return err == nil && verified
+}
+
+func isFacebookGraph(channel string) bool {
+	return channel == core.ChannelWhatsApp || channel == core.ChannelMessenger
 }
 
 type inboundChannelMessage struct {
@@ -172,6 +177,59 @@ func parseZalo(account channelAccount, secret string, header http.Header, raw []
 		msg.attachment = "Tệp đính kèm trên Zalo OA"
 	}
 	return []inboundChannelMessage{msg}, nil
+}
+
+func parseMessenger(account channelAccount, secret string, header http.Header, raw []byte) ([]inboundChannelMessage, error) {
+	invalid := core.Fail(401, "Webhook Messenger không hợp lệ")
+	mac := hmac.New(sha1.New, []byte(secret))
+	mac.Write(raw)
+	signature := header.Get("X-Hub-Signature")
+	if !validSignature(signature, "sha1=", mac.Sum(nil)) {
+		return nil, invalid
+	}
+	var payload struct {
+		Object string `json:"object"`
+		Entry  []struct {
+			ID        string `json:"id"`
+			Messaging []struct {
+				Sender struct {
+					ID string `json:"id"`
+				}
+				Message struct {
+					MID        string `json:"mid"`
+					Text       string `json:"text"`
+					Attachment []struct {
+						Type string `json:"type"`
+					} `json:"attachments"`
+				}
+			}
+		}
+	}
+	if json.Unmarshal(raw, &payload) != nil || payload.Object != "page" {
+		return nil, core.Fail(400, "Dữ liệu Messenger không hợp lệ")
+	}
+	var messages []inboundChannelMessage
+	for _, entry := range payload.Entry {
+		if entry.ID != account.AccountID {
+			continue
+		}
+		for _, original := range entry.Messaging {
+			mid := original.Message.MID
+			if mid == "" || original.Sender.ID == "" {
+				continue
+			}
+			msg := inboundChannelMessage{id: mid, sender: original.Sender.ID, text: original.Message.Text}
+			if len(original.Message.Attachment) > 0 && original.Message.Attachment[0].Type != "" {
+				kind := strings.ToLower(original.Message.Attachment[0].Type)
+				msg.attachment = "Đính kèm " + clipped(kind, 40) + " trên Messenger"
+				if msg.text == "" {
+					msg.text = msg.attachment
+				}
+			}
+			messages = append(messages, msg)
+		}
+	}
+	return messages, nil
 }
 
 func parseWhatsApp(account channelAccount, secret string, header http.Header, raw []byte) ([]inboundChannelMessage, error) {
@@ -231,7 +289,9 @@ func (m *ChannelManager) Receive(tenant, channel string, header http.Header, raw
 			return err
 		}
 		parse := parseZalo
-		if channel == core.ChannelWhatsApp {
+		if channel == core.ChannelMessenger {
+			parse = parseMessenger
+		} else if channel == core.ChannelWhatsApp {
 			parse = parseWhatsApp
 		}
 		var messages []inboundChannelMessage
@@ -319,7 +379,10 @@ func (p *liveChannel) send(ctx context.Context, account channelAccount, creds ch
 	}
 	endpoint := "https://openapi.zalo.me/v3.0/oa/message/cs"
 	payload := map[string]any{"recipient": map[string]string{"user_id": to}, "message": map[string]string{"text": content}}
-	if p.name == core.ChannelWhatsApp {
+	if p.name == core.ChannelMessenger {
+		endpoint = "https://graph.facebook.com/" + creds.GraphVersion + "/" + account.AccountID + "/messages"
+		payload = map[string]any{"recipient": map[string]string{"id": to}, "message": map[string]string{"text": content}}
+	} else if p.name == core.ChannelWhatsApp {
 		endpoint = "https://graph.facebook.com/" + creds.GraphVersion + "/" + account.AccountID + "/messages"
 		payload = map[string]any{"messaging_product": "whatsapp", "to": to, "type": "text", "text": map[string]string{"body": content}, "biz_opaque_callback_data": delivery}
 	}
@@ -333,7 +396,7 @@ func (p *liveChannel) send(ctx context.Context, account channelAccount, creds ch
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Nexa-Delivery", delivery)
-	if p.name == core.ChannelWhatsApp {
+	if isFacebookGraph(p.name) {
 		req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
 	} else {
 		req.Header.Set("access_token", creds.AccessToken)
@@ -367,6 +430,11 @@ func (p *liveChannel) send(ctx context.Context, account channelAccount, creds ch
 		}
 		if res.Data.ID != "" {
 			return channelSendResult{receipt: res.Data.ID}
+		}
+	} else if p.name == core.ChannelMessenger {
+		// Messenger Graph API returns {"messages":[{...}]} or an error object.
+		if len(res.Messages) == 1 && res.Messages[0].ID != "" {
+			return channelSendResult{receipt: res.Messages[0].ID}
 		}
 	} else if len(res.Messages) == 1 && res.Messages[0].ID != "" {
 		return channelSendResult{receipt: res.Messages[0].ID}
