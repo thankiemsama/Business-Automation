@@ -15,6 +15,23 @@ projects:
                 fromDatabase:
                   name: nexa-postgres
                   property: connectionString
+              # Per-client IP rate-limiting. The Go API only sees 127.0.0.1 when
+              # served through the in-container Next.js BFF, so without these two
+              # vars every real user shares one 20-req/min bucket and logins can
+              # intermittently return 429.
+              #
+              # To enable: add BOTH vars in the Render dashboard (Web service ->
+              # Environment -> Add env var). Generate the secret once with
+              #   openssl rand -hex 32
+              # and set:
+              #   NEXA_TRUST_INGRESS_IP=true
+              #   NEXA_PROXY_SECRET=<64-char hex>   (mark it "secret")
+              # Keeping the secret out of the repo means it is never committed.
+              - key: NEXA_TRUST_INGRESS_IP
+                value: "true"
+              - key: NEXA_PROXY_SECRET
+                value: "SET_IN_RENDER_DASHBOARD"
+                secret: true
         databases:
           - name: nexa-postgres
             region: singapore

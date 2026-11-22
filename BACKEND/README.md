@@ -11,7 +11,7 @@ cd D:\GOLANG\BACKEND
 go run ./cmd/api
 ```
 
-API mặc định: `http://127.0.0.1:8080`, kiểm tra bằng `GET /healthz`.
+API mặc định: `http://127.0.0.1:8080`, kiểm tra bằng `GET /readyz`.
 
 Cấu hình tùy chọn (biến môi trường được đọc trực tiếp, không tự nạp file .env):
 

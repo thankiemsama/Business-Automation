@@ -32,8 +32,21 @@ jobs:
         with:
           go-version: "1.26.x"
           cache-dependency-path: BACKEND/go.sum
+      - name: Check gofmt
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "gofmt: files not formatted:"
+            echo "$files"
+            gofmt -d $files
+            exit 1
+          fi
       - run: go vet ./...
       - run: go test ./...
+        env:
+          TEST_DATABASE_URL: postgres://nexa:nexa-ci@127.0.0.1:${{ job.services.postgres.ports[5432] }}/nexa?sslmode=disable
+      - name: Race detector (concurrency-heavy packages)
+        run: go test -race ./internal/api/... ./internal/service/... ./internal/repository/...
         env:
           TEST_DATABASE_URL: postgres://nexa:nexa-ci@127.0.0.1:${{ job.services.postgres.ports[5432] }}/nexa?sslmode=disable
 

@@ -13,7 +13,7 @@ var auditedKinds = map[string]bool{
 	"customers": true, "tickets": true, "conversations": true, "messages": true, "knowledge": true, "automations": true,
 	"workflow_rules": true, "report_schedules": true, "tenant_settings": true, "webhooks": true, "api_keys": true, "channel_config": true,
 	"custom_fields": true, "crm_sync": true, "billing_plan": true,
-	skillRoutingKind: true,
+	skillRoutingKind:     true,
 	ticketAgentPlansKind: true, leadCampaignKind: true, qaReviewsKind: true,
 	trainingScenariosKind: true, sparringCertificatesKind: true, evalSetsKind: true,
 	governanceKind: true,

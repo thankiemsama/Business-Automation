@@ -84,7 +84,7 @@ func (s *PlatformService) CreatePortalTicket(tenant, token, subject, content, pr
 			Subject: subject, Content: content, Status: core.StatusOpen,
 			Priority: priority, Tags: append([]string{}, customer.Tags...),
 			AssigneeID: routed.AssigneeID,
-			CreatedAt: now, UpdatedAt: now,
+			CreatedAt:  now, UpdatedAt: now,
 		}
 		response, resolution := ticketDeadlines(ticket)
 		ticket.ResponseDueAt, ticket.ResolutionDueAt = &response, &resolution

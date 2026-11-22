@@ -91,7 +91,7 @@ cd BACKEND
 go run ./cmd/api
 ```
 
-API mặc định nghe tại `http://127.0.0.1:8080` và lưu dữ liệu bằng JSON nếu chưa cấu hình `DATABASE_URL`. Kiểm tra API qua [http://127.0.0.1:8080/healthz](http://127.0.0.1:8080/healthz).
+API mặc định nghe tại `http://127.0.0.1:8080` và lưu dữ liệu bằng JSON nếu chưa cấu hình `DATABASE_URL`. Kiểm tra API qua [http://127.0.0.1:8080/readyz](http://127.0.0.1:8080/readyz).
 
 Chạy giao diện trong terminal thứ hai.
 
@@ -122,17 +122,25 @@ Với Docker Compose, đặt các biến trên trong tệp `.env` ở thư mục
 Bảng demo mẫu ngành **E-commerce**, chạy 1 lệnh, dữ liệu cố định, chạy lại không trùng:
 
 ```powershell
-# backend đang chạy (docker compose up hoặc Render)
+# Chạy ở local (Go API đang chạy tại 127.0.0.1:8080):
 cd BACKEND
 .\scripts\seed-demo.ps1
 ```
+
+Với instance **Render**, Go API chỉ nghe trong container (loopback), nên chạy seed từ máy của bạn qua BFF của web:
+
+```powershell
+.\scripts\seed-demo.ps1 -Mode bff -BaseUrl https://<ten-mien-cua-ban>.onrender.com
+```
+
+Chế độ `bff` tự động kèm `Origin` đúng và giữ cookie phiên HttpOnly của BFF. Chạy lại nhiều lần không tạo trùng.
 
 | Role | Email | Mật khẩu | Quyền |
 | --- | --- | --- | --- |
 | Owner | `owner@nexa.local` | `NexaDemo!2026` | Toàn quyền + dữ liệu demo |
 | Agent | `agent@nexa.local` | `NexaDemo!2026` | Nhận và xử lý đơn |
 
-Dữ liệu demo (mẫu E-commerce): 8 hồ sơ khách hàng, 5 bài KB (hoàn tiền, vận chuyển, COD, đổi hàng, khuyến mãi), 3 automation từ khóa, 5 hội thoại đơn hàng, 2 phiếu hỗ trợ (1 phiếu high priority). Đổi mật khẩu khi chạy instance công khai bằng `-Password`.
+Dữ liệu demo (mẫu E-commerce): 8 hồ sơ khách hàng, 5 bài KB (hoàn tiền, vận chuyển, COD, đổi hàng, khuyến mãi), 3 automation từ khóa, 5 hội thoại đơn hàng, 2 phiếu hỗ trợ (1 phiếu high priority), 2 quy tắc Workflow (tự tạo phiếu theo từ khóa + nhắc phiếu ngán 3 ngày) và 2 kịch bản AI Sparring (giải quyết + chuyển người thật). Đổi mật khẩu khi chạy instance công khai bằng `-Password`.
 
 Script cũ tạo email ngẫu nhiên: `scripts/demo.ps1` (không còn khuyến nghị cho demo pitch).
 

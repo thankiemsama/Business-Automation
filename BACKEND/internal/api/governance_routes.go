@@ -22,7 +22,7 @@ func (h *Handler) governanceRoutes(mux *http.ServeMux) {
 			return
 		}
 		var input struct {
-			PlatformKill bool                  `json:"platform_kill"`
+			PlatformKill bool                    `json:"platform_kill"`
 			Config       service.AgentGovernance `json:"config"`
 		}
 		if err := decode(w, r, &input); err != nil {

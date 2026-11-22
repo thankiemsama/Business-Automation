@@ -8,29 +8,80 @@
     email, ten, noi dung luon giong nhau o moi lan chay. Chay nhieu lan khong
     tao trung: tai khoan / tai nguyen da ton tai se duoc bo qua (co canh bao).
 
+    Hai che do:
+      - direct (mac dinh): goi thurong API cua Go (http://127.0.0.1:8080) voi
+        Bearer token. Dung khi chay API local hoac Docker.
+      - bff: goi thurong /api/platform cua Next.js (https://ten-mien-render.com)
+        voi cookie HttpOnly. BATT BUOC voi instance Render vi API Go chi nghe
+        trong container; BFF proxy vao loopback va co bien Origin dung.
+
     Luu y: tai khoan demo la co dinh -> chuan bi dung trong mo i pitch / demo.
     Neu chay tren public instance, ban chinh -Password truong hoc.
 
+.PARAMETER Mode
+    "direct" (mac dinh) hoac "bff".
+
 .PARAMETER BaseUrl
-    URL goc cua backend API. Mac dinh http://127.0.0.1:8080.
+    direct: URL goc cua Go API, mac dinh http://127.0.0.1:8080.
+    bff: URL goc cua web (Next.js), mac dinh https://nexa-web-55cq.onrender.com.
 
 .PARAMETER Password
     Mat khau chung cho owner va agent. Mac dinh: NexaDemo!2026
 #>
 param(
+    [ValidateSet("direct", "bff")][string]$Mode = "direct",
     [string]$BaseUrl = "http://127.0.0.1:8080",
     [string]$Password = "NexaDemo!2026"
 )
 
 $ErrorActionPreference = "Stop"
-$api = "$BaseUrl/api/v1"
+$base = $BaseUrl.TrimEnd("/")
+if ($Mode -eq "bff") {
+    if ($base -like "*127.0.0.1*" -or $base -like "http://localhost*") {
+        Write-Host "Loi: mode bff can URL web co the (https), vi du -BaseUrl https://nexa-web-55cq.onrender.com" -ForegroundColor Red
+        exit 1
+    }
+    if ($BaseUrl -eq "http://127.0.0.1:8080") {
+        $base = "https://nexa-web-55cq.onrender.com"
+        Write-Host "Chuan: mode bff khong co -BaseUrl -> dung $base (dung -BaseUrl de ghi che)" -ForegroundColor DarkYellow
+    }
+}
+$api = if ($Mode -eq "bff") { "$base/api/platform" } else { "$base/api/v1" }
+
 $headers = @{}
+$cookieJar = @{}
+if ($Mode -eq "bff") {
+    $u = [uri]$base
+    $headers["Origin"] = "$($u.Scheme)://$($u.Authority)"
+}
+
+function Get-CookieHeader {
+    if ($cookieJar.Count -eq 0) { return $null }
+    $pairs = foreach ($k in $cookieJar.Keys) { $k + "=" + $cookieJar[$k] }
+    return ($pairs -join "; ")
+}
+function Capture-SetCookie($response) {
+    $raw = $response.Headers["Set-Cookie"]
+    if (-not $raw) { return }
+    foreach ($c in @($raw)) {
+        $pair = $c.Split(";")[0]
+        $i = $pair.IndexOf("=")
+        if ($i -le 0) { continue }
+        $name = $pair.Substring(0, $i).Trim()
+        $val = $pair.Substring($i + 1)
+        if ($val -eq "") { $cookieJar.Remove($name) } else { $cookieJar[$name] = $val }
+    }
+}
 
 function Call-Api([string]$Method, [string]$Path, $Body) {
+    $reqHeaders = @{}
+    foreach ($k in $headers.Keys) { $reqHeaders[$k] = $headers[$k] }
+    $cookie = Get-CookieHeader
+    if ($cookie) { $reqHeaders["Cookie"] = $cookie }
     $argsForRequest = @{
         Method    = $Method
         Uri       = "$api$Path"
-        Headers   = $headers
+        Headers   = $reqHeaders
         ContentType = "application/json; charset=utf-8"
     }
     if ($null -ne $Body) {
@@ -49,17 +100,20 @@ function Call-Api([string]$Method, [string]$Path, $Body) {
         }
         throw "API loi [$status] $Method $Path -> $bodyText"
     }
+    Capture-SetCookie $response
     $json = $response.Content | ConvertFrom-Json
     if ($json.data) { return $json.data } else { return $json }
 }
 
 function Log([string]$Msg) { Write-Host "    $Msg" }
 function Note([string]$Msg) { Write-Host "    [SKIP] $Msg" -ForegroundColor DarkYellow }
+function Warn([string]$Msg) { Write-Host "    [WARN] $Msg" -ForegroundColor DarkYellow }
 
 function Get-List([string]$Path) {
     $raw = $null
     try { $raw = Call-Api GET $Path $null } catch { return @() }
-    # Resource lists are paginated: { items, total, page, limit }. Team is a plain array.
+    # Resource lists are paginated: { items, total, page, limit }. Team and
+    # operations/workflows are plain arrays.
     if ($null -eq $raw) { return @() }
     if ($raw.PSObject.Properties.Name -contains "items") { return @($raw.items) }
     return @($raw)
@@ -83,7 +137,7 @@ function Ensure-Owner() {
 }
 function Ensure-Agent() {
     $ownerLogin = Call-Api POST "/auth/login" @{ email = "owner@nexa.local"; password = $Password }
-    $headers.Authorization = "Bearer $($ownerLogin.access_token)"
+    if ($Mode -eq "direct") { $headers.Authorization = "Bearer $($ownerLogin.access_token)" }
     $members = Get-List "/team"
     if (Find-By $members "email" "agent@nexa.local") {
         Note "agent@nexa.local da co trong team"
@@ -95,23 +149,29 @@ function Ensure-Agent() {
 
 Write-Host ""
 Write-Host "=== NEXA DEMO SEED (E-commerce, 1 bang) ===" -ForegroundColor Cyan
-Write-Host "API: $api"
+Write-Host "Che do : $Mode"
+Write-Host "API    : $api"
 Write-Host ""
 
 # ---------- 1. Tai khoan ----------
-Write-Host "[1/5] Tai khoan demo co dinh" -ForegroundColor Yellow
+Write-Host "[1/8] Tai khoan demo co dinh" -ForegroundColor Yellow
 Ensure-Owner
 $ownerLogin = Call-Api POST "/auth/login" @{ email = "owner@nexa.local"; password = $Password }
-$headers.Authorization = "Bearer $($ownerLogin.access_token)"
+if ($Mode -eq "direct") { $headers.Authorization = "Bearer $($ownerLogin.access_token)" }
 Ensure-Agent
 
 # Thu nghiem login agent (de kiem tra mat khau chung lam viec duoc)
 $agentLogin = Call-Api POST "/auth/login" @{ email = "agent@nexa.local"; password = $Password }
 Log "agent login OK - phien agent su dung duoc mat khau chung"
-$headers.Authorization = "Bearer $($ownerLogin.access_token)"
+if ($Mode -eq "direct") {
+    $headers.Authorization = "Bearer $($ownerLogin.access_token)"
+} else {
+    # BFF: quay lai phien owner (cookie) de cac muc tiep theo duyen quyen owner.
+    $null = Call-Api POST "/auth/login" @{ email = "owner@nexa.local"; password = $Password }
+}
 
 # ---------- 2. Khach hang ----------
-Write-Host "[2/5] Ho so khach hang (8 ho so)" -ForegroundColor Yellow
+Write-Host "[2/8] Ho so khach hang (8 ho so)" -ForegroundColor Yellow
 $customers = @(
     @{ name = "Nguyen Thu Ha";  email = "ha.nguyen@example.vn";  phone = "0912000001" },
     @{ name = "Le Van Tuan";    email = "tuan.le@example.vn";    phone = "0912000002" },
@@ -132,7 +192,7 @@ foreach ($c in $customers) {
 }
 
 # ---------- 3. Kho kien thuc ----------
-Write-Host "[3/5] Kho kien thuc (5 bai, public - de RAG + trung tam tro giup)" -ForegroundColor Yellow
+Write-Host "[3/8] Kho kien thuc (5 bai, public - de RAG + trung tam tro giup)" -ForegroundColor Yellow
 $articles = @(
     @{
         subject = "Chinh sach hoan tien trong 7 ngay"
@@ -166,7 +226,7 @@ foreach ($a in $articles) {
 }
 
 # ---------- 4. Automation ----------
-Write-Host "[4/5] Tong hop tu dong (3 automation tu khoa)" -ForegroundColor Yellow
+Write-Host "[4/8] Tong hop tu dong (3 automation tu khoa)" -ForegroundColor Yellow
 $automations = @(
     @{ name = "Tu dong tra loi tu khoa 'hoan tien'";  keywords = @("hoan tien", "trau tien") },
     @{ name = "Tu dong tra loi tu khoa 'chua nhan don'"; keywords = @("chua nhan don", "don cam") },
@@ -183,7 +243,7 @@ foreach ($a in $automations) {
 }
 
 # ---------- 5. Hoi thoai + phieu ho tro ----------
-Write-Host "[5/5] Hoi thoai don hang + phieu ho tro (demo wow)" -ForegroundColor Yellow
+Write-Host "[5/8] Hoi thoai don hang + phieu ho tro (demo wow)" -ForegroundColor Yellow
 
 $customerList = Get-List "/customers"
 $scenarios = @(
@@ -273,6 +333,93 @@ foreach ($t in $ticketScenarios) {
     }
 }
 
+# ---------- 6. Thiet lap tenant: workflow + AI Sparring ----------
+Write-Host "[6/8] Thiet lap tenant (bat workflow + ai_sparring)" -ForegroundColor Yellow
+function Ensure-Flags([hashtable]$Flags) {
+    $settings = $null
+    try { $settings = Call-Api GET "/admin/settings" $null } catch {
+        Warn "Khong doc duoc /admin/settings: $($_.Exception.Message)"
+        return
+    }
+    $flags = @{}
+    if ($settings -and $settings.PSObject.Properties.Name -contains "flags" -and $settings.flags) {
+        foreach ($k in $settings.flags.PSObject.Properties.Name) { $flags[$k] = [bool]$settings.flags.$k }
+    }
+    foreach ($k in $Flags.Keys) { $flags[$k] = [bool]$Flags[$k] }
+    $body = @{ allowlist = @(); flags = $flags }
+    if ($settings) {
+        foreach ($prop in @("display_name", "logo_url", "accent", "host", "realtime_qa_policy")) {
+            if ($settings.PSObject.Properties.Name -contains $prop -and $settings.$prop) { $body[$prop] = $settings.$prop }
+        }
+        if ($settings.PSObject.Properties.Name -contains "daily_ai_requests" -and $null -ne $settings.daily_ai_requests) { $body["daily_ai_requests"] = $settings.daily_ai_requests }
+        if ($settings.PSObject.Properties.Name -contains "persona_sop" -and $settings.persona_sop) { $body["persona_sop"] = $settings.persona_sop }
+    }
+    $null = Call-Api PUT "/admin/settings" $body
+    Log "Flags da bat: $($Flags.Keys -join ', ')"
+}
+Ensure-Flags @{ workflows = $true; ai_sparring = $true }
+
+# ---------- 7. Workflow tu dong ----------
+Write-Host "[7/8] Workflow tu dong (2 quy tac)" -ForegroundColor Yellow
+function Ensure-Workflow([string]$Name, $Rule) {
+    $existing = Get-List "/operations/workflows"
+    if (Find-By $existing "name" $Name) {
+        Note "workflow '$Name' da co"
+        return
+    }
+    $null = Call-Api POST "/operations/workflows" $Rule
+    Log "Them workflow: $Name"
+}
+Ensure-Workflow "Tu tao phieu khi khach bao hoan tien" @{
+    name      = "Tu tao phieu khi khach bao hoan tien"
+    enabled   = $true
+    trigger   = "message_received"
+    conditions = @{ keywords_any = @("hoan tien", "tra lai tien"); status = "open" }
+    actions   = @(@{ type = "create_ticket"; value = "Yeu cau hoan tien (tu dong)" })
+}
+Ensure-Workflow "Nhan phieu ho tro ngung 3 ngay" @{
+    name      = "Nhan phieu ho tro ngung 3 ngay"
+    enabled   = $true
+    trigger   = "ticket_idle"
+    idle_days = 3
+    conditions = @{}
+    actions   = @(@{ type = "notify_owner"; value = "Phieu da im 3 ngay - can phan hoi" })
+}
+
+# ---------- 8. Kich ban AI Sparring ----------
+Write-Host "[8/8] Kich ban AI Sparring (2 kich ban tu hoi thoai demo)" -ForegroundColor Yellow
+function Ensure-Scenario([string]$Title, [string]$ConvSubject, [string]$Expected, [array]$Lines) {
+    $convs = Get-List "/conversations"
+    $conv = Find-By $convs "subject" $ConvSubject
+    if (-not $conv) {
+        Note "conversation '$ConvSubject' chua co - bo qua kich ban '$Title'"
+        return
+    }
+    $body = @{
+        conversation_id = $conv.id
+        title           = $Title
+        expected_action = $Expected
+        lines           = $Lines
+        anonymized      = $true
+    }
+    try {
+        $scen = Call-Api POST "/ai/sparring/scenarios" $body
+        Log "Kich ban sparring '$($scen.id)' - '$Title' (dinh: $Expected)"
+    } catch {
+        Warn "Tao kich ban '$Title' that bai: $($_.Exception.Message)"
+    }
+}
+# Kich ban "giai quyet": nhan vien thuc hien trong hoi thoai -> dinh resolve_ticket
+Ensure-Scenario "Ho tro doi size san khau trong 15 ngay" "Doi size M sang L don #20260020" "resolve_ticket" @(
+    @{ role = "customer"; text = "Doi size M sang L don #20260020 mua ao da size M, muon doi L. Hoi lai chi tiet ve thu gia van chuyen." },
+    @{ role = "agent";    text = "Don #20260020 duoc doi hang trong vong 15 ngay. Khach chi thanh thu gia van chuyen 15.000 dong. Don doi da duoc tao voi ma #20260020-R1." }
+)
+# Kich ban "chuyen nguoi that": can shipper / xu ly ngoai hoi thoai -> dinh handoff
+Ensure-Scenario "Ship COD that bai 2 lan - chon lai thoi gian nhan hang" "Ship COD that bai 2 lan - don #20260018" "handoff" @(
+    @{ role = "customer"; text = "Don #20260018 ship 2 lan deu that bai vi toi di lam. Gio toi muon chon lai thoi gian nhat hang. Ban giup toi co duoc khong?" },
+    @{ role = "agent";    text = "Duoc nha! Don #20260018 da duoc chuyen sang 'doi thoi gian nhan hang'. Ban nhat hang truoc 17h ngay hom nay, toi se lien he shipper de giao trong 1 gio." }
+)
+
 # ---------- Xac nhan dashboard ----------
 Write-Host ""
 $dash = $null
@@ -295,6 +442,10 @@ Write-Host "  - 5 bai KB public (hoan tien, van chuyen, COD, doi hang, khuyen ma
 Write-Host "  - 3 automation tu khoa (hoan tien / chua nhan don / khuyen mai)"
 Write-Host "  - 5 hoi thoai don hang: chua nhan don, hoan tien, COD that bai, van chuyen Can Tho, doi size"
 Write-Host "  - 2 phieu ho tro: don hang bi an duong (high), chuyen COD sang chuyen khoan (normal)"
+Write-Host "  - 2 workflow tu dong: tin nhap chua tu tao phieu + nhan phieu ngung 3 ngay"
+Write-Host "  - 2 kich ban AI Sparring: doi size (resolve) + COD that bai (handoff)"
 Write-Host ""
 Write-Host "Ghi chu: owner co du lieu demo, agent chi nhan don. Chay lai script khong tao trung."
+Write-Host "AI Sparring can OPENAI_API_KEY (hoac LLM_PROVIDER) de bat dau phien luyen t?."
+Write-Host "Cham diem / Cham kiem dinh AI agent chay nen sau 10-20 giay (hang doi AI jobs)."
 Write-Host ""

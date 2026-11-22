@@ -119,7 +119,13 @@ async function forward(
     "Content-Type": "application/json",
   };
   const proxySecret = process.env.NEXA_PROXY_SECRET;
-  const ingressIP = request.headers.get("x-nexa-ingress-ip");
+  // A custom ingress may sign X-Nexa-Client-IP itself; behind Render or any
+  // trusted edge the real client IP arrives in the first X-Forwarded-For hop.
+  // Behind Render the real client IP is the right-most X-Forwarded-For hop
+  // (Render appends it last); the left-most hop can be client-supplied/spoofed.
+  const xff = request.headers.get("x-forwarded-for");
+  const forwarded = xff ? xff.split(",").pop()?.trim() : undefined;
+  const ingressIP = request.headers.get("x-nexa-ingress-ip") || forwarded;
   if (
     process.env.NEXA_TRUST_INGRESS_IP === "true" &&
     proxySecret &&

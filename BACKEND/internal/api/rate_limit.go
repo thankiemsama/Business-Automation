@@ -1,7 +1,6 @@
 package api
 
 import (
-	"net"
 	"net/http"
 	"time"
 
@@ -27,10 +26,10 @@ func (h *Handler) acquireAuthSlot(w http.ResponseWriter) bool {
 func (h *Handler) releaseAuthSlot() { <-h.authSlots }
 
 func (h *Handler) allowAuth(r *http.Request) bool {
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
-	}
+	// Key the limiter on the resolved client IP so a proxied deployment
+	// (loopback BFF, Render ingress) does not collapse all real users
+	// into a single 127.0.0.1 bucket.
+	ip := requestIP(r).String()
 	now := time.Now()
 	h.mu.Lock()
 	defer h.mu.Unlock()

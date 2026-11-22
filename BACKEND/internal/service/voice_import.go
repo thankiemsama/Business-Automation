@@ -82,7 +82,7 @@ func (s *AIService) ImportVoice(user core.User, customerID string, data []byte) 
 				ID: s.repo.IDs.NewID(), TenantID: user.TenantID, Kind: core.KindMessages,
 				ConversationID: id, Sender: "note", AuthorID: user.ID, Content: text[:end],
 				AutomationID: voiceTranscriptMarker,
-				Sequence: sequence, CreatedAt: now, UpdatedAt: now,
+				Sequence:     sequence, CreatedAt: now, UpdatedAt: now,
 			})
 			text = text[end:]
 		}

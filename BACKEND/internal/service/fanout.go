@@ -85,7 +85,10 @@ func (m *MemoryFanout) Publish(scopes []string) {
 	m.mu.Lock()
 	m.revision++
 	cursor := m.cursor()
-	type target struct{ scope string; subs []chan string }
+	type target struct {
+		scope string
+		subs  []chan string
+	}
 	targets := make([]target, 0, len(scopes))
 	for _, scope := range scopes {
 		subs := make([]chan string, 0, len(m.watchers[scope]))
