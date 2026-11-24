@@ -130,8 +130,11 @@ type UserResponse struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Role     string `json:"role"`
+	// G1: lets the client show the pending-verification screen after a fresh
+	// register or a 403/email_unverified login.
+	EmailVerificationPending bool `json:"email_verification_pending,omitempty"`
 }
 
 func publicUser(u core.User) UserResponse {
-	return UserResponse{Disabled: u.Disabled, ID: u.ID, TenantID: u.TenantID, Name: u.Name, Email: u.Email, Role: u.Role}
+	return UserResponse{Disabled: u.Disabled, ID: u.ID, TenantID: u.TenantID, Name: u.Name, Email: u.Email, Role: u.Role, EmailVerificationPending: u.EmailVerificationPending}
 }

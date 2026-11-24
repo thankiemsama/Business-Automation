@@ -7,8 +7,8 @@ const resource =
   "(?:customers|conversations|tickets|knowledge|automations|templates)";
 
 const allowedPath = new RegExp(
-  `^(?:auth/(?:login|register|me|logout|password|forgot|redeem|oidc-exchange)|` +
-    `branding|oidc/providers|account/(?:sessions(?:/revoke)?|mfa)|admin/(?:settings|brand|audit|usage|export|backup|fields|billing|crm|custom/(?:customers|tickets|conversations)/${id})|` +
+  `^(?:auth/(?:login|register|me|logout|password|forgot|redeem|verify|confirm|oidc-exchange)|` +
+    `branding|oidc/providers|account/(?:sessions(?:/revoke)?|mfa|step-up)|admin/(?:settings|brand|audit|usage|export|backup|fields|billing|crm|custom/(?:customers|tickets|conversations)/${id})|` +
     `chat/${token}(?:/(?:events|voice-status|transcribe))?|` +
     `team(?:/${id})?|` +
     `ai/(?:status|search|transcribe|voice-inbox/(?:status|transcribe)|summary/(?:conversations|tickets)/${id}|(?:suggestion|review)/${id})|` +
@@ -44,6 +44,8 @@ function isPublicEndpoint(path: string) {
       "auth/register",
       "auth/forgot",
       "auth/redeem",
+      "auth/verify",
+      "auth/confirm",
       "auth/oidc-exchange",
       "branding",
       "oidc/providers",
@@ -119,13 +121,18 @@ async function forward(
     "Content-Type": "application/json",
   };
   const proxySecret = process.env.NEXA_PROXY_SECRET;
-  // A custom ingress may sign X-Nexa-Client-IP itself; behind Render or any
-  // trusted edge the real client IP arrives in the first X-Forwarded-For hop.
-  // Behind Render the real client IP is the right-most X-Forwarded-For hop
-  // (Render appends it last); the left-most hop can be client-supplied/spoofed.
+  // Behind Render the real client IP arrives as the LAST X-Forwarded-For hop
+  // (Render appends it; the left-most hops are client-supplied/spoofable).
+  // X-Nexa-Ingress-IP, by contrast, can always be set by an end client, so it
+  // is only honored on deployments behind a custom ingress that signs it:
+  // opt-in via NEXA_CUSTOM_INGRESS_HEADER=true, never the default.
   const xff = request.headers.get("x-forwarded-for");
   const forwarded = xff ? xff.split(",").pop()?.trim() : undefined;
-  const ingressIP = request.headers.get("x-nexa-ingress-ip") || forwarded;
+  const signedIngressIP =
+    process.env.NEXA_CUSTOM_INGRESS_HEADER === "true"
+      ? request.headers.get("x-nexa-ingress-ip")
+      : undefined;
+  const ingressIP = signedIngressIP || forwarded;
   if (
     process.env.NEXA_TRUST_INGRESS_IP === "true" &&
     proxySecret &&

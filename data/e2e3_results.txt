@@ -1,0 +1,16 @@
+﻿FAIL|Lockout|L8c reason account_locked|account_locked||msg=
+PASS|Team|L9 owner creates agent|201|201|msg=Thành công
+PASS|Team|L9b owner disables agent|200|200|msg=Thành công
+PASS|Team|L9c disabled agent login|401|401|
+FAIL|Headers|H1 X-Content-Type-Options|nosniff||
+FAIL|Headers|H2 Cache-Control|no-store||
+PASS|MFA|M2 setup ok|200|200|msg=Thành công
+FAIL|MFA|M4 enable valid TOTP|200|401|msg=
+FAIL|MFA|M4b 8 recovery codes|8|0|
+FAIL|MFA|M4c enabled true|True||
+FAIL|MFA|M5 login without MFA|409|200|msg=Thành công
+PASS|MFA|M6 login with TOTP|200|200|msg=Thành công
+FAIL|MFA|M7 replay TOTP rejected|401|200|replay-proof
+PASS|MFA|M8 recovery code login|||consumed codes[0]
+FAIL|MFA|M9 replay recovery code|401|200|single-use
+PASS|MFA|M10 disable with pw+code|200|200|msg=Thành công

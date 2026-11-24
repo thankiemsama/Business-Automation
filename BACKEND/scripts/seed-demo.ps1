@@ -106,6 +106,26 @@ function Call-Api([string]$Method, [string]$Path, $Body) {
 }
 
 function Log([string]$Msg) { Write-Host "    $Msg" }
+
+function Test-Login([string]$Email, [string]$Pw) {
+    # G1: self-serve signups are held for mailbox confirmation. When the
+    # demo owner is still pending, tell the user exactly what to do instead
+    # of crashing mid-script.
+    try {
+        return (Call-Api POST "/auth/login" @{ email = $Email; password = $Pw })
+    } catch {
+        if ($_.Exception.Message -match "403") {
+            Warn "Tai khoan $Email dang chan o buoc xac nhan email (G1)."
+            Warn "Moi lan tao tai khoan moi: mo thu, bam link /account/verify (hieu luc 30 phut), roi chay lai seed."
+            if ($Email -eq "owner@nexa.local") {
+                Warn "Hoc dep tro: set bien NEXA_AUTO_CONFIRM_EMAIL=true tren Render (chi dung cho instance demo) de bo buoc xac nhan."
+                exit 1
+            }
+            return $null
+        }
+        throw
+    }
+}
 function Note([string]$Msg) { Write-Host "    [SKIP] $Msg" -ForegroundColor DarkYellow }
 function Warn([string]$Msg) { Write-Host "    [WARN] $Msg" -ForegroundColor DarkYellow }
 
@@ -136,7 +156,8 @@ function Ensure-Owner() {
     }
 }
 function Ensure-Agent() {
-    $ownerLogin = Call-Api POST "/auth/login" @{ email = "owner@nexa.local"; password = $Password }
+    $ownerLogin = Test-Login "owner@nexa.local" $Password
+    if ($null -eq $ownerLogin) { exit 1 }
     if ($Mode -eq "direct") { $headers.Authorization = "Bearer $($ownerLogin.access_token)" }
     $members = Get-List "/team"
     if (Find-By $members "email" "agent@nexa.local") {
@@ -156,18 +177,19 @@ Write-Host ""
 # ---------- 1. Tai khoan ----------
 Write-Host "[1/8] Tai khoan demo co dinh" -ForegroundColor Yellow
 Ensure-Owner
-$ownerLogin = Call-Api POST "/auth/login" @{ email = "owner@nexa.local"; password = $Password }
+$ownerLogin = Test-Login "owner@nexa.local" $Password
+if ($null -eq $ownerLogin) { exit 1 }
 if ($Mode -eq "direct") { $headers.Authorization = "Bearer $($ownerLogin.access_token)" }
 Ensure-Agent
 
 # Thu nghiem login agent (de kiem tra mat khau chung lam viec duoc)
-$agentLogin = Call-Api POST "/auth/login" @{ email = "agent@nexa.local"; password = $Password }
-Log "agent login OK - phien agent su dung duoc mat khau chung"
+$agentLogin = Test-Login "agent@nexa.local" $Password
+Log "agent login OK - phien agent su dung duoc mat khau chung (agent do owner tao -> khong chan xac nhan email)"
 if ($Mode -eq "direct") {
     $headers.Authorization = "Bearer $($ownerLogin.access_token)"
 } else {
     # BFF: quay lai phien owner (cookie) de cac muc tiep theo duyen quyen owner.
-    $null = Call-Api POST "/auth/login" @{ email = "owner@nexa.local"; password = $Password }
+    $null = Test-Login "owner@nexa.local" $Password
 }
 
 # ---------- 2. Khach hang ----------

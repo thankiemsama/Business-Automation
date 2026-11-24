@@ -59,6 +59,44 @@ export class AdminRepository {
     this.http.request<Usage>("admin/usage", { signal });
   billing = (signal: AbortSignal) =>
     this.http.request<Record<string, boolean>>("admin/billing", { signal });
+  /** G8: exchange a password for a 5-minute single-use step-up token. */
+  stepUp(password: string) {
+    return this.http.request<{ token: string; expires_in: number }>(
+      "account/step-up",
+      { method: "POST", body: JSON.stringify({ password }) },
+    );
+  }
+  /** Download an admin payload that needs step-up confirmation. */
+  async adminDownload(
+    password: string,
+    path: "admin/export" | "admin/backup",
+    query = "",
+  ): Promise<void> {
+    const { token } = await this.stepUp(password);
+    const suffix = query ? query + "&step_up=" : "?step_up=";
+    const url = new URL(
+      "/api/platform/" + path + suffix + encodeURIComponent(token),
+      window.location.origin,
+    );
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error("Yêu cầu bị từ chối, vui lòng thử lại.");
+    }
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = /filename="([^"]+)"/.exec(disposition);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = match ? match[1] : "nexa-download";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
   crm = (signal: AbortSignal) =>
     this.http.request<Record<string, boolean>>("admin/crm", { signal });
 

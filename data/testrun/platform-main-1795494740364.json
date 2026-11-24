@@ -1,0 +1,214 @@
+{
+  "users": {
+    "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175": {
+      "login_failures": 1,
+      "locked_until": "0001-01-01T00:00:00Z",
+      "id": "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175",
+      "tenant_id": "6008bf47618b1497a3bc62f745656421b76f7eda202eb1d8",
+      "name": "Owner QA",
+      "email": "owner-1795494740364@example.test",
+      "role": "owner",
+      "salt": "d756dba9c1cdb8588f93a1d835f9c5ae7529e38f3382e244",
+      "password_hash": "pbkdf2v2.507a4c1e7a2e96b3469b955a3908fee59fd7ff55d35647a472f153e2782eddf1"
+    },
+    "fa95768e2818f51ecd858a907c2c0bf7b0db6b971a4acdc9": {
+      "locked_until": "0001-01-01T00:00:00Z",
+      "id": "fa95768e2818f51ecd858a907c2c0bf7b0db6b971a4acdc9",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "name": "Ind",
+      "email": "ind1795494740364@x.test",
+      "role": "owner",
+      "salt": "2e024e2175e18893c39875ddd89a2a7708560db75458e26f",
+      "password_hash": "pbkdf2v2.f089ecb69f9d6c6d4cd4f32dcce9716b9d5ef4b78af76e9ff091a67237429cfa"
+    }
+  },
+  "sessions": {
+    "9a0513e3382fa990eb698f122713c9cff3694c9777044b4c4041556fbe4e07ac": {
+      "CreatedAt": "2026-11-24T11:32:23.5125407+07:00",
+      "UserID": "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175",
+      "ExpiresAt": "2026-11-25T11:32:23.5125407+07:00"
+    }
+  },
+  "records": {
+    "04886765745506ded5f72095fcc187f422f8e3a7067da50f": {
+      "author_id": "system",
+      "id": "04886765745506ded5f72095fcc187f422f8e3a7067da50f",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "kind": "audit_log",
+      "name": "workflow_rules",
+      "content": "{\"assignee\":{\"before\":null,\"after\":\"\"},\"attachment_changed\":{\"before\":null,\"after\":\"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d\"},\"channel\":{\"before\":null,\"after\":\"\"},\"content_fingerprint\":{\"before\":null,\"after\":\"ed6ab33764ef2e2ab9caefa09a85efd888a0ffb9c1f8fc999e021a4d85774910\"},\"custom_fields_fingerprint\":{\"before\":null,\"after\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"},\"enabled\":{\"before\":null,\"after\":false},\"keywords_fingerprint\":{\"before\":null,\"after\":\"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b\"},\"pii_fingerprint\":{\"before\":null,\"after\":\"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d\"},\"priority\":{\"before\":null,\"after\":\"\"},\"public\":{\"before\":null,\"after\":false},\"rating\":{\"before\":null,\"after\":0},\"status\":{\"before\":null,\"after\":\"\"},\"tags\":{\"before\":null,\"after\":[]},\"title_fingerprint\":{\"before\":null,\"after\":\"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d\"}}",
+      "conversation_id": "922cf59d7397ea5c3c2f9488b1b048d753186895043a67d8",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-24T11:32:22.1162468+07:00",
+      "updated_at": "2026-11-24T11:32:22.1162468+07:00"
+    },
+    "056d985109072247c536902aaede1a13c018dba004e15423": {
+      "id": "056d985109072247c536902aaede1a13c018dba004e15423",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "kind": "workflow_rules",
+      "content": "{\"id\":\"056d985109072247c536902aaede1a13c018dba004e15423\",\"name\":\"Phân loại — Kiểm tra đơn hàng và đổi trả\",\"enabled\":false,\"trigger\":\"message_received\",\"conditions\":{\"channel\":\"\",\"priority\":\"\",\"status\":\"\",\"contains\":\"đổi trả\"},\"actions\":[{\"type\":\"notify_owner\"}]}",
+      "enabled": false,
+      "created_at": "2026-11-24T04:32:22.1132496Z",
+      "updated_at": "2026-11-24T04:32:22.1132496Z"
+    },
+    "102a628a01430fdc8472ea21cd2624c8194e3c7d786e98cb": {
+      "author_id": "system",
+      "id": "102a628a01430fdc8472ea21cd2624c8194e3c7d786e98cb",
+      "tenant_id": "6008bf47618b1497a3bc62f745656421b76f7eda202eb1d8",
+      "kind": "audit_log",
+      "name": "auth_event",
+      "content": "{\"client_ip\":{\"before\":null,\"after\":\"127.0.0.1\"},\"email_fp\":{\"before\":null,\"after\":\"d2c2047051ef706b6906baf51193be8cd7ab6ff58da1e3892c7b6b828f0fc71f\"},\"event\":{\"before\":null,\"after\":\"login:failed:credentials\"},\"user_fp\":{\"before\":null,\"after\":\"90813045e745199d6d3980439912c1c257d8a0c8091f45f2bf32bbbc39c49a50\"}}",
+      "conversation_id": "529c2911467e2340bd4cbee8853d73b60899edf187474fb6",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-24T11:32:24.170644+07:00",
+      "updated_at": "2026-11-24T11:32:24.170644+07:00"
+    },
+    "126782af864919f15e132a2dc57b3ae7fd3f14845f368cbf": {
+      "version": 1,
+      "id": "126782af864919f15e132a2dc57b3ae7fd3f14845f368cbf",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "kind": "knowledge",
+      "subject": "Kiểm tra đơn hàng và đổi trả",
+      "content": "Xác minh mã đơn qua kênh hỗ trợ riêng. Kiểm tra trạng thái giao và điều kiện đổi trả đã công bố trước khi xác nhận thời hạn với khách.",
+      "slug": "kiem-tra-dn-hang-va-doi-tra",
+      "enabled": false,
+      "created_at": "2026-11-24T04:32:22.1132496Z",
+      "updated_at": "2026-11-24T04:32:22.1132496Z"
+    },
+    "49e285ba99685f30835e4eaba4c3e56b5214942501ca7ba5": {
+      "author_id": "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175",
+      "id": "49e285ba99685f30835e4eaba4c3e56b5214942501ca7ba5",
+      "tenant_id": "6008bf47618b1497a3bc62f745656421b76f7eda202eb1d8",
+      "kind": "audit_log",
+      "name": "users",
+      "content": "{\"disabled\":{\"before\":null,\"after\":false},\"email_fingerprint\":{\"before\":null,\"after\":\"d2c2047051ef706b6906baf51193be8cd7ab6ff58da1e3892c7b6b828f0fc71f\"},\"mfa_enabled\":{\"before\":null,\"after\":false},\"name\":{\"before\":null,\"after\":\"Owner QA\"},\"role\":{\"before\":null,\"after\":\"owner\"}}",
+      "conversation_id": "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-24T11:32:21.3522216+07:00",
+      "updated_at": "2026-11-24T11:32:21.3522216+07:00"
+    },
+    "4d17192a65a456d9e992a4ea143921bdbb5e9467498c8787": {
+      "author_id": "fa95768e2818f51ecd858a907c2c0bf7b0db6b971a4acdc9",
+      "id": "4d17192a65a456d9e992a4ea143921bdbb5e9467498c8787",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "kind": "audit_log",
+      "name": "users",
+      "content": "{\"disabled\":{\"before\":null,\"after\":false},\"email_fingerprint\":{\"before\":null,\"after\":\"e5788557b65ac86ecd7e609d001de6dd9414ed9c3bdd377da4a51bfeec3f9f76\"},\"mfa_enabled\":{\"before\":null,\"after\":false},\"name\":{\"before\":null,\"after\":\"Ind\"},\"role\":{\"before\":null,\"after\":\"owner\"}}",
+      "conversation_id": "fa95768e2818f51ecd858a907c2c0bf7b0db6b971a4acdc9",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-24T11:32:22.1122502+07:00",
+      "updated_at": "2026-11-24T11:32:22.1122502+07:00"
+    },
+    "529c2911467e2340bd4cbee8853d73b60899edf187474fb6": {
+      "author_id": "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175",
+      "id": "529c2911467e2340bd4cbee8853d73b60899edf187474fb6",
+      "tenant_id": "6008bf47618b1497a3bc62f745656421b76f7eda202eb1d8",
+      "kind": "auth_event",
+      "name": "127.0.0.1",
+      "email": "owner-1795494740364@example.test",
+      "status": "login:failed:credentials",
+      "enabled": false,
+      "created_at": "2026-11-24T04:32:24.1696673Z",
+      "updated_at": "2026-11-24T04:32:24.1696673Z"
+    },
+    "5ce5b10cbcf055148992b0f78f6f16806816f672902c3cd9": {
+      "author_id": "system",
+      "id": "5ce5b10cbcf055148992b0f78f6f16806816f672902c3cd9",
+      "tenant_id": "6008bf47618b1497a3bc62f745656421b76f7eda202eb1d8",
+      "kind": "audit_log",
+      "name": "auth_event",
+      "content": "{\"client_ip\":{\"before\":null,\"after\":\"127.0.0.1\"},\"email_fp\":{\"before\":null,\"after\":\"d2c2047051ef706b6906baf51193be8cd7ab6ff58da1e3892c7b6b828f0fc71f\"},\"event\":{\"before\":null,\"after\":\"login:ok\"},\"user_fp\":{\"before\":null,\"after\":\"90813045e745199d6d3980439912c1c257d8a0c8091f45f2bf32bbbc39c49a50\"}}",
+      "conversation_id": "91054937c69f89114e64038c0a07158950b9785cb3d5c552",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-24T11:32:23.5125407+07:00",
+      "updated_at": "2026-11-24T11:32:23.5125407+07:00"
+    },
+    "90bb5780a0ef0dfb65000936c69324eb51c7e17f049ba3753d8e4788f1c0e9fb": {
+      "author_id": "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175",
+      "id": "90bb5780a0ef0dfb65000936c69324eb51c7e17f049ba3753d8e4788f1c0e9fb",
+      "tenant_id": "6008bf47618b1497a3bc62f745656421b76f7eda202eb1d8",
+      "kind": "account_links",
+      "email": "owner-1795494740364@example.test",
+      "subject": "reset",
+      "enabled": true,
+      "created_at": "2026-11-24T04:32:24.7458364Z",
+      "updated_at": "2026-11-24T05:02:24.7458364Z"
+    },
+    "91054937c69f89114e64038c0a07158950b9785cb3d5c552": {
+      "author_id": "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175",
+      "id": "91054937c69f89114e64038c0a07158950b9785cb3d5c552",
+      "tenant_id": "6008bf47618b1497a3bc62f745656421b76f7eda202eb1d8",
+      "kind": "auth_event",
+      "name": "127.0.0.1",
+      "email": "owner-1795494740364@example.test",
+      "status": "login:ok",
+      "enabled": false,
+      "created_at": "2026-11-24T04:32:23.5115413Z",
+      "updated_at": "2026-11-24T04:32:23.5115413Z"
+    },
+    "922cf59d7397ea5c3c2f9488b1b048d753186895043a67d8": {
+      "id": "922cf59d7397ea5c3c2f9488b1b048d753186895043a67d8",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "kind": "workflow_rules",
+      "content": "{\"id\":\"922cf59d7397ea5c3c2f9488b1b048d753186895043a67d8\",\"name\":\"SLA — Báo quản trị khi phiếu ưu tiên cao quá hạn\",\"enabled\":false,\"trigger\":\"sla_breached\",\"conditions\":{\"channel\":\"\",\"priority\":\"high\",\"status\":\"\",\"contains\":\"\"},\"actions\":[{\"type\":\"notify_owner\"}]}",
+      "enabled": false,
+      "created_at": "2026-11-24T04:32:22.1132496Z",
+      "updated_at": "2026-11-24T04:32:22.1132496Z"
+    },
+    "a42eeef96e11a6dbca93840ca42df5440bd1aaaea75c56b1": {
+      "author_id": "system",
+      "id": "a42eeef96e11a6dbca93840ca42df5440bd1aaaea75c56b1",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "kind": "audit_log",
+      "name": "workflow_rules",
+      "content": "{\"assignee\":{\"before\":null,\"after\":\"\"},\"attachment_changed\":{\"before\":null,\"after\":\"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d\"},\"channel\":{\"before\":null,\"after\":\"\"},\"content_fingerprint\":{\"before\":null,\"after\":\"4932bc6836cf7e4a5a91a7d8418da561b175d30ac3d1fa7498be2c1322dceee8\"},\"custom_fields_fingerprint\":{\"before\":null,\"after\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"},\"enabled\":{\"before\":null,\"after\":false},\"keywords_fingerprint\":{\"before\":null,\"after\":\"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b\"},\"pii_fingerprint\":{\"before\":null,\"after\":\"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d\"},\"priority\":{\"before\":null,\"after\":\"\"},\"public\":{\"before\":null,\"after\":false},\"rating\":{\"before\":null,\"after\":0},\"status\":{\"before\":null,\"after\":\"\"},\"tags\":{\"before\":null,\"after\":[]},\"title_fingerprint\":{\"before\":null,\"after\":\"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d\"}}",
+      "conversation_id": "056d985109072247c536902aaede1a13c018dba004e15423",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-24T11:32:22.1162468+07:00",
+      "updated_at": "2026-11-24T11:32:22.1162468+07:00"
+    },
+    "cefcab540c510bf53fdd2d6ab59972f98b40c920e29ebd66": {
+      "author_id": "system",
+      "id": "cefcab540c510bf53fdd2d6ab59972f98b40c920e29ebd66",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "kind": "audit_log",
+      "name": "knowledge",
+      "content": "{\"assignee\":{\"before\":null,\"after\":\"\"},\"attachment_changed\":{\"before\":null,\"after\":\"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d\"},\"channel\":{\"before\":null,\"after\":\"\"},\"content_fingerprint\":{\"before\":null,\"after\":\"4c76f7ab2d91b309778421a266ab291488305420ade834d92ea43f0ff3f03464\"},\"custom_fields_fingerprint\":{\"before\":null,\"after\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"},\"enabled\":{\"before\":null,\"after\":false},\"keywords_fingerprint\":{\"before\":null,\"after\":\"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b\"},\"pii_fingerprint\":{\"before\":null,\"after\":\"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d\"},\"priority\":{\"before\":null,\"after\":\"\"},\"public\":{\"before\":null,\"after\":false},\"rating\":{\"before\":null,\"after\":0},\"status\":{\"before\":null,\"after\":\"\"},\"tags\":{\"before\":null,\"after\":[]},\"title_fingerprint\":{\"before\":null,\"after\":\"9b48518877afb6f56149c6f8de8d35cd5817075a6ce6b3a52aad60506a9676c3\"}}",
+      "conversation_id": "126782af864919f15e132a2dc57b3ae7fd3f14845f368cbf",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-24T11:32:22.1152473+07:00",
+      "updated_at": "2026-11-24T11:32:22.1152473+07:00"
+    },
+    "df498010955e9556de279f9af354dfffef80842b76ae6650": {
+      "author_id": "73ecd76c6ca5bc73321d13b52b3443bffa7c9fd671302175",
+      "id": "df498010955e9556de279f9af354dfffef80842b76ae6650",
+      "tenant_id": "6008bf47618b1497a3bc62f745656421b76f7eda202eb1d8",
+      "kind": "audit_log",
+      "name": "sessions",
+      "content": "{\"active\":{\"before\":null,\"after\":true},\"expires_at\":{\"before\":null,\"after\":\"2026-11-25T11:32:23.5125407+07:00\"}}",
+      "conversation_id": "9a0513e3382f",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-24T11:32:23.5125407+07:00",
+      "updated_at": "2026-11-24T11:32:23.5125407+07:00"
+    },
+    "f5fad1d62bd3b903eb0159d5134c634b6654788a8728f2ad": {
+      "version": 1,
+      "id": "f5fad1d62bd3b903eb0159d5134c634b6654788a8728f2ad",
+      "tenant_id": "bc4c10240df1ff4854cad278ac6559c411e8cb40b1636e33",
+      "kind": "templates",
+      "subject": "Mẫu CSAT — Kiểm tra đơn hàng và đổi trả",
+      "content": "Bạn hài lòng thế nào với cách chúng tôi hỗ trợ đơn hàng của bạn? Bạn có thể đánh giá từ 1 đến 5 và góp ý thêm.",
+      "enabled": true,
+      "created_at": "2026-11-24T04:32:22.1132496Z",
+      "updated_at": "2026-11-24T04:32:22.1132496Z"
+    }
+  }
+}

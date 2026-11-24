@@ -112,6 +112,13 @@ func (h *Handler) adminRead(path string) authenticatedHandler {
 			fields, err := h.admin.Fields(user.TenantID)
 			respond(w, 200, fields, err)
 		default:
+			// G8: bulk export/backup requires a 5-minute single-use step-up
+			// token (password re-confirmation), so a leaked session cookie
+			// alone cannot dump the tenant's data.
+			if err := h.auth.ConsumeStepUp(user, r.URL.Query().Get("step_up")); err != nil {
+				respond(w, 403, nil, err)
+				return
+			}
 			value, err := h.admin.Export(user, r.URL.Query().Get("customer_id"))
 			if err != nil {
 				respond(w, 400, nil, err)

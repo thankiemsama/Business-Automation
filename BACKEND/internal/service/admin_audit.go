@@ -11,7 +11,7 @@ import (
 
 var auditedKinds = map[string]bool{
 	"customers": true, "tickets": true, "conversations": true, "messages": true, "knowledge": true, "automations": true,
-	"workflow_rules": true, "report_schedules": true, "tenant_settings": true, "webhooks": true, "api_keys": true, "channel_config": true,
+	"workflow_rules": true, "report_schedules": true, "tenant_settings": true, "webhooks": true, "api_keys": true, "channel_config": true, "auth_event": true, "step_up": true,
 	"custom_fields": true, "crm_sync": true, "billing_plan": true,
 	skillRoutingKind:     true,
 	ticketAgentPlansKind: true, leadCampaignKind: true, qaReviewsKind: true,
@@ -28,6 +28,13 @@ func auditUser(u core.User) map[string]any {
 	return map[string]any{"name": u.Name, "role": u.Role, "disabled": u.Disabled, "email_fingerprint": tokenHash(u.Email), "mfa_enabled": u.TOTPSecret != ""}
 }
 func auditRecord(r core.Record) map[string]any {
+	// G4: auth trails are audited as PII-free fingerprints only.
+	if r.Kind == core.KindAuthEvent {
+		return map[string]any{"event": r.Status, "email_fp": tokenHash(r.Email), "client_ip": r.Name, "user_fp": tokenHash(r.AuthorID)}
+	}
+	if r.Kind == core.KindStepUp {
+		return map[string]any{"granted": r.Enabled, "expires_at": r.UpdatedAt}
+	}
 	result := map[string]any{"status": r.Status, "enabled": r.Enabled, "priority": r.Priority, "channel": r.Channel, "assignee": r.AssigneeID,
 		"public": r.Public, "title_fingerprint": tokenHash(r.Name + "\x00" + r.Subject), "content_fingerprint": tokenHash(r.Content),
 		"pii_fingerprint": tokenHash(r.Email + "\x00" + r.Phone), "tags": append([]string{}, r.Tags...), "keywords_fingerprint": tokenHash(joinForAudit(r.Keywords)),
@@ -117,7 +124,21 @@ func (w *workspaceWriter) audit(tenant, actor, kind, id string, exists bool, bef
 }
 func (a *Admin) Audit(user core.User) ([]core.Record, error) {
 	result := []core.Record{}
-	err := a.repo.View(func(store core.Reader) error { result = store.Records(user.TenantID, "audit_log"); return nil })
+	err := a.repo.View(func(store core.Reader) error {
+		// G4: the auth trail (login failures, lockouts, verify, step-up) is
+		// stored in its own kinds so it can be pruned independently of diffs.
+		result = append(store.Records(user.TenantID, "audit_log"),
+			store.Records(user.TenantID, core.KindAuthEvent)...)
+		result = append(result, store.Records(user.TenantID, core.KindStepUp)...)
+		// Raw trail rows carry the mailbox in their payload; the audit diffs
+		// already store a fingerprint, so the list view stays PII-free.
+		for i := range result {
+			if result[i].Kind == core.KindAuthEvent || result[i].Kind == core.KindStepUp {
+				result[i].Email = ""
+			}
+		}
+		return nil
+	})
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].CreatedAt.Equal(result[j].CreatedAt) {
 			return result[i].ID > result[j].ID

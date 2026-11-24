@@ -78,6 +78,16 @@ Cấu hình biến môi trường cho tiến trình Go:
 | `SUPPORT_REPLY_TO` | Địa chỉ hộp thư hỗ trợ nhận phản hồi. |
 | `INBOUND_EMAIL_TENANT` | Tenant đích. Có thể lấy từ URL widget hoặc `/api/v1/auth/me`. |
 | `INBOUND_EMAIL_SECRET` | Bí mật ngẫu nhiên từ 32 ký tự dùng giữa gateway nhận thư và API. |
+| `NEXA_SECURITY_KEY` | Chìa AES-GCM (32 byte, base64) mã hóa secret TOTP cho MFA. Thiếu thì /account/mfa trả 503. |
+| `NEXA_DEV_EMAIL_SINK` | `true` = dev-only: log email ra console thay vì gửi Resend (tự tắt khi APP_ORIGIN là https). |
+| `NEXA_AUTO_CONFIRM_EMAIL` | `true` = instance demo: bỏ bước chờ xác nhận email (G1). |
+| `NEXA_TURNSTILE_SECRET` | Secret xác minh Cloudflare Turnstile (tùy chọn, CAPTCHA cho endpoint khách). |
+| `NEXA_CUSTOM_INGRESS_HEADER` | (BFF) `true` = tin header X-Nexa-Ingress-IP đã ký bởi ingress riêng; mặc định dùng XFF cuối. |
+### Khôi phục mật khẩu
+
+Trang *Quên mật khẩu* (`/account/forgot`) và trang đặt lại (`/account/setup#tenant.token`) dùng chung liên kết một lần, hiệu lực 30 phút, gửi qua Resend. Cần đủ cả ba biến `APP_ORIGIN`, `RESEND_API_KEY` và `EMAIL_FROM`: thiếu một trong số đó, nút *Gửi liên kết đặt lại* sẽ báo *chưa cấu hình email* (HTTP 503) thay vì gửi thư.
+
+Liệt kê thư mời nhân viên (trước `TEAM_INVITE` và cả trong *Đội ngũ*) cũng cùng mô hình này: liên kết 48 giờ, dùng một lần, cho phép tạo tài khoản agent mà không cần mật khẩu ban đầu.
 
 Nếu dùng gateway hộp thư, cấu hình gateway để chuẩn hóa email nhận được thành JSON và gửi `POST /api/v1/email/inbound` trực tiếp đến backend. Gateway truyền `Authorization: Bearer <INBOUND_EMAIL_SECRET>`. Giữ nguyên `id` giữa các lần thử lại và dùng cùng `thread_id` cho chuỗi thư.
 
@@ -297,3 +307,61 @@ Render Free có thể ngủ sau 15 phút không hoạt động. PostgreSQL Free 
 - Khong dat NEXA_NATS_URL: backend van chay binh thuong voi fanout in-memory (1 process). Chi chay nhieu replica SAU khi da bat NATS va da do load (xem CUTOVER_SCHEMA_V2.md).
 - Khoi luong: stream NEXA_SSE dung memory storage, toi da 1 gio. Khong can ban dau vao NATS.
 - Kiem chung: chay loadtest/sse-latency.mjs (node loadtest/sse-latency.mjs voi NEXA_SSE_API_URL va NEXA_SSE_TOKENS) de do muong refresh SSE sau tung viec ghi. Tat ca streams phai nhan refresh trong han; stream nao khong bao gio nhan tu nhieu la dau hieu fanout chua duoc noi NATS.
+
+
+## Bảo mật xác thực (văn bản hóa G1–G8 + CAPTCHA)
+
+### Xác nhận email khi đăng ký (G1)
+
+Tạo tài khoản qua trang *Tạo không gian làm việc* khi hệ thống **có** provider email (Resend hoặc dev-sink) sẽ để owner ở trạng thái *chờ xác nhận*: đăng nhập trả về HTTP 403 kèm mã machine-readable `reason: email_unverified` và màn hình chờ bấm link xác nhận.
+
+- Link xác nhận `/account/verify#tenant.token` hiệu lực 30 phút, dùng một lần, gửi bằng provider email hiện hành. Mỗi lần gửi lại thu hồi link cũ.
+- Nút *Gửi lại email xác nhận* gọi `POST /api/v1/auth/verify`: trả 200 cho **mọi** email (kể cả email lạ) để không lộ danh sách người dùng; chỉ 503 khi chưa cấu hình email.
+- Bấm link xác nhận gọi `POST /api/v1/auth/confirm`, kích hoạt tài khoản và thu hồi mọi link verify còn treo.
+- **Không chặn** các luồng tin cậy: owner tạo agent (vouch qua mật khẩu owner), liên kết mời 48 giờ, đặt lại mật khẩu, OIDC/SSO — đều vào thẳng, không cần bấm link.
+- Dev/seed: dev-sink (chỉ log ra console) **không có kênh thực** để người dùng bấm, nên hệ thống tự confirm; hoặc đặt `NEXA_AUTO_CONFIRM_EMAIL=true` cho instance demo công khai.
+- Email trùng: đăng ký `A@X.COM` rồi `a@x.com` vẫn bị chặn (chuẩn hóa trước khi đối chiếu, 409).
+
+### Khóa tài khoản brute-force (G2)
+
+- 5 lần đăng nhập sai liên tiếp theo tài khoản → khóa tạm, cửa sổ tăng cấp số: 5 lần = 5 phút, 6 = 10 phút, 7 = 20 phút, 8 = 40 phút, 9+ = 1 giờ.
+- Đăng nhập trong lúc khóa trả 401 kèm `reason: account_locked` và thông báo thời gian thử lại; bộ đếm chỉ reset khi đăng nhập đúng.
+- Email lạ không tạo trạng thái (không lộ tồn tại); mỗi lần đăng nhập email lạ vẫn chạy đủ một vòng PBKDF2 để không lộ qua thời gian phản hồi (timing equalizer).
+- State nằm trong DB nên **dùng chung mọi replica** — khác với bộ đếm rate-limit 20 req/phút theo IP (xem mục bên dưới).
+
+### Nâng cấp mật mã mật khẩu (G6)
+
+PBKDF2-SHA256 nâng từ 210.000 lên 600.000 lượt (khuyến nghị OWASP), hash lưu kèm tiền tố `pbkdf2v2.` để nhận diện phiên bản. Hash cũ (trước nâng cấp) vẫn đăng nhập được và **được tự động re-hash** khi đăng nhập/đổi mật khẩu/MFA thành công lần tiếp theo — không cần migration thủ công, không gián đoạn phiên.
+
+### Rà soát sự kiện bảo mật (G4)
+
+Các sự kiện `login (ok / failed / locked / needs_mfa / mfa_invalid)`, `verify`, `step_up` được ghi thành bản ghi `auth_event` (PII fingerprint — không lưu email/IP thô trong bản audit) và được nhập vào trang **Lịch sử hoạt động → Audit** (tenant owner). Dấu vết `step_up` ghi rõ phiên xác nhận được cấp cho ai, hết hạn lúc nào.
+
+### Step-up cho xuất/sao lưu (G8)
+
+`GET /api/v1/admin/export` và `/api/v1/admin/backup` bắt buộc token step-up: chủ tenant nhập lại mật khẩu (`POST /api/v1/account/step-up`) để đổi lấy token **dùng một lần, hiệu lực 5 phút**. Phiên cookie bị đánh cắp một mình không thể kéo dữ liệu. Frontend (panel Xuất & sao lưu) tự hỏi mật khẩu và đính kèm token vào URL tải xuống.
+
+### Khóa TOTP (G7 — khuyến nghị vận hành)
+
+Secret TOTP được AES-GCM (chìa `NEXA_SECURITY_KEY`, 32 byte base64) rồi lưu trong DB. Khuyến nghị:
+
+- Không bao giờ commit `NEXA_SECURITY_KEY`; sinh bằng `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
+- **Rotation**: rotation key hiện nay cần re-encrypt toàn bộ secret TOTP đang lưu (chưa tự động). Khi cần đổi key: dự phòng trước, đổi key, rồi cho các user bật MFA chạy lại setup (disable → enable) để secret được seal bằng key mới. Việc này được ghi nhận như hạng mục kỹ thuật mở trong AUDIT_FOUNDATION.md.
+
+### Rate-limit và nhiều replica (G3 — khuyến nghị vận hành)
+
+Bộ đếm 20 req/phút theo IP hiện **nằm trong bộ nhớ tiến trình**: mỗi replica có bucket riêng và reset khi restart.
+
+- 1 replica (Render Free hiện tại): không ảnh hưởng.
+- 2+ replica: giới hạn thực tế ×N replica; khi scale backend lên 2+, cân nhắc chia sẻ state qua NATS (đã có trong kiến trúc fanout) hoặc trước hết tăng NEXA_TRUST_INGRESS_IP + secret để mỗi IP thật có bucket riêng thay vì bucket 127.0.0.1.
+
+### CAPTCHA Cloudflare Turnstile (tuỳ chọn)
+
+- Bật bằng 2 biến: `NEXA_TURNSTILE_SECRET` (backend xác minh, secret) và `NEXA_TURNSTILE_SITE_KEY` (frontend render widget, build arg của Dockerfile.render). Không đặt biến nào → CAPTCHA tắt, mọi luồng chạy như trước.
+- Khi bật, 4 endpoint khách (register / login / forgot / verify) yêu cầu token Turnstile hợp lệ; token sai trả `reason: captcha_invalid`, thiếu token trả `reason: captcha_missing`.
+- Endpoint `/auth/redeem` (bấm link từ email) và OIDC-exchange **không** qua CAPTCHA (token-bound, không brute-force được).
+
+### Dev-sink email (G5 — an toàn)
+
+`NEXA_DEV_EMAIL_SINK=true` chỉ dùng dev: email (reset/verify/mời) được log ra console thay vì gửi Resend. Guard: khi `APP_ORIGIN` là `https://...` (production) thì dev-sink **tự từ chối hoạt động** (log cảnh báo, mailer về nil) để link reset/verify không rơi vào log container.
+

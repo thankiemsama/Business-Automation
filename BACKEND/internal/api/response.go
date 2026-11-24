@@ -30,9 +30,20 @@ func respond(w http.ResponseWriter, status int, data any, err error) {
 		code = http.StatusText(status)
 		data = nil
 	}
+	var reason string
+	if err != nil {
+		var e *core.Error
+		if errors.As(err, &e) {
+			reason = e.Reason
+		}
+	}
+	envelope := map[string]any{"data": data, "message": message, "code": code}
+	if reason != "" {
+		envelope["reason"] = reason
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"data": data, "message": message, "code": code})
+	_ = json.NewEncoder(w).Encode(envelope)
 }
 
 func decode(w http.ResponseWriter, r *http.Request, dst any) error {

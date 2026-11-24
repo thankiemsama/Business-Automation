@@ -42,7 +42,14 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 	ids := service.RandomIDs{}
 	auth := service.NewAuth(repo, clock, ids, service.PBKDF2Hasher{})
 	mailer := service.EmailFromEnvironment()
-	auth.ConfigureEmail(mailer, os.Getenv("APP_ORIGIN"))
+	authOrigin := os.Getenv("APP_ORIGIN")
+	if authOrigin == "" && os.Getenv("NEXA_DEV_EMAIL_SINK") == "true" {
+		// Dev convenience: with the mail sink enabled but no public origin set,
+		// build reset/invite links against the local dev server so the whole
+		// password-recovery flow can be exercised without a mail provider.
+		authOrigin = "http://localhost:3000"
+	}
+	auth.ConfigureEmail(mailer, authOrigin)
 	resources := service.NewResources(repo, clock, ids, service.DefaultPolicies())
 	conversations := service.NewConversations(repo, clock, ids, service.LocalKnowledgeProvider{}, service.NewKeywordAutomation(ids, clock))
 	var model *service.OpenAIKnowledge
@@ -133,6 +140,7 @@ func NewHandlerWithContext(ctx context.Context, repo core.Repository) http.Handl
 		InboundEmailTenant: os.Getenv("INBOUND_EMAIL_TENANT"),
 		InboundEmailSecret: os.Getenv("INBOUND_EMAIL_SECRET"),
 		Auth:               auth,
+		Captcha:            service.TurnstileFromEnvironment(),
 		Resources:          resources,
 		Conversations:      conversations,
 		Dashboard:          dashboard,

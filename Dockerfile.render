@@ -9,6 +9,12 @@ RUN CGO_ENABLED=0 go build -trimpath -o /out/nexa-api ./cmd/api
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# Optional Cloudflare Turnstile site key for the auth screens. NEXT_PUBLIC_
+# values are inlined at build time, so pass it when building:
+#   docker build --build-arg NEXA_TURNSTILE_SITE_KEY=0x4... -f Dockerfile.render .
+# The backend must have the matching NEXA_TURNSTILE_SECRET to enforce it.
+ARG NEXA_TURNSTILE_SITE_KEY=""
+ENV NEXT_PUBLIC_NEXA_TURNSTILE_SITE_KEY=${NEXA_TURNSTILE_SITE_KEY}
 COPY FRONTEND/package.json FRONTEND/package-lock.json ./
 RUN npm ci
 COPY FRONTEND/next.config.ts FRONTEND/tsconfig.json ./

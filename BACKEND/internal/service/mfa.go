@@ -114,7 +114,15 @@ func (s *AuthService) MFA(user core.User, action, password, code, session string
 	if action == "status" {
 		return data, nil
 	}
-	if (action == "setup" || action == "disable") && (password == "" || len(password) > 128 || subtle.ConstantTimeCompare([]byte(user.PasswordHash), []byte(s.hasher.Hash(password, user.Salt))) != 1) {
+	// verifyStoredHash also matches legacy (pre 600k) hashes so MFA works
+	// before the user's next login has upgraded the stored value (G6).
+	passwordValid := false
+	if password != "" && len(password) <= maximumPasswordBytes {
+		if ok, _ := verifyStoredHash(s.hasher, password, user.Salt, user.PasswordHash); ok {
+			passwordValid = true
+		}
+	}
+	if (action == "setup" || action == "disable") && !passwordValid {
 		return nil, core.Fail(403, "Mật khẩu hiện tại không đúng")
 	}
 	err := updateAs(s.repo, user.ID, func(store core.Writer) error {
@@ -125,6 +133,10 @@ func (s *AuthService) MFA(user core.User, action, password, code, session string
 		id := tokenHash("totp-pending:" + user.ID)
 		switch action {
 		case "setup":
+			// Persist the upgraded hash while we are here (G6).
+			if ok, upgraded := verifyStoredHash(s.hasher, password, fresh.Salt, fresh.PasswordHash); ok && upgraded != fresh.PasswordHash {
+				fresh.PasswordHash = upgraded
+			}
 			if fresh.TOTPSecret != "" {
 				return core.Fail(409, "TOTP đã bật")
 			}

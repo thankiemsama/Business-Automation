@@ -1,7 +1,9 @@
 "use client";
 import layout from "@/shared/ui/workspace-settings.module.css";
+import { useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
-import { errorMessage } from "@/shared/api/http-client";
+import { ApiError, errorMessage } from "@/shared/api/http-client";
+import { Icon } from "@/shared/ui/icon";
 import { useServices } from "@/shared/providers/services-provider";
 import { useQuery } from "@/shared/hooks/use-query";
 import { Badge, ErrorState, Loading } from "@/shared/ui/primitives";
@@ -283,35 +285,81 @@ export function AccessPanel() {
   );
 }
 export function BackupPanel() {
+  const t = useTranslations("Admin");
+  const { admin } = useServices();
   const [customer, setCustomer] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState<"" | "export" | "backup">("");
+  const [error, setError] = useState("");
   const exportQuery = customer.trim()
     ? "?" + new URLSearchParams({ customer_id: customer.trim() })
     : "";
+
+  // G8: bulk data export re-confirms the password first; the returned token
+  // is single-use and valid for five minutes, so a stolen cookie alone cannot
+  // dump the workspace.
+  async function download(kind: "export" | "backup") {
+    setBusy(kind);
+    setError("");
+    try {
+      await admin.adminDownload(
+        password,
+        kind === "backup" ? "admin/backup" : "admin/export",
+        kind === "export" ? exportQuery : "",
+      );
+      setPassword("");
+    } catch (err) {
+      if (err instanceof ApiError && err.reason === "step_up_expired")
+        setPassword("");
+      setError(errorMessage(err));
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
     <section className="panel team-form form-stack">
-      <h2>Xuất và sao lưu dữ liệu</h2>
+      <h2>{t("backupTitle")}</h2>
       <label>
-        Mã khách hàng (để trống nếu xuất dữ liệu doanh nghiệp)
+        {t("backupCustomer")}
         <input
           value={customer}
           onChange={(event) => setCustomer(event.target.value)}
         />
       </label>
+      <label>
+        {t("stepUpPassword")}
+        <input
+          type={show ? "text" : "password"}
+          value={password}
+          autoComplete="current-password"
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() => setShow((value) => !value)}
+          aria-label={show ? t("hidePassword") : t("showPassword")}
+        >
+          <Icon name={show ? "eye-off" : "eye"} size={16} />
+        </button>
+      </label>
+      {error && <ErrorState message={error} />}
       <div className="toolbar-controls">
-        <a
+        <button
           className="button secondary"
-          href={`/api/platform/admin/export${exportQuery}`}
-          download
+          disabled={busy !== "" || password.length === 0}
+          onClick={() => void download("export")}
         >
-          Xuất JSON
-        </a>
-        <a
+          {busy === "export" ? t("busy") : t("exportJson")}
+        </button>
+        <button
           className="button secondary"
-          href="/api/platform/admin/backup"
-          download
+          disabled={busy !== "" || password.length === 0}
+          onClick={() => void download("backup")}
         >
-          Sao lưu mã hóa
-        </a>
+          {busy === "backup" ? t("busy") : t("backupEncrypted")}
+        </button>
       </div>
     </section>
   );

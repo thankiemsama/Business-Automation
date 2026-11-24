@@ -1,0 +1,150 @@
+{
+  "users": {
+    "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae": {
+      "locked_until": "0001-01-01T00:00:00Z",
+      "id": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "name": "Probe O",
+      "email": "probe-12345@example.test",
+      "role": "owner",
+      "salt": "2fc34d57629bec91b0bac33aba75f2c303090f40d00b7f01",
+      "password_hash": "pbkdf2v2.f1a68f3e153ef7f1a340bff7cd1471318b7d65fcb28dd5f9888982bdd55a22a6"
+    },
+    "d00c5ad89ce46d86ed7ceca6dabe448a4335e0e0349e7dc6": {
+      "locked_until": "0001-01-01T00:00:00Z",
+      "id": "d00c5ad89ce46d86ed7ceca6dabe448a4335e0e0349e7dc6",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "name": "A",
+      "email": "agent-probe-12345@example.test",
+      "role": "agent",
+      "salt": "b9df491e9dd430278f8a51337f9cc0e01dd3f98c26f4bcde",
+      "password_hash": "pbkdf2v2.3c738674b85d69717138c65966e444b3c71156d2323815e7a3446b9a65cd80d2"
+    }
+  },
+  "sessions": {
+    "0f7c62f52f309495e43b3ec855a5ae3f4290a24b78d7a29a4aa955e13ee169ad": {
+      "CreatedAt": "2026-11-23T20:09:49.3635183+07:00",
+      "UserID": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "ExpiresAt": "2026-11-24T20:09:49.3635183+07:00"
+    },
+    "dd56533c6a0cd65f2a0bc2fa51ca57af136d246101a5c83a0f6057179ed07349": {
+      "CreatedAt": "2026-11-23T20:08:58.7448921+07:00",
+      "UserID": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "ExpiresAt": "2026-11-24T20:08:58.7448921+07:00"
+    }
+  },
+  "records": {
+    "12f17b16267fe1b5c96c3c7b693ff12aa7fc5abaabb62ed7": {
+      "author_id": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "id": "12f17b16267fe1b5c96c3c7b693ff12aa7fc5abaabb62ed7",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "audit_log",
+      "name": "users",
+      "content": "{\"disabled\":{\"before\":null,\"after\":false},\"email_fingerprint\":{\"before\":null,\"after\":\"02e5cb26f948916493984d7fb2da61ae9afc72544ad46005ef2bdacf7a13ada2\"},\"mfa_enabled\":{\"before\":null,\"after\":false},\"name\":{\"before\":null,\"after\":\"Probe O\"},\"role\":{\"before\":null,\"after\":\"owner\"}}",
+      "conversation_id": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-23T20:08:57.3282844+07:00",
+      "updated_at": "2026-11-23T20:08:57.3282844+07:00"
+    },
+    "135da8f1cc31c1955e2e526bba38063ca4658afa6a3d7244": {
+      "author_id": "d00c5ad89ce46d86ed7ceca6dabe448a4335e0e0349e7dc6",
+      "id": "135da8f1cc31c1955e2e526bba38063ca4658afa6a3d7244",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "audit_log",
+      "name": "users",
+      "content": "{\"disabled\":{\"before\":null,\"after\":false},\"email_fingerprint\":{\"before\":null,\"after\":\"f92b735a339f3946d75d94a41edbb90628cff7ae2c3785f967680c6308056754\"},\"mfa_enabled\":{\"before\":null,\"after\":false},\"name\":{\"before\":null,\"after\":\"A\"},\"role\":{\"before\":null,\"after\":\"agent\"}}",
+      "conversation_id": "d00c5ad89ce46d86ed7ceca6dabe448a4335e0e0349e7dc6",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-23T20:09:49.9862278+07:00",
+      "updated_at": "2026-11-23T20:09:49.9862278+07:00"
+    },
+    "1a47a9a6a533fb01373e6750dec51e4d9f2d7e98cd7d45ac": {
+      "author_id": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "id": "1a47a9a6a533fb01373e6750dec51e4d9f2d7e98cd7d45ac",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "auth_event",
+      "name": "127.0.0.1",
+      "email": "probe-12345@example.test",
+      "status": "login:ok",
+      "enabled": false,
+      "created_at": "2026-11-23T13:08:58.7448921Z",
+      "updated_at": "2026-11-23T13:08:58.7448921Z"
+    },
+    "3614c896e366049fea4f9a9eb44e413acbd28df9a2370e10": {
+      "author_id": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "id": "3614c896e366049fea4f9a9eb44e413acbd28df9a2370e10",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "audit_log",
+      "name": "sessions",
+      "content": "{\"active\":{\"before\":null,\"after\":true},\"expires_at\":{\"before\":null,\"after\":\"2026-11-24T20:08:58.7448921+07:00\"}}",
+      "conversation_id": "dd56533c6a0c",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-23T20:08:58.7448921+07:00",
+      "updated_at": "2026-11-23T20:08:58.7448921+07:00"
+    },
+    "3becea8030113f6694e9d4cbdfde75327a7f1c5370345dea": {
+      "author_id": "system",
+      "id": "3becea8030113f6694e9d4cbdfde75327a7f1c5370345dea",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "audit_log",
+      "name": "auth_event",
+      "content": "{\"client_ip\":{\"before\":null,\"after\":\"127.0.0.1\"},\"email_fp\":{\"before\":null,\"after\":\"02e5cb26f948916493984d7fb2da61ae9afc72544ad46005ef2bdacf7a13ada2\"},\"event\":{\"before\":null,\"after\":\"login:ok\"},\"user_fp\":{\"before\":null,\"after\":\"c29be796d9e5b7544fb430f06853e1b3d60f6986833b831fcd93cf8917435f70\"}}",
+      "conversation_id": "1a47a9a6a533fb01373e6750dec51e4d9f2d7e98cd7d45ac",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-23T20:08:58.7448921+07:00",
+      "updated_at": "2026-11-23T20:08:58.7448921+07:00"
+    },
+    "46ae6dec1fc959d46a8f3379a251b8ebef734f3c9df00e5d": {
+      "author_id": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "id": "46ae6dec1fc959d46a8f3379a251b8ebef734f3c9df00e5d",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "audit_log",
+      "name": "sessions",
+      "content": "{\"active\":{\"before\":null,\"after\":true},\"expires_at\":{\"before\":null,\"after\":\"2026-11-24T20:09:49.3635183+07:00\"}}",
+      "conversation_id": "0f7c62f52f30",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-23T20:09:49.3635183+07:00",
+      "updated_at": "2026-11-23T20:09:49.3635183+07:00"
+    },
+    "56e60b3ca34db30007c13143aa288468cb0baea2f3b2e5b4783dedee0e729279": {
+      "id": "56e60b3ca34db30007c13143aa288468cb0baea2f3b2e5b4783dedee0e729279",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "meter",
+      "name": "2026-11",
+      "sequence": 2,
+      "enabled": false,
+      "created_at": "0001-01-01T00:00:00Z",
+      "updated_at": "0001-01-01T00:00:00Z"
+    },
+    "8047004c958fec40f209cbfcaff23664ea85562eea961003": {
+      "author_id": "6d0ecf107835b9c2b1a6949059557baa2175e42f363602ae",
+      "id": "8047004c958fec40f209cbfcaff23664ea85562eea961003",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "auth_event",
+      "name": "127.0.0.1",
+      "email": "probe-12345@example.test",
+      "status": "login:ok",
+      "enabled": false,
+      "created_at": "2026-11-23T13:09:49.3625188Z",
+      "updated_at": "2026-11-23T13:09:49.3625188Z"
+    },
+    "ef5f170509f692986e565443a22c046e013b1c6eb5857122": {
+      "author_id": "system",
+      "id": "ef5f170509f692986e565443a22c046e013b1c6eb5857122",
+      "tenant_id": "6aafa1327242bd29de5ea696a0b7737857bd04c411b68e8e",
+      "kind": "audit_log",
+      "name": "auth_event",
+      "content": "{\"client_ip\":{\"before\":null,\"after\":\"127.0.0.1\"},\"email_fp\":{\"before\":null,\"after\":\"02e5cb26f948916493984d7fb2da61ae9afc72544ad46005ef2bdacf7a13ada2\"},\"event\":{\"before\":null,\"after\":\"login:ok\"},\"user_fp\":{\"before\":null,\"after\":\"c29be796d9e5b7544fb430f06853e1b3d60f6986833b831fcd93cf8917435f70\"}}",
+      "conversation_id": "8047004c958fec40f209cbfcaff23664ea85562eea961003",
+      "status": "created",
+      "enabled": false,
+      "created_at": "2026-11-23T20:09:49.3635183+07:00",
+      "updated_at": "2026-11-23T20:09:49.3635183+07:00"
+    }
+  }
+}

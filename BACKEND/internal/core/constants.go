@@ -49,6 +49,9 @@ const (
 	KindCustomerNotes     = "customer_notes"
 	KindLTV               = "customer_ltv"
 	KindKnowledgePublic   = "kb_public"
+	// Operational (non-user-resource) kinds used by the auth hardening layer.
+	KindAuthEvent = "auth_event"
+	KindStepUp    = "step_up"
 )
 
 // PublicChannels are the multi-channel integrations a tenant can configure.

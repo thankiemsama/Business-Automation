@@ -1,0 +1,81 @@
+﻿PASS|Register|R1 register valid|201|201|
+PASS|Register|R1b no secrets in payload|||public fields only
+PASS|Register|R1c role owner|owner|owner|
+FAIL|Register|R1d email_verification_pending=false (auto-confirm)|False||
+PASS|Register|R2 duplicate email case-variant|409|409|msg=
+PASS|Register|R3 pw 11 chars|400|400|
+PASS|Register|R4 pw 129 chars|400|400|
+PASS|Register|R5 empty name|400|400|
+PASS|Register|R6 malformed email|400|400|
+PASS|Register|R7 angle-bracket email|400|400|
+PASS|Register|R8 role injection|400|400|
+PASS|Register|R9 admin field injection|400|400|
+PASS|Register|R10 bogus industry|400|400|
+PASS|Register|R11 valid industry|201|201|
+PASS|Register|R12 JSON array body|400|400|
+PASS|Register|R13 text/plain content-type|415|415|
+PASS|Login|L1 login valid|200|200|
+PASS|Login|L1b token_type|Bearer|Bearer|
+PASS|Login|L1c expires_in|86400|86400|
+PASS|Login|L2 wrong password|401|401|
+PASS|Login|L3 unknown email (enum-safe)|401|401|
+PASS|Login|L3b identical message|||anti-enumeration
+PASS|Login|L4 case-insensitive email|200|200|
+PASS|Login|L5 GET not allowed|405|405|
+PASS|Login|L6 empty body|401|401|
+PASS|Lockout|L8 5th wrong attempt|401|401|
+PASS|Lockout|L8b correct pw while locked|401|401|msg=
+FAIL|Lockout|L8c reason account_locked|account_locked||
+PASS|Lockout|L8d unknown email no lockout leak|401|401|
+PASS|Login|L7 129-char password|401|401|
+FAIL|Team|L9 owner creates agent|201|401|msg=
+FAIL|Team|L9b owner disables agent|200|404|msg=
+PASS|Team|L9c disabled agent login|401|401|
+FAIL|Team|L9d agent cannot create agent|403|401|msg=
+PASS|Team|L9e cross-tenant team update|404|404|
+PASS|Password|P1 wrong old pw|400|400|
+PASS|Password|P2 11-char new pw|400|400|
+PASS|Password|P3 129-char new pw|400|400|
+PASS|Password|P4 valid change|200|200|
+PASS|Password|P5 old session revoked|401|401|
+PASS|Logout|O1 logout|200|200|
+PASS|Logout|O2 token dead after logout|401|401|
+PASS|Forgot|F1 forgot known email|200|200|
+PASS|Forgot|F2 forgot unknown email|200|200|enum-safe
+PASS|Forgot|F3 empty token|400|400|
+PASS|Forgot|F4 no dot|400|400|
+PASS|Forgot|F5 empty secret|400|400|
+PASS|Forgot|F6 random token|400|400|
+FAIL|Forgot|F7 extract reset link from dev-sink log|True|False|token=...
+PASS|Forgot|F8 valid token + short pw|400|400|
+FAIL|Forgot|F9 redeem valid|200|400|msg=
+FAIL|Forgot|F10 sessions revoked after redeem|401|200|
+FAIL|Forgot|F11 login new pw|200|401|
+FAIL|Forgot|F12 old pw rejected|401|200|
+PASS|Forgot|F13 replay token|400|400|single-use
+PASS|Verify|V1 resend verify unknown|200|200|enum-safe
+PASS|Verify|V3 confirm garbage|400|400|
+PASS|RateLimit|RL1 first 20 -> 401|20|20|got=20
+PASS|RateLimit|RL2 21st -> 429|1|1|last=429
+PASS|RateLimit|RL3 same bucket still 429|429|429|
+FAIL|Headers|H1 X-Content-Type-Options|nosniff||
+FAIL|Headers|H2 Cache-Control|no-store||
+PASS|Headers|H3 unknown endpoint|404|404|
+PASS|MFA|M0 mfa status|200|200|
+PASS|MFA|M0b mfa not enabled|False|False|
+PASS|MFA|M1 setup wrong pw|403|403|
+PASS|MFA|M2 setup ok|200|200|msg=Thành công
+FAIL|MFA|M3 enable wrong code|401|409|401|
+FAIL|MFA|M4 enable valid TOTP|200|401|msg=
+FAIL|MFA|M4b 8 recovery codes|8|0|
+FAIL|MFA|M4c mfa enabled|True||
+FAIL|MFA|M5 login without MFA|409|200|msg=Thành công
+PASS|MFA|M6 login with TOTP|200|200|msg=Thành công
+FAIL|MFA|M7 replay TOTP code|401|200|replay-proof
+PASS|MFA|M8 recovery code login|200|200|msg=Thành công
+FAIL|MFA|M9 replay recovery code|401|200|single-use
+PASS|MFA|M10 disable with pw+code|200|200|msg=Thành công
+FAIL|MFA|M11 disable without pw|403|200|password gate holds
+PASS|MFA-Sessions|S1 sessions list|200|200|msg=Thành công
+PASS|MFA-Sessions|S2 revoke current session|200|200|msg=Thành công
+PASS|MFA-Sessions|S3 revoked token dead|401|401|

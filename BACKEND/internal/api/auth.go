@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"businessautomation/internal/core"
@@ -9,7 +10,10 @@ import (
 
 type authAction func(service.Credentials) (any, int, error)
 
-func (h *Handler) authEndpoint(action authAction) http.HandlerFunc {
+// authEndpoint serves a guest credential endpoint. resolveCaptcha gates
+// brute-force-prone actions (register/login/forgot/verify) behind the
+// optional Turnstile check; IP is resolved server-side for the audit trail.
+func (h *Handler) authEndpoint(action authAction, resolveCaptcha bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			method(w, http.MethodPost)
@@ -27,6 +31,13 @@ func (h *Handler) authEndpoint(action authAction) http.HandlerFunc {
 		if err := decode(w, r, &c); err != nil {
 			respond(w, http.StatusBadRequest, nil, err)
 			return
+		}
+		c.IP = requestIP(r).String()
+		if resolveCaptcha {
+			if err := h.captcha.Verify(c.CAPTCHA); err != nil {
+				respond(w, http.StatusBadRequest, nil, err)
+				return
+			}
 		}
 		data, status, err := action(c)
 		respond(w, status, data, err)
@@ -93,6 +104,49 @@ func (h *Handler) stats(w http.ResponseWriter, r *http.Request, u core.User, _ s
 func (h *Handler) register(credentials service.Credentials) (any, int, error) {
 	user, err := h.auth.Register(credentials)
 	return publicUser(user), http.StatusCreated, err
+}
+
+// confirmEmail redeems the 30-minute mailbox-verification link (G1).
+func (h *Handler) confirmEmail(credentials service.Credentials) (any, int, error) {
+	return nil, http.StatusOK, h.auth.ConfirmEmail(credentials.Token)
+}
+
+// resendVerification re-issues the pending verification link (G1). Unknown or
+// already-confirmed emails return success so the endpoint does not disclose
+// which mailboxes exist, mirroring /auth/forgot. Only a missing mail
+// provider (503) is surfaced: the form shows the "chưa cấu hình" state.
+func (h *Handler) resendVerification(credentials service.Credentials) (any, int, error) {
+	err := h.auth.SendVerification(credentials.Email)
+	var apiErr *core.Error
+	if err != nil && (errors.As(err, &apiErr) && apiErr.Status != http.StatusNotFound) {
+		return nil, apiErr.Status, err
+	}
+	return nil, http.StatusOK, nil
+}
+
+// issueStepUp mints a 5-minute single-use token for sensitive operations (G8).
+func (h *Handler) issueStepUp(w http.ResponseWriter, r *http.Request, user core.User, _ string) {
+	if !h.allowAuth(r) {
+		respond(w, http.StatusTooManyRequests, nil, core.Fail(http.StatusTooManyRequests, "Vui lòng thử lại sau"))
+		return
+	}
+	if !h.acquireAuthSlot(w) {
+		return
+	}
+	defer h.releaseAuthSlot()
+	var input struct {
+		Password string `json:"password"`
+	}
+	if err := decode(w, r, &input); err != nil {
+		respond(w, http.StatusBadRequest, nil, err)
+		return
+	}
+	token, err := h.auth.IssueStepUp(user, input.Password)
+	if err != nil {
+		respond(w, http.StatusForbidden, nil, err)
+		return
+	}
+	respond(w, http.StatusOK, map[string]any{"token": token, "expires_in": 300}, nil)
 }
 
 func (h *Handler) login(credentials service.Credentials) (any, int, error) {

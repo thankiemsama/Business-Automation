@@ -19,4 +19,10 @@ type Credentials struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	// CAPTCHA carries the one-shot Turnstile token when the deployment enables
+	// NEXA_TURNSTILE_SECRET; it is ignored (and not required) otherwise.
+	CAPTCHA string `json:"captcha,omitempty"`
+	// IP is resolved server-side from the trusted ingress chain (BFF +
+	// NEXA_PROXY_SECRET) for audit trails. It is never read from the JSON body.
+	IP string `json:"-"`
 }

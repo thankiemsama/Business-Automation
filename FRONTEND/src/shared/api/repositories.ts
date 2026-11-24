@@ -1,4 +1,4 @@
-import type { HttpClient } from "./http-client";
+import { ApiError, type HttpClient } from "./http-client";
 import type {
   Credentials,
   Dashboard,
@@ -91,26 +91,52 @@ export class AuthRepository {
     return this.me();
   }
   async register(credentials: Credentials) {
-    await this.http.request<User>("auth/register", {
+    const user = await this.http.request<User>("auth/register", {
       method: "POST",
       body: JSON.stringify(credentials),
     });
-    return this.login({
-      email: credentials.email,
-      password: credentials.password,
-    });
+    try {
+      return await this.login({
+        email: credentials.email,
+        password: credentials.password,
+      });
+    } catch (error) {
+      // G1: while the mailbox is unconfirmed the login returns
+      // 403/email_unverified; hand back the fresh user so the UI can show
+      // the verification screen instead of a hard failure.
+      if (
+        user.email_verification_pending ||
+        (error instanceof ApiError && error.reason === "email_unverified")
+      ) {
+        return user;
+      }
+      throw error;
+    }
   }
   logout() {
     return this.http.request("auth/logout", { method: "POST" });
   }
   account(
-    action: "auth/password" | "team/invite" | "auth/forgot" | "auth/redeem",
+    action:
+      | "auth/password"
+      | "team/invite"
+      | "auth/forgot"
+      | "auth/redeem"
+      | "auth/verify"
+      | "auth/confirm",
     input: Record<string, string>,
   ) {
     return this.http.request(action, {
       method: "POST",
       body: JSON.stringify(input),
     });
+  }
+  /** G8: mint a 5-minute single-use token after password re-confirmation. */
+  stepUp(password: string) {
+    return this.http.request<{ token: string; expires_in: number }>(
+      "account/step-up",
+      { method: "POST", body: JSON.stringify({ password }) },
+    );
   }
   members(signal?: AbortSignal) {
     return this.http.request<User[]>("team", { signal });

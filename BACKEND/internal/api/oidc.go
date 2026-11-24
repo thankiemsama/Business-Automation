@@ -52,8 +52,10 @@ func (h *Handler) oidcRoutes(mux *http.ServeMux) {
 			return nil, 503, core.Fail(503, "SSO chưa sẵn sàng")
 		}
 		token, err := auth.ExchangeOIDC(c.Token, c.Code)
+		// SSO exchange is token-bound (PKCE) and not brute-forceable, so it
+		// stays outside the captcha-gated guest endpoints.
 		return tokenResponse{AccessToken: token, TokenType: "Bearer", ExpiresIn: int(core.SessionLifetime.Seconds())}, 200, err
-	}))
+	}, false))
 }
 
 func (h *Handler) oidcLogin(w http.ResponseWriter, r *http.Request) {

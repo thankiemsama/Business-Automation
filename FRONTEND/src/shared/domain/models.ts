@@ -5,6 +5,8 @@ export interface User {
   email: string;
   disabled: boolean;
   role: "owner" | "agent";
+  /** G1: self-serve signups wait for the mailbox confirmation link. */
+  email_verification_pending?: boolean;
 }
 export interface Entity {
   id: string;
@@ -112,6 +114,11 @@ export interface Credentials {
   email: string;
   password: string;
   name?: string;
+  /** MFA second factor on /auth/login or /auth/oidc-exchange. */
+  code?: string;
+  /** One-shot Turnstile token; only required when the backend enables
+   * NEXA_TURNSTILE_SECRET. Ignored (and optional) otherwise. */
+  captcha?: string;
 }
 export type Dashboard = Record<
   ResourceKind | "messages" | "open_tickets",

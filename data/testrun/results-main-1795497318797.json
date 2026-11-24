@@ -1,0 +1,2980 @@
+{
+  "run": "main",
+  "generated": "2026-11-24T05:19:35.233Z",
+  "passed": 235,
+  "total": 266,
+  "failures": [
+    {
+      "id": 17,
+      "area": "RECOVERY",
+      "name": "redeem reset link -> 200",
+      "expected": "200",
+      "actual": 400,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 18,
+      "area": "RECOVERY",
+      "name": "login with reset password -> 200",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 19,
+      "area": "RECOVERY",
+      "name": "old password rejected after reset -> 401",
+      "expected": "401",
+      "actual": 200,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 25,
+      "area": "AUTH",
+      "name": "change password valid -> 200 (revokes sessions)",
+      "expected": "200",
+      "actual": 400,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 26,
+      "area": "AUTH",
+      "name": "old token invalidated after password change -> 401",
+      "expected": "401",
+      "actual": 200,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 27,
+      "area": "AUTH",
+      "name": "re-login after password change -> 200",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 38,
+      "area": "TEAM",
+      "name": "invitee redeems invite link -> 200",
+      "expected": "200",
+      "actual": 400,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 39,
+      "area": "TEAM",
+      "name": "invitee login -> 200 with agent role",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": "role=undefined"
+    },
+    {
+      "id": 77,
+      "area": "MESSAGES",
+      "name": "AI draft (no LLM) -> 403/503",
+      "expected": "403|503",
+      "actual": 409,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 78,
+      "area": "MESSAGES",
+      "name": "close conversation -> 200",
+      "expected": "200",
+      "actual": 409,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 79,
+      "area": "MESSAGES",
+      "name": "message to closed conversation -> 409",
+      "expected": "409",
+      "actual": 201,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 145,
+      "area": "APIKEYS",
+      "name": "public API with valid key -> 200",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": "total=undefined"
+    },
+    {
+      "id": 146,
+      "area": "APIKEYS",
+      "name": "public API single customer -> 200",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 147,
+      "area": "APIKEYS",
+      "name": "public API unknown id -> 404",
+      "expected": "404",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 157,
+      "area": "CUSTOMER360",
+      "name": "merge customer -> 200",
+      "expected": "200",
+      "actual": 409,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 158,
+      "area": "CUSTOMER360",
+      "name": "merged source now 404 (soft-delete)",
+      "expected": "404",
+      "actual": 200,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 160,
+      "area": "CHANNELS",
+      "name": "configure messenger channel -> 201",
+      "expected": "201",
+      "actual": 400,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 196,
+      "area": "AI",
+      "name": "ai summary (no provider) -> 503",
+      "expected": "503",
+      "actual": 200,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 198,
+      "area": "AI",
+      "name": "ai transcribe (no provider) -> 503",
+      "expected": "503",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 228,
+      "area": "STEPUP",
+      "name": "step-up correct -> 200 token (5 min, single-use)",
+      "expected": "200",
+      "actual": 403,
+      "reason": "",
+      "pass": false,
+      "note": "expires_in=undefined"
+    },
+    {
+      "id": 229,
+      "area": "STEPUP",
+      "name": "admin export with step-up -> 200",
+      "expected": "200",
+      "actual": 403,
+      "reason": "step_up_expired",
+      "pass": false,
+      "note": "{\"code\":\"Forbidden\",\"data\":null,\"message"
+    },
+    {
+      "id": 231,
+      "area": "STEPUP",
+      "name": "admin encrypted backup with step-up -> 200",
+      "expected": "200",
+      "actual": 403,
+      "reason": "step_up_expired",
+      "pass": false,
+      "note": "{\"code\":\"Forbidden\",\"dat"
+    },
+    {
+      "id": 234,
+      "area": "MFA",
+      "name": "MFA setup -> 200 + secret",
+      "expected": "200",
+      "actual": 403,
+      "reason": "",
+      "pass": false,
+      "note": "secret=MISSING"
+    },
+    {
+      "id": 235,
+      "area": "MFA",
+      "name": "MFA enable bad code -> 401",
+      "expected": "401",
+      "actual": 409,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 236,
+      "area": "MFA",
+      "name": "MFA enable (no secret returned)",
+      "expected": "200",
+      "actual": 500,
+      "reason": "setup gave no secret",
+      "pass": false,
+      "note": "CANNOT VERIFY MFA ENABLE"
+    },
+    {
+      "id": 237,
+      "area": "MFA",
+      "name": "owner login now needs MFA -> 409",
+      "expected": "409",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 240,
+      "area": "MFA",
+      "name": "MFA disable bad code -> 401",
+      "expected": "401",
+      "actual": 403,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 242,
+      "area": "SECURITY",
+      "name": "healthz -> 200",
+      "expected": "200",
+      "actual": 404,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 248,
+      "area": "SECURITY",
+      "name": "email inbound unconfigured (GET -> 405, POST path exists) -> 404/405",
+      "expected": "404|405",
+      "actual": 0,
+      "reason": "network:Request with GET/HEAD method cannot have body.",
+      "pass": false,
+      "note": "network:Request with GET/HEAD method cannot have body."
+    },
+    {
+      "id": 252,
+      "area": "SECURITY",
+      "name": "wrong content-type -> 415",
+      "expected": "415",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": "Thông tin đăng nhập không đúng"
+    },
+    {
+      "id": 261,
+      "area": "SESSIONS",
+      "name": "logout garbage token -> 200 (no-op)",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    }
+  ],
+  "results": [
+    {
+      "id": 1,
+      "area": "AUTH",
+      "name": "register valid -> 201 owner+tenant",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "tenant=8a6ed5"
+    },
+    {
+      "id": 2,
+      "area": "AUTH",
+      "name": "register duplicate email -> 409",
+      "expected": "409",
+      "actual": 409,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 3,
+      "area": "AUTH",
+      "name": "register short password -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 4,
+      "area": "AUTH",
+      "name": "register malformed email -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 5,
+      "area": "AUTH",
+      "name": "register empty name -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 6,
+      "area": "AUTH",
+      "name": "register unknown JSON field -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 7,
+      "area": "AUTH",
+      "name": "register password >128 bytes -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 8,
+      "area": "AUTH",
+      "name": "register with industry starter -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 9,
+      "area": "AUTH",
+      "name": "register bad industry -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 10,
+      "area": "AUTH",
+      "name": "login valid -> 200 + token",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "expires=86400s"
+    },
+    {
+      "id": 11,
+      "area": "AUTH",
+      "name": "login wrong password -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 12,
+      "area": "AUTH",
+      "name": "login unknown email -> 401 (anti-enumeration)",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 13,
+      "area": "AUTH",
+      "name": "GET /auth/me -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"disabled\":false,\"id\":\"1ba5daa2b4e328945634240b0e135fbdd7e8"
+    },
+    {
+      "id": 14,
+      "area": "AUTH",
+      "name": "GET /auth/me without token -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 15,
+      "area": "RECOVERY",
+      "name": "forgot password -> 200 (link mailed)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 16,
+      "area": "RECOVERY",
+      "name": "extract reset link from dev mail sink",
+      "expected": "200",
+      "actual": 200,
+      "reason": "http://127.0.0.1:18080/account/setup#8a6ed5370981cbae7d3ed4d",
+      "pass": true,
+      "note": "http://127.0.0.1:18080/account/setup#8a6ed5370981cbae7d3ed4de56734bec8e93fbb14426f4fb.54ce154f37063e6ea950ea00217c73394e63732e9a747bff"
+    },
+    {
+      "id": 17,
+      "area": "RECOVERY",
+      "name": "redeem reset link -> 200",
+      "expected": "200",
+      "actual": 400,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 18,
+      "area": "RECOVERY",
+      "name": "login with reset password -> 200",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 19,
+      "area": "RECOVERY",
+      "name": "old password rejected after reset -> 401",
+      "expected": "401",
+      "actual": 200,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 20,
+      "area": "RECOVERY",
+      "name": "reset link single-use (replay) -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 21,
+      "area": "RECOVERY",
+      "name": "forgot unknown email -> 200 (no disclosure)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 22,
+      "area": "RECOVERY",
+      "name": "redeem malformed token -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 23,
+      "area": "AUTH",
+      "name": "change password wrong old -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 24,
+      "area": "AUTH",
+      "name": "change password short new -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 25,
+      "area": "AUTH",
+      "name": "change password valid -> 200 (revokes sessions)",
+      "expected": "200",
+      "actual": 400,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 26,
+      "area": "AUTH",
+      "name": "old token invalidated after password change -> 401",
+      "expected": "401",
+      "actual": 200,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 27,
+      "area": "AUTH",
+      "name": "re-login after password change -> 200",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 28,
+      "area": "TEAM",
+      "name": "owner creates agent -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 29,
+      "area": "TEAM",
+      "name": "agent login -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 30,
+      "area": "TEAM",
+      "name": "agent role verified",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "role=agent"
+    },
+    {
+      "id": 31,
+      "area": "TEAM",
+      "name": "owner lists team -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "members=2"
+    },
+    {
+      "id": 32,
+      "area": "TEAM",
+      "name": "agent cannot create agent -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 33,
+      "area": "TEAM",
+      "name": "owner updates member -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 34,
+      "area": "TEAM",
+      "name": "agent cannot update member -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 35,
+      "area": "TEAM",
+      "name": "cannot edit owner via team/{id} -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 36,
+      "area": "TEAM",
+      "name": "owner invites teammate -> 200 (link mailed)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 37,
+      "area": "TEAM",
+      "name": "extract invite link from dev mail sink",
+      "expected": "200",
+      "actual": 200,
+      "reason": "link",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 38,
+      "area": "TEAM",
+      "name": "invitee redeems invite link -> 200",
+      "expected": "200",
+      "actual": 400,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 39,
+      "area": "TEAM",
+      "name": "invitee login -> 200 with agent role",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": "role=undefined"
+    },
+    {
+      "id": 40,
+      "area": "RESOURCES",
+      "name": "create customer -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "version=1"
+    },
+    {
+      "id": 41,
+      "area": "RESOURCES",
+      "name": "customer without name -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 42,
+      "area": "RESOURCES",
+      "name": "list customers -> 200 (paged)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "total=1"
+    },
+    {
+      "id": 43,
+      "area": "RESOURCES",
+      "name": "pagination limit/page -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "total=1 items=0"
+    },
+    {
+      "id": 44,
+      "area": "RESOURCES",
+      "name": "page=0 -> 400 (bounds)",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 45,
+      "area": "RESOURCES",
+      "name": "limit>100 -> 400 (bounds)",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 46,
+      "area": "RESOURCES",
+      "name": "get customer -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 47,
+      "area": "RESOURCES",
+      "name": "get unknown id -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 48,
+      "area": "RESOURCES",
+      "name": "update customer (versioned) -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "new version=2"
+    },
+    {
+      "id": 49,
+      "area": "RESOURCES",
+      "name": "stale version -> 409",
+      "expected": "409",
+      "actual": 409,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 50,
+      "area": "RESOURCES",
+      "name": "missing version -> 428",
+      "expected": "428",
+      "actual": 428,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 51,
+      "area": "RESOURCES",
+      "name": "create conversation -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 52,
+      "area": "RESOURCES",
+      "name": "conversation bad channel -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 53,
+      "area": "RESOURCES",
+      "name": "conversation unknown customer -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 54,
+      "area": "RESOURCES",
+      "name": "create ticket -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 55,
+      "area": "RESOURCES",
+      "name": "ticket bad priority -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 56,
+      "area": "RESOURCES",
+      "name": "ticket customer/conversation mismatch -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 57,
+      "area": "RESOURCES",
+      "name": "create knowledge (owner) -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "slug=chinh-sach-hoan-tin"
+    },
+    {
+      "id": 58,
+      "area": "RESOURCES",
+      "name": "knowledge non-HTTPS video -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 59,
+      "area": "RESOURCES",
+      "name": "create automation -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 60,
+      "area": "RESOURCES",
+      "name": "automation without keywords -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 61,
+      "area": "RESOURCES",
+      "name": "DELETE resource -> 405 (soft state only)",
+      "expected": "405",
+      "actual": 405,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 62,
+      "area": "RESOURCES",
+      "name": "unknown resource kind -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 63,
+      "area": "RESOURCES",
+      "name": "agent create knowledge -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 64,
+      "area": "RESOURCES",
+      "name": "agent create automation -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 65,
+      "area": "RESOURCES",
+      "name": "agent create customer -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 66,
+      "area": "RESOURCES",
+      "name": "agent list owner's customers -> 200 (shared tenant)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "total=3"
+    },
+    {
+      "id": 67,
+      "area": "RESOURCES",
+      "name": "second tenant registered -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 68,
+      "area": "RESOURCES",
+      "name": "cross-tenant read -> 404 (isolation)",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 69,
+      "area": "RESOURCES",
+      "name": "cross-tenant update -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 70,
+      "area": "RESOURCES",
+      "name": "cross-tenant messages -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 71,
+      "area": "RESOURCES",
+      "name": "other tenant list -> 200 (its own empty data)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "total=0"
+    },
+    {
+      "id": 72,
+      "area": "MESSAGES",
+      "name": "post customer message -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "seq=1 status=undefined"
+    },
+    {
+      "id": 73,
+      "area": "MESSAGES",
+      "name": "invalid sender role -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 74,
+      "area": "MESSAGES",
+      "name": "keyword automation created ticket",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "automation=345330 total 2 (was 1)"
+    },
+    {
+      "id": 75,
+      "area": "MESSAGES",
+      "name": "auto reply from knowledge -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "sender=assistant source=5083efdabf9060d82b3f4ca942c30d80a7569ae647b43e5f needs_human=false"
+    },
+    {
+      "id": 76,
+      "area": "MESSAGES",
+      "name": "double reply -> 409",
+      "expected": "409",
+      "actual": 409,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 77,
+      "area": "MESSAGES",
+      "name": "AI draft (no LLM) -> 403/503",
+      "expected": "403|503",
+      "actual": 409,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 78,
+      "area": "MESSAGES",
+      "name": "close conversation -> 200",
+      "expected": "200",
+      "actual": 409,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 79,
+      "area": "MESSAGES",
+      "name": "message to closed conversation -> 409",
+      "expected": "409",
+      "actual": 201,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 80,
+      "area": "MESSAGES",
+      "name": "mark conversation read -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 81,
+      "area": "MESSAGES",
+      "name": "record ticket response -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "first_response_at=true"
+    },
+    {
+      "id": 82,
+      "area": "MESSAGES",
+      "name": "escalate not-overdue ticket -> 409",
+      "expected": "409",
+      "actual": 409,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 83,
+      "area": "REPORTS",
+      "name": "dashboard -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"automations\":1,\"conversations\":1,\"customers\":3,\"knowledge\""
+    },
+    {
+      "id": 84,
+      "area": "REPORTS",
+      "name": "reports valid range -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"total\":{\"id\":\"\",\"name\":\"\",\"opened\":2,\"backlog\":2,\"response"
+    },
+    {
+      "id": 85,
+      "area": "REPORTS",
+      "name": "reports to<from -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 86,
+      "area": "REPORTS",
+      "name": "reports range >366d -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 87,
+      "area": "REPORTS",
+      "name": "reports/analytics -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"realtime_qa\":{\"by_kind\":{},\"by_agent\":{},\"by_day\":{}},\"mul"
+    },
+    {
+      "id": 88,
+      "area": "REPORTS",
+      "name": "export tickets CSV -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "ID,Tiêu đề,Trạng thái,Ưu tiên,Người phụ trách (ID)"
+    },
+    {
+      "id": 89,
+      "area": "REPORTS",
+      "name": "export customers CSV (since filter) -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "ID,Tên,Email,Điện thoại,Ngày tạo\nbd3a73f"
+    },
+    {
+      "id": 90,
+      "area": "REPORTS",
+      "name": "export tickets XLSX -> 200 (zip)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "PK\u0003\u0004\u0014\u0000\b\u0000\b\u0000\u0000\u0000"
+    },
+    {
+      "id": 91,
+      "area": "REPORTS",
+      "name": "export bad format -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 92,
+      "area": "WORKSPACE",
+      "name": "global search -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "hits=2"
+    },
+    {
+      "id": 93,
+      "area": "WORKSPACE",
+      "name": "save saved-view -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 94,
+      "area": "WORKSPACE",
+      "name": "remove view -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 95,
+      "area": "WORKSPACE",
+      "name": "save view bad kind -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 96,
+      "area": "WORKSPACE",
+      "name": "notifications -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "unread=1"
+    },
+    {
+      "id": 97,
+      "area": "WORKSPACE",
+      "name": "read unknown notification -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 98,
+      "area": "WORKSPACE",
+      "name": "bulk resolve tickets -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "updated=2"
+    },
+    {
+      "id": 99,
+      "area": "WORKSPACE",
+      "name": "bulk bad action -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 100,
+      "area": "WORKSPACE",
+      "name": "bulk close conversations -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "updated=1"
+    },
+    {
+      "id": 101,
+      "area": "WORKSPACE",
+      "name": "SSE /events stream -> 200 text/event-stream",
+      "expected": "200",
+      "actual": 200,
+      "reason": "text/event-stream",
+      "pass": true,
+      "note": "text/event-stream first=id: 77daf5e67b529c7e-38\\nevent: refresh\\nd"
+    },
+    {
+      "id": 102,
+      "area": "WORKSPACE",
+      "name": "SSE invalid token -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 103,
+      "area": "CSAT",
+      "name": "resolve unknown sat link -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 104,
+      "area": "CSAT",
+      "name": "submit unknown sat -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 105,
+      "area": "CSAT",
+      "name": "resolve ticket (triggers CSAT link + mail job)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 106,
+      "area": "CSAT",
+      "name": "CSAT survey link e-mailed by worker (dev sink)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "http://127.0.0.1:18080/sat/8a6ed5370981cbae7d3ed4de56734bec8",
+      "pass": true,
+      "note": "http://127.0.0.1:18080/sat/8a6ed5370981cbae7d3ed4de56734bec8e93fbb14426f4fb.40af6e5b20ca4b9065fcd75833a6ab4d12369e816e84c46c"
+    },
+    {
+      "id": 107,
+      "area": "CSAT",
+      "name": "resolve issued CSAT link -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"conversation\":\"26f431b096d9f667615e1e4978bfc664a8bf45ca2c2"
+    },
+    {
+      "id": 108,
+      "area": "CSAT",
+      "name": "submit CSAT rating -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 109,
+      "area": "CSAT",
+      "name": "double CSAT submit -> 409",
+      "expected": "409",
+      "actual": 409,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 110,
+      "area": "CHAT",
+      "name": "guest start chat -> 201 + token",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "token=cf7dd23838"
+    },
+    {
+      "id": 111,
+      "area": "CHAT",
+      "name": "guest read chat -> 200 (knowledge reply)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "msgs=1 last=customer"
+    },
+    {
+      "id": 112,
+      "area": "CHAT",
+      "name": "guest read chat bad token -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 113,
+      "area": "CHAT",
+      "name": "guest send msg -> 200 (knowledge reply)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "[{\"id\":\"2a5452efe1dc02eeaaab9eec88c8ff017d0e61097632fb38\",\"content\":\"c"
+    },
+    {
+      "id": 114,
+      "area": "CHAT",
+      "name": "guest empty msg -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 115,
+      "area": "CHAT",
+      "name": "guest voice-status -> 200 (LLM off)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "enabled=false"
+    },
+    {
+      "id": 116,
+      "area": "CHAT",
+      "name": "guest transcribe (feature off) -> 503",
+      "expected": "503",
+      "actual": 503,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 117,
+      "area": "CHAT",
+      "name": "guest chat SSE -> 200 text/event-stream",
+      "expected": "200",
+      "actual": 200,
+      "reason": "text/event-stream",
+      "pass": true,
+      "note": "text/event-stream first=id: 77daf5e67b529c7e-46\\nevent: refresh\\nd"
+    },
+    {
+      "id": 118,
+      "area": "PORTAL",
+      "name": "portal request code -> 202 (mail code)",
+      "expected": "202",
+      "actual": 202,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 119,
+      "area": "PORTAL",
+      "name": "extract portal code from dev mail sink",
+      "expected": "200",
+      "actual": 200,
+      "reason": "5d8bfb53",
+      "pass": true,
+      "note": "5d8bfb53"
+    },
+    {
+      "id": 120,
+      "area": "PORTAL",
+      "name": "portal login with mailed code -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "token=3436f36a"
+    },
+    {
+      "id": 121,
+      "area": "PORTAL",
+      "name": "portal list own tickets -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=2"
+    },
+    {
+      "id": 122,
+      "area": "PORTAL",
+      "name": "portal create ticket -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 123,
+      "area": "PORTAL",
+      "name": "portal read own ticket -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "msgs=1"
+    },
+    {
+      "id": 124,
+      "area": "PORTAL",
+      "name": "portal wrong token -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 125,
+      "area": "PORTAL",
+      "name": "portal code single-use -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 126,
+      "area": "PORTAL",
+      "name": "portal wrong code -> 401 (uniform)",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 127,
+      "area": "WEBHOOKS",
+      "name": "save webhook (https) -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "id=869cfd"
+    },
+    {
+      "id": 128,
+      "area": "WEBHOOKS",
+      "name": "webhook -> 127.0.0.1 blocked (SSRF)",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 129,
+      "area": "WEBHOOKS",
+      "name": "webhook -> cloud metadata blocked (SSRF)",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 130,
+      "area": "WEBHOOKS",
+      "name": "webhook -> RFC1918 blocked (SSRF)",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 131,
+      "area": "WEBHOOKS",
+      "name": "webhook -> localhost blocked",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 132,
+      "area": "WEBHOOKS",
+      "name": "webhook non-http scheme -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 133,
+      "area": "WEBHOOKS",
+      "name": "webhook URL with userinfo -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 134,
+      "area": "WEBHOOKS",
+      "name": "webhook unknown event -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 135,
+      "area": "WEBHOOKS",
+      "name": "agent save webhook -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 136,
+      "area": "WEBHOOKS",
+      "name": "list webhooks -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=1"
+    },
+    {
+      "id": 137,
+      "area": "WEBHOOKS",
+      "name": "update webhook -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 138,
+      "area": "WEBHOOKS",
+      "name": "dead letters -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=0"
+    },
+    {
+      "id": 139,
+      "area": "WEBHOOKS",
+      "name": "replay unknown dead letter -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 140,
+      "area": "WEBHOOKS",
+      "name": "remove webhook -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 141,
+      "area": "APIKEYS",
+      "name": "create API key (owner) -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "prefix=nexa_946843d1976d secret?=true"
+    },
+    {
+      "id": 142,
+      "area": "APIKEYS",
+      "name": "list API keys (no secrets) -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=1 secretsExposed=false"
+    },
+    {
+      "id": 143,
+      "area": "APIKEYS",
+      "name": "agent create key -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 144,
+      "area": "APIKEYS",
+      "name": "key write scope -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 145,
+      "area": "APIKEYS",
+      "name": "public API with valid key -> 200",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": "total=undefined"
+    },
+    {
+      "id": 146,
+      "area": "APIKEYS",
+      "name": "public API single customer -> 200",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 147,
+      "area": "APIKEYS",
+      "name": "public API unknown id -> 404",
+      "expected": "404",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 148,
+      "area": "APIKEYS",
+      "name": "public API without key -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 149,
+      "area": "APIKEYS",
+      "name": "public API bad key -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 150,
+      "area": "APIKEYS",
+      "name": "public API write -> 405 (read-only)",
+      "expected": "405",
+      "actual": 405,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 151,
+      "area": "APIKEYS",
+      "name": "public openapi.json -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "paths=0"
+    },
+    {
+      "id": 152,
+      "area": "APIKEYS",
+      "name": "revoke key -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 153,
+      "area": "APIKEYS",
+      "name": "revoked key -> 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 154,
+      "area": "CUSTOMER360",
+      "name": "customer profile -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "tickets=3 notes=0 timeline=10"
+    },
+    {
+      "id": 155,
+      "area": "CUSTOMER360",
+      "name": "add customer note -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 156,
+      "area": "CUSTOMER360",
+      "name": "empty note -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 157,
+      "area": "CUSTOMER360",
+      "name": "merge customer -> 200",
+      "expected": "200",
+      "actual": 409,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 158,
+      "area": "CUSTOMER360",
+      "name": "merged source now 404 (soft-delete)",
+      "expected": "404",
+      "actual": 200,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 159,
+      "area": "CHANNELS",
+      "name": "channel status -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"instagram\":{\"id\":\"650177d1324a1c391921128de738bda71df2b9eb"
+    },
+    {
+      "id": 160,
+      "area": "CHANNELS",
+      "name": "configure messenger channel -> 201",
+      "expected": "201",
+      "actual": 400,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 161,
+      "area": "CHANNELS",
+      "name": "agent configure channel -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 162,
+      "area": "CHANNELS",
+      "name": "messenger webhook verify (no config) -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": "Webhook verification failed\n"
+    },
+    {
+      "id": 163,
+      "area": "CHANNELS",
+      "name": "sms webhook with query params -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 164,
+      "area": "CHANNELS",
+      "name": "channel test delivery (config disabled, no live provider) -> 409",
+      "expected": "409|202|400|404|503",
+      "actual": 409,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 165,
+      "area": "CHANNELS",
+      "name": "list channel deliveries -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=0"
+    },
+    {
+      "id": 166,
+      "area": "LEADCAMPAIGN",
+      "name": "create lead campaign (zalo) -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 167,
+      "area": "LEADCAMPAIGN",
+      "name": "lead campaign bad channel -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 168,
+      "area": "LEADCAMPAIGN",
+      "name": "lead campaign QR -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "image bytes=1466"
+    },
+    {
+      "id": 169,
+      "area": "LEADCAMPAIGN",
+      "name": "public lead landing (no live provider) -> 404",
+      "expected": "404|200",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": "\"\""
+    },
+    {
+      "id": 170,
+      "area": "LEADCAMPAIGN",
+      "name": "list campaign leads -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=0"
+    },
+    {
+      "id": 171,
+      "area": "OPERATIONS",
+      "name": "list workflows -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=0"
+    },
+    {
+      "id": 172,
+      "area": "OPERATIONS",
+      "name": "save workflow -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 173,
+      "area": "OPERATIONS",
+      "name": "workflow bad trigger -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 174,
+      "area": "OPERATIONS",
+      "name": "workflow idle_days out of range -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 175,
+      "area": "OPERATIONS",
+      "name": "workflow without actions -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 176,
+      "area": "OPERATIONS",
+      "name": "migrate keyword automation -> workflow",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 177,
+      "area": "OPERATIONS",
+      "name": "remove workflow -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 178,
+      "area": "OPERATIONS",
+      "name": "list schedules -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"email_enabled\":true,\"items\":[]}"
+    },
+    {
+      "id": 179,
+      "area": "OPERATIONS",
+      "name": "save schedule (valid member) -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 180,
+      "area": "OPERATIONS",
+      "name": "schedule bad frequency -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 181,
+      "area": "OPERATIONS",
+      "name": "remove schedule -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 182,
+      "area": "OPERATIONS",
+      "name": "field-extraction batches -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=0"
+    },
+    {
+      "id": 183,
+      "area": "OPERATIONS",
+      "name": "queue field extraction (no LLM / no fields) -> 503/400",
+      "expected": "503|400",
+      "actual": 503,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 184,
+      "area": "OPERATIONS",
+      "name": "skill-routing config -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"enabled\":false,\"groups\":[],\"rules\":[]}"
+    },
+    {
+      "id": 185,
+      "area": "AI",
+      "name": "governance inventory -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"platform_kill\":false,\"disabled\":{},\"risk_tiers\":{},\"approv"
+    },
+    {
+      "id": 186,
+      "area": "AI",
+      "name": "save governance -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 187,
+      "area": "AI",
+      "name": "agent save governance -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 188,
+      "area": "AI",
+      "name": "list AI actions -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=0"
+    },
+    {
+      "id": 189,
+      "area": "AI",
+      "name": "create AI action -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 190,
+      "area": "AI",
+      "name": "AI action bad risk tier -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 191,
+      "area": "AI",
+      "name": "list AI skills -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=0"
+    },
+    {
+      "id": 192,
+      "area": "AI",
+      "name": "create AI skill -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 193,
+      "area": "AI",
+      "name": "AI skill bad tone -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 194,
+      "area": "AI",
+      "name": "ai/status -> 200 (LLM off)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"enabled\":false,\"transcription\":false}"
+    },
+    {
+      "id": 195,
+      "area": "AI",
+      "name": "ai search (no provider) -> 503",
+      "expected": "503",
+      "actual": 503,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 196,
+      "area": "AI",
+      "name": "ai summary (no provider) -> 503",
+      "expected": "503",
+      "actual": 200,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 197,
+      "area": "AI",
+      "name": "ai review ticket -> 200/503",
+      "expected": "200|503",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 198,
+      "area": "AI",
+      "name": "ai transcribe (no provider) -> 503",
+      "expected": "503",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 199,
+      "area": "AI",
+      "name": "sparring overview -> 200/403",
+      "expected": "200|403",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"enabled\":false,\"scenarios\":[],\"sessions\":[]}"
+    },
+    {
+      "id": 200,
+      "area": "AI",
+      "name": "feedback stats -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"average\":0,\"count\":0,\"improve\":0}"
+    },
+    {
+      "id": 201,
+      "area": "AI",
+      "name": "feedback on unknown message -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 202,
+      "area": "AI",
+      "name": "realtime-qa status -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"enabled\":false}"
+    },
+    {
+      "id": 203,
+      "area": "AI",
+      "name": "voice-inbox status -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"enabled\":false}"
+    },
+    {
+      "id": 204,
+      "area": "AI",
+      "name": "voicebot call history -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"calls\":[],\"enabled\":false}"
+    },
+    {
+      "id": 205,
+      "area": "AI",
+      "name": "voicebot outbound (no Twilio creds) -> 400/503",
+      "expected": "400|503",
+      "actual": 503,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 206,
+      "area": "AI",
+      "name": "twiml fetch unconfigured -> 200 xml",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Say voice=\""
+    },
+    {
+      "id": 207,
+      "area": "AI",
+      "name": "twilio inbound webhook (no Twilio creds) -> 503",
+      "expected": "503",
+      "actual": 503,
+      "reason": "",
+      "pass": true,
+      "note": "{\"code\":\"Service Unavailable\",\"data\":null,\"message"
+    },
+    {
+      "id": 208,
+      "area": "TEMPLATES",
+      "name": "create template -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 209,
+      "area": "TEMPLATES",
+      "name": "export template (password-protected) -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "code=nexa-template-v1.S"
+    },
+    {
+      "id": 210,
+      "area": "TEMPLATES",
+      "name": "export with a different share key -> 200 (key = encryption key, not verified)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 211,
+      "area": "TEMPLATES",
+      "name": "import with wrong password -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 212,
+      "area": "TEMPLATES",
+      "name": "import into other tenant -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "subject=Hướng dẫn đổi hàng"
+    },
+    {
+      "id": 213,
+      "area": "ADMIN",
+      "name": "admin/settings -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"allowlist\":[],\"flags\":{},\"brand_card\":{\"enabled\":false,\"in"
+    },
+    {
+      "id": 214,
+      "area": "ADMIN",
+      "name": "admin/audit -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"items\":[{\"author_id\":\"system\",\"id\":\"d924dda86c70b41a5e75ba"
+    },
+    {
+      "id": 215,
+      "area": "ADMIN",
+      "name": "admin/usage -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"messages\":6,\"month\":\"2026-11\",\"plan\":\"free\",\"quota\":{\"ai\":"
+    },
+    {
+      "id": 216,
+      "area": "ADMIN",
+      "name": "admin/fields -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "[]"
+    },
+    {
+      "id": 217,
+      "area": "ADMIN",
+      "name": "admin/billing -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"enterprise\":false,\"pro\":false}"
+    },
+    {
+      "id": 218,
+      "area": "ADMIN",
+      "name": "admin/brand -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"accent\":\"\",\"logo_url\":\"\",\"name\":\"\"}"
+    },
+    {
+      "id": 219,
+      "area": "ADMIN",
+      "name": "admin/crm -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"hubspot\":false,\"odoo\":false,\"salesforce\":false}"
+    },
+    {
+      "id": 220,
+      "area": "ADMIN",
+      "name": "agent admin/settings -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 221,
+      "area": "ADMIN",
+      "name": "billing link (no Stripe keys) -> 503",
+      "expected": "503",
+      "actual": 503,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 222,
+      "area": "ADMIN",
+      "name": "stripe webhook (unconfigured) -> 503",
+      "expected": "503",
+      "actual": 503,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 223,
+      "area": "ADMIN",
+      "name": "push key -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{\"key\":\"\"}"
+    },
+    {
+      "id": 224,
+      "area": "ADMIN",
+      "name": "save settings round-trip -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 225,
+      "area": "ADMIN",
+      "name": "settings bad accent -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 226,
+      "area": "STEPUP",
+      "name": "admin export without step-up -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "step_up_expired",
+      "pass": true,
+      "note": "step_up_expired"
+    },
+    {
+      "id": 227,
+      "area": "STEPUP",
+      "name": "step-up wrong password -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 228,
+      "area": "STEPUP",
+      "name": "step-up correct -> 200 token (5 min, single-use)",
+      "expected": "200",
+      "actual": 403,
+      "reason": "",
+      "pass": false,
+      "note": "expires_in=undefined"
+    },
+    {
+      "id": 229,
+      "area": "STEPUP",
+      "name": "admin export with step-up -> 200",
+      "expected": "200",
+      "actual": 403,
+      "reason": "step_up_expired",
+      "pass": false,
+      "note": "{\"code\":\"Forbidden\",\"data\":null,\"message"
+    },
+    {
+      "id": 230,
+      "area": "STEPUP",
+      "name": "step-up token single-use -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "step_up_expired",
+      "pass": true,
+      "note": "step_up_expired"
+    },
+    {
+      "id": 231,
+      "area": "STEPUP",
+      "name": "admin encrypted backup with step-up -> 200",
+      "expected": "200",
+      "actual": 403,
+      "reason": "step_up_expired",
+      "pass": false,
+      "note": "{\"code\":\"Forbidden\",\"dat"
+    },
+    {
+      "id": 232,
+      "area": "MFA",
+      "name": "MFA status -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "enabled=false"
+    },
+    {
+      "id": 233,
+      "area": "MFA",
+      "name": "MFA setup wrong pw -> 403",
+      "expected": "403",
+      "actual": 403,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 234,
+      "area": "MFA",
+      "name": "MFA setup -> 200 + secret",
+      "expected": "200",
+      "actual": 403,
+      "reason": "",
+      "pass": false,
+      "note": "secret=MISSING"
+    },
+    {
+      "id": 235,
+      "area": "MFA",
+      "name": "MFA enable bad code -> 401",
+      "expected": "401",
+      "actual": 409,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 236,
+      "area": "MFA",
+      "name": "MFA enable (no secret returned)",
+      "expected": "200",
+      "actual": 500,
+      "reason": "setup gave no secret",
+      "pass": false,
+      "note": "CANNOT VERIFY MFA ENABLE"
+    },
+    {
+      "id": 237,
+      "area": "MFA",
+      "name": "owner login now needs MFA -> 409",
+      "expected": "409",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 238,
+      "area": "MFA",
+      "name": "list active sessions -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=2"
+    },
+    {
+      "id": 239,
+      "area": "MFA",
+      "name": "revoke unknown session -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 240,
+      "area": "MFA",
+      "name": "MFA disable bad code -> 401",
+      "expected": "401",
+      "actual": 403,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 241,
+      "area": "MFA",
+      "name": "revoke another session -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 242,
+      "area": "SECURITY",
+      "name": "healthz -> 200",
+      "expected": "200",
+      "actual": 404,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 243,
+      "area": "SECURITY",
+      "name": "security header X-Content-Type-Options",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "header=nosniff"
+    },
+    {
+      "id": 244,
+      "area": "SECURITY",
+      "name": "security header Cache-Control no-store",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "header=no-store"
+    },
+    {
+      "id": 245,
+      "area": "SECURITY",
+      "name": "public branding -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "{}"
+    },
+    {
+      "id": 246,
+      "area": "SECURITY",
+      "name": "oidc/providers -> 200 (empty, unconfigured)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "[]"
+    },
+    {
+      "id": 247,
+      "area": "SECURITY",
+      "name": "oidc start unconfigured -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 248,
+      "area": "SECURITY",
+      "name": "email inbound unconfigured (GET -> 405, POST path exists) -> 404/405",
+      "expected": "404|405",
+      "actual": 0,
+      "reason": "network:Request with GET/HEAD method cannot have body.",
+      "pass": false,
+      "note": "network:Request with GET/HEAD method cannot have body."
+    },
+    {
+      "id": 249,
+      "area": "SECURITY",
+      "name": "resend webhook unconfigured -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 250,
+      "area": "SECURITY",
+      "name": "JSON body >64KB -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": "JSON không hợp lệ hoặc vượt quá 64 KB"
+    },
+    {
+      "id": 251,
+      "area": "SECURITY",
+      "name": "malformed JSON -> 400",
+      "expected": "400",
+      "actual": 400,
+      "reason": "",
+      "pass": true,
+      "note": "JSON không hợp lệ hoặc vượt quá 64 KB"
+    },
+    {
+      "id": 252,
+      "area": "SECURITY",
+      "name": "wrong content-type -> 415",
+      "expected": "415",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": "Thông tin đăng nhập không đúng"
+    },
+    {
+      "id": 253,
+      "area": "SECURITY",
+      "name": "DELETE on list -> 405",
+      "expected": "405",
+      "actual": 405,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 254,
+      "area": "SECURITY",
+      "name": "stored XSS payload accepted in name (UI must sanitize)",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": "payload round-trips in JSON; no HTML-escape layer on the API"
+    },
+    {
+      "id": 255,
+      "area": "SECURITY",
+      "name": "search does not execute stored HTML (JSON only)",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "xss=true"
+    },
+    {
+      "id": 256,
+      "area": "SECURITY",
+      "name": "kb unknown tenant -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 257,
+      "area": "SECURITY",
+      "name": "kb public list -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": "count=1"
+    },
+    {
+      "id": 258,
+      "area": "SECURITY",
+      "name": "kb cross-tenant article -> 404",
+      "expected": "404",
+      "actual": 404,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 259,
+      "area": "SESSIONS",
+      "name": "logout -> 200",
+      "expected": "200",
+      "actual": 200,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 260,
+      "area": "SESSIONS",
+      "name": "token after logout -> 401 (revoked)",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 261,
+      "area": "SESSIONS",
+      "name": "logout garbage token -> 200 (no-op)",
+      "expected": "200",
+      "actual": 401,
+      "reason": "",
+      "pass": false,
+      "note": ""
+    },
+    {
+      "id": 262,
+      "area": "LOCKOUT",
+      "name": "lockout account register -> 201",
+      "expected": "201",
+      "actual": 201,
+      "reason": "",
+      "pass": true,
+      "note": ""
+    },
+    {
+      "id": 263,
+      "area": "LOCKOUT",
+      "name": "5th consecutive failure -> account locked",
+      "expected": "401",
+      "actual": 401,
+      "reason": "",
+      "pass": true,
+      "note": "reason= msg=Thông tin đăng nhập không đúng"
+    },
+    {
+      "id": 264,
+      "area": "LOCKOUT",
+      "name": "6th call: still locked (growing window)",
+      "expected": "401",
+      "actual": 401,
+      "reason": "account_locked",
+      "pass": true,
+      "note": "reason=account_locked"
+    },
+    {
+      "id": 265,
+      "area": "LOCKOUT",
+      "name": "correct password while locked -> still 401",
+      "expected": "401",
+      "actual": 401,
+      "reason": "account_locked",
+      "pass": true,
+      "note": "reason=account_locked"
+    },
+    {
+      "id": 266,
+      "area": "RATELIMIT",
+      "name": "auth rate limiter trips within 22 raw calls",
+      "expected": "429",
+      "actual": 429,
+      "reason": "",
+      "pass": true,
+      "note": "429 count=2/22"
+    }
+  ]
+}

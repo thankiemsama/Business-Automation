@@ -2,6 +2,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly reason?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -32,6 +33,7 @@ export class FetchHttpClient implements HttpClient {
       throw new ApiError(
         envelope?.message || "Không thể xử lý yêu cầu. Vui lòng thử lại.",
         response.status,
+        typeof envelope?.reason === "string" ? envelope.reason : undefined,
       );
     }
     return envelope.data as T;

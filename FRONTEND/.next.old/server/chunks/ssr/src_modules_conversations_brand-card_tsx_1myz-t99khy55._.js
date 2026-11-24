@@ -1,0 +1,3 @@
+module.exports=[30982,a=>{"use strict";var b=a.i(87924);a.s(["f",0,function({card:a}){return(0,b.jsxs)("aside",{className:"panel form-stack","aria-label":"Danh thiếp thương hiệu",children:[(0,b.jsx)("strong",{children:a.name}),a.intro&&(0,b.jsx)("p",{children:a.intro}),(a.product_url||a.support_url)&&(0,b.jsxs)("div",{className:"toolbar-controls",children:[a.product_url?.startsWith("https://")&&(0,b.jsx)("a",{href:a.product_url,target:"_blank",rel:"noopener noreferrer",children:"Sản phẩm"}),a.support_url?.startsWith("https://")&&(0,b.jsx)("a",{href:a.support_url,target:"_blank",rel:"noopener noreferrer",children:"Hỗ trợ"})]})]})}])}];
+
+//# sourceMappingURL=src_modules_conversations_brand-card_tsx_1myz-t99khy55._.js.map

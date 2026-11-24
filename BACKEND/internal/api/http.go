@@ -15,6 +15,10 @@ type AuthUseCases interface {
 	SendReset(string) error
 	Invite(core.User, string, string) error
 	Redeem(string, string) error
+	SendVerification(string) error
+	ConfirmEmail(string) error
+	IssueStepUp(core.User, string) (string, error)
+	ConsumeStepUp(core.User, string) error
 	Register(service.Credentials) (core.User, error)
 	Login(service.Credentials) (string, error)
 	Authenticate(string) (core.User, error)
@@ -89,6 +93,7 @@ type ChannelUseCases interface {
 
 type Dependencies struct {
 	Admin                                  *service.Admin
+	Captcha                                *service.Turnstile
 	Operations                             *service.Operations
 	AI                                     *service.AIService
 	Workspace                              *service.Workspace
@@ -134,6 +139,7 @@ type Handler struct {
 	actions                                *service.AIActionService
 	skills                                 *service.AISkills
 	voicebot                               *service.Voicebot
+	captcha                                *service.Turnstile
 	mu                                     sync.Mutex
 	attempts                               map[string]window
 	aiRate                                 map[string]window
@@ -151,6 +157,7 @@ func New(d Dependencies) http.Handler {
 		inboundEmailTenant: d.InboundEmailTenant, inboundEmailSecret: d.InboundEmailSecret,
 		resendInbound:   d.ResendInbound,
 		auth:            d.Auth,
+		captcha:         d.Captcha,
 		resources:       d.Resources,
 		conversations:   d.Conversations,
 		dashboard:       d.Dashboard,
@@ -183,16 +190,19 @@ func New(d Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/email/inbound", h.inboundEmail)
 	mux.HandleFunc("POST /api/v1/email/resend", h.inboundResend)
 	mux.HandleFunc("POST /api/v1/conversations/{id}/messages/{message}/deliver", h.protected(h.deliverEmail))
-	mux.HandleFunc("/api/v1/auth/register", h.authEndpoint(h.register))
-	mux.HandleFunc("/api/v1/auth/login", h.authEndpoint(h.login))
+	mux.HandleFunc("/api/v1/auth/register", h.authEndpoint(h.register, true))
+	mux.HandleFunc("/api/v1/auth/login", h.authEndpoint(h.login, true))
 	mux.HandleFunc("/api/v1/auth/me", h.protected(h.me))
 	mux.HandleFunc("/api/v1/auth/logout", h.protected(h.logout))
 	mux.HandleFunc("POST /api/v1/auth/password", h.protected(h.accountAction("password")))
 	mux.HandleFunc("POST /api/v1/team/invite", h.protected(h.accountAction("invite")))
-	mux.HandleFunc("/api/v1/auth/forgot", h.authEndpoint(func(c service.Credentials) (any, int, error) { return nil, http.StatusOK, h.auth.SendReset(c.Email) }))
+	mux.HandleFunc("/api/v1/auth/forgot", h.authEndpoint(func(c service.Credentials) (any, int, error) { return nil, http.StatusOK, h.auth.SendReset(c.Email) }, true))
 	mux.HandleFunc("/api/v1/auth/redeem", h.authEndpoint(func(c service.Credentials) (any, int, error) {
 		return nil, http.StatusOK, h.auth.Redeem(c.Token, c.Password)
-	}))
+	}, false))
+	mux.HandleFunc("/api/v1/auth/verify", h.authEndpoint(h.resendVerification, true))
+	mux.HandleFunc("/api/v1/auth/confirm", h.authEndpoint(h.confirmEmail, false))
+	mux.HandleFunc("POST /api/v1/account/step-up", h.protected(h.issueStepUp))
 	mux.HandleFunc("/api/v1/team", h.protected(h.team))
 	mux.HandleFunc("PUT /api/v1/team/{id}", h.protected(h.updateMember))
 	mux.HandleFunc("POST /api/v1/conversations/{id}/assignment", h.protected(h.assignment(core.KindConversations)))

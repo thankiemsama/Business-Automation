@@ -32,6 +32,46 @@ projects:
               - key: NEXA_PROXY_SECRET
                 value: "SET_IN_RENDER_DASHBOARD"
                 secret: true
+              # Email delivery (password recovery, invites, reports). Without
+              # RESEND_API_KEY + EMAIL_FROM the mailer is disabled and the
+              # password-reset form shows "chưa cấu hình email" (503).
+              # Generate/keep the Resend key in the dashboard as a secret.
+              - key: RESEND_API_KEY
+                value: "SET_IN_RENDER_DASHBOARD"
+                secret: true
+              - key: EMAIL_FROM
+                value: "Nexa <no-reply@example.com>"
+              # MFA (TOTP) encrypts the per-user secret with AES-GCM using this
+              # key. Without it, /account/mfa returns 503 on Render. Generate
+              # once with:  node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+              # or:  python -c "import base64,os;print(base64.b64encode(os.urandom(32)).decode())"
+              # and set it in the dashboard as a secret. Never commit it.
+              - key: NEXA_SECURITY_KEY
+                value: "SET_IN_RENDER_DASHBOARD"
+                secret: true
+              # NEVER set this in production: it writes every mail (including
+              # reset/verify links) to the container log instead of Resend. It
+              # is also auto-disabled whenever APP_ORIGIN is a public https
+              # origin, so it cannot leak links on a live deployment.
+              # - key: NEXA_DEV_EMAIL_SINK
+              #   value: "true"
+              # Demo instances only: self-serve signups skip the mailbox
+              # confirmation hold (G1). Leave unset in real deployments so new
+              # owners must click the /account/verify link before first login.
+              # - key: NEXA_AUTO_CONFIRM_EMAIL
+              #   value: "true"
+              # Optional Cloudflare Turnstile CAPTCHA on the guest auth
+              # endpoints (register / login / forgot / verify). Both vars are
+              # optional: unset = CAPTCHA off, everything keeps working.
+              # Create a key pair at https://dash.cloudflare.com (Turnstile ->
+              # Create widget), then set the secret in the dashboard:
+              # - key: NEXA_TURNSTILE_SECRET
+              #   value: "SET_IN_RENDER_DASHBOARD"
+              #   secret: true
+              # ...and give the site key to the Docker image build (ARG)
+              # NEXT_PUBLIC_NEXA_TURNSTILE_SITE_KEY: rebuild the image with
+              #   NEXT_PUBLIC_NEXA_TURNSTILE_SITE_KEY=0x... to render the
+              # widget in the auth screens (see Dockerfile.render).
         databases:
           - name: nexa-postgres
             region: singapore

@@ -112,6 +112,9 @@ Với cả hai cách chạy, chọn **Tạo tài khoản** để tạo doanh ngh
 | Gửi email, báo cáo định kỳ và thư khảo sát CSAT | Đặt `RESEND_API_KEY` và `EMAIL_FROM` đã xác minh trên Resend. Đặt `APP_ORIGIN` theo URL frontend để liên kết CSAT mở đúng địa chỉ. Docker Compose đã đặt origin local. |
 | Nhận email qua Resend | Cấu hình biến môi trường dành cho thư đến và webhook `email.received` theo [hướng dẫn vận hành](OPERATIONS.md#zalo-oa-whatsapp-và-resend-inbound). Resend cần một endpoint HTTPS có thể truy cập từ bên ngoài. |
 | Web Push | Đặt `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` và `VAPID_SUBJECT`. Trên trình duyệt hỗ trợ Web Push, mở **Thông báo → Bật Web Push** rồi cấp quyền. |
+| Xác nhận email khi đăng ký | Tự bật khi có `RESEND_API_KEY` + `EMAIL_FROM` + `APP_ORIGIN`: chủ tenant mới phải bấm link 30 phút (dùng 1 lần) trước lần đăng nhập đầu. Instance demo: đặt `NEXA_AUTO_CONFIRM_EMAIL=true` để bỏ bước chờ. |
+| MFA (TOTP) | Đặt `NEXA_SECURITY_KEY` (32 byte, base64 — sinh bằng `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). Thiếu khóa này, mục MFA trả 503. |
+| CAPTCHA (tùy chọn) | Tạo cặp khóa Cloudflare Turnstile rồi đặt `NEXA_TURNSTILE_SECRET` (secret) và build ảnh với `NEXT_PUBLIC_NEXA_TURNSTILE_SITE_KEY` (site key) — widget hiện ở màn hình đăng nhập/đăng ký/quên mật khẩu. Không đặt biến nào thì CAPTCHA tắt. |
 
 Với Docker Compose, đặt các biến trên trong tệp `.env` ở thư mục gốc rồi chạy lại `docker compose up -d`. Khi chạy trực tiếp, đặt biến bằng `$env:TÊN_BIẾN = 'giá-trị'` trong terminal chạy Go rồi khởi động lại API. Với cấu hình local mặc định, dùng `http://localhost:3000` làm `APP_ORIGIN` khi chạy trực tiếp. Giữ khóa thật trong môi trường local hoặc kho bí mật.
 
@@ -143,6 +146,8 @@ Chế độ `bff` tự động kèm `Origin` đúng và giữ cookie phiên Http
 Dữ liệu demo (mẫu E-commerce): 8 hồ sơ khách hàng, 5 bài KB (hoàn tiền, vận chuyển, COD, đổi hàng, khuyến mãi), 3 automation từ khóa, 5 hội thoại đơn hàng, 2 phiếu hỗ trợ (1 phiếu high priority), 2 quy tắc Workflow (tự tạo phiếu theo từ khóa + nhắc phiếu ngán 3 ngày) và 2 kịch bản AI Sparring (giải quyết + chuyển người thật). Đổi mật khẩu khi chạy instance công khai bằng `-Password`.
 
 Script cũ tạo email ngẫu nhiên: `scripts/demo.ps1` (không còn khuyến nghị cho demo pitch).
+
+> **Ghi chú (G1):** trên instance công khai có Resend thật, lần chạy seed tạo owner *mới* sẽ ở trạng thái chờ xác nhận email — seed dừng kèm hướng dẫn mở link `/account/verify`. Để seed không bị chặn, đặt `NEXA_AUTO_CONFIRM_EMAIL=true` (chỉ dùng cho instance demo, không dùng cho hệ thật).
 
 ## Cấu trúc thư mục
 

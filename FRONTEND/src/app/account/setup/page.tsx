@@ -1,9 +1,5 @@
-import { AccountForm } from "@/modules/auth/account-form";
+import { SetupPasswordView } from "@/modules/auth/recovery";
 
 export default function SetupPasswordPage() {
-  return (
-    <main>
-      <AccountForm action="auth/redeem" />
-    </main>
-  );
+  return <SetupPasswordView />;
 }
