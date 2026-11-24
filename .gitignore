@@ -21,6 +21,7 @@ node_modules/
 
 # Next.js build output
 FRONTEND/.next/
+FRONTEND/.next.old/
 out/
 
 # Production build

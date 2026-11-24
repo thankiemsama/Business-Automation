@@ -1,1 +1,0 @@
-globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/platform/[...path]/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"D:\\GOLANG\\FRONTEND\\src\\app\\api\\platform\\[...path]\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};
