@@ -1,99 +1,104 @@
 <p align="center">
-  <img src="FRONTEND/public/nexa-192.png" alt="Logo Nexa" width="88">
+  <img src="FRONTEND/public/nexa-192.png" alt="Nexa logo" width="88">
 </p>
 
-<h1 align="center">Nexa · Business Automation</h1>
-
-<p align="center">Nền tảng chăm sóc khách hàng và tự động hóa quy trình cho doanh nghiệp.</p>
+<h1 align="center">Nexa — Customer Care & Business Automation Platform</h1>
 
 <p align="center">
-  <a href="https://nexa-web-55cq.onrender.com"><strong>Mở Nexa trên web</strong></a> ·
-  <a href="#hình-ảnh-giao-diện">Hình ảnh giao diện</a> ·
-  <a href="#chạy-trên-máy-cá-nhân">Chạy local</a>
+  <a href="https://nexa-web-55cq.onrender.com"><strong>Live demo</strong></a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#demo-data">Demo data</a>
 </p>
 
-> **Đang phát triển** · Bản web dùng thử đã được triển khai trên Render. Giao diện và tính năng tiếp tục được cập nhật.
+> **In development** — A live trial instance is hosted on Render. Features and the UI are still being updated.
 
-## Giới thiệu
+---
 
-Nexa tập trung hồ sơ khách hàng, hội thoại và phiếu hỗ trợ vào một không gian làm việc. Đội ngũ hỗ trợ có thể phân công công việc, theo dõi thời hạn phản hồi và tự động hóa các thao tác lặp lại.
+## What is Nexa?
 
-## Hình ảnh giao diện
+Nexa brings customer profiles, conversations, and support tickets into one workspace. Support teams can assign work, track response deadlines (SLA), and automate repetitive tasks — all from a single dashboard.
 
-Ảnh chụp từ bản chạy local với dữ liệu minh họa. Bấm vào ảnh để xem kích thước đầy đủ.
+### Core features
 
-### Tổng quan
-
-[![Tổng quan Nexa với chỉ số hỗ trợ, phiếu đang mở và tiến độ xử lý](docs/screenshots/tong-quan.webp)](docs/screenshots/tong-quan.webp)
-
-### Chăm sóc khách hàng
-
-| Hộp hội thoại | Phiếu hỗ trợ |
+| Area | What you can do |
 | --- | --- |
-| [![Hộp hội thoại với lịch sử tin nhắn và thông tin liên hệ](docs/screenshots/hoi-thoai.webp)](docs/screenshots/hoi-thoai.webp) | [![Danh sách phiếu với trạng thái, SLA và phân công](docs/screenshots/phieu-ho-tro.webp)](docs/screenshots/phieu-ho-tro.webp) |
-| **Hồ sơ khách hàng** | **Báo cáo hỗ trợ** |
-| [![Hồ sơ khách hàng với thông tin liên hệ và chỉ số hỗ trợ](docs/screenshots/ho-so-khach-hang.webp)](docs/screenshots/ho-so-khach-hang.webp) | [![Báo cáo với bộ lọc ngày, chỉ số và dự báo](docs/screenshots/bao-cao.webp)](docs/screenshots/bao-cao.webp) |
+| Customer support | Manage customer profiles, conversations, tickets, internal notes, and canned replies. |
+| Communication channels | Live chat widget over SSE. Send/receive email through Resend when configured. |
+| Knowledge base & AI | Curate help articles, publish them to a help center, and use AI to draft replies (when OpenAI is configured). |
+| Automation | Build event → condition → action workflows. Schedule report delivery. |
+| Reporting | Track support volume, SLA deadlines, and customer satisfaction (CSAT). |
+| Administration | Manage the organization, owner/agent accounts, login sessions, and activity logs. |
 
-### Kho kiến thức, tự động hóa và tích hợp
+### Tech stack
 
-| Kho kiến thức | Workflow |
+| Component | Technology |
 | --- | --- |
-| [![Danh sách bài viết trong kho kiến thức](docs/screenshots/kho-kien-thuc.webp)](docs/screenshots/kho-kien-thuc.webp) | [![Trình thiết lập workflow theo sự kiện, điều kiện và hành động](docs/screenshots/workflow.webp)](docs/screenshots/workflow.webp) |
-| **Kênh kết nối** | **Đăng nhập** |
-| [![Cấu hình kênh và trạng thái kết nối](docs/screenshots/tich-hop.webp)](docs/screenshots/tich-hop.webp) | [![Màn hình đăng nhập Nexa](docs/screenshots/dang-nhap.webp)](docs/screenshots/dang-nhap.webp) |
+| [BACKEND/](BACKEND/) | Go API with JSON or PostgreSQL persistence |
+| [FRONTEND/](FRONTEND/) | Next.js, React, TypeScript, Tailwind CSS |
+| [compose.yaml](compose.yaml) | Docker Compose setup for frontend, backend, and PostgreSQL |
 
-## Tính năng
+---
 
-| Nhóm | Khả năng |
+## Screenshots
+
+Captured from a local instance running demo data. Click any image to view it full size.
+
+### Overview
+
+[![Nexa dashboard showing support metrics, open tickets, and processing progress](docs/screenshots/tong-quan.webp)](docs/screenshots/tong-quan.webp)
+
+### Customer care
+
+| Conversation inbox | Support tickets |
 | --- | --- |
-| Hỗ trợ khách hàng | Quản lý hồ sơ, hội thoại, phiếu hỗ trợ, ghi chú nội bộ và câu trả lời mẫu. |
-| Kênh liên lạc | Widget chat cập nhật trực tiếp qua SSE. Email gửi và nhận qua Resend khi được cấu hình. |
-| Kho kiến thức và AI | Quản lý bài hướng dẫn, xuất bản bài trong trung tâm trợ giúp và dùng AI hỗ trợ soạn phản hồi khi cấu hình OpenAI. |
-| Tự động hóa | Thiết lập workflow theo sự kiện, điều kiện và nhánh xử lý. Lên lịch gửi báo cáo. |
-| Báo cáo | Theo dõi khối lượng hỗ trợ, thời hạn SLA và mức độ hài lòng của khách hàng (CSAT). |
-| Quản trị | Quản lý doanh nghiệp, tài khoản owner và agent, phiên đăng nhập và nhật ký hoạt động. |
+| [![Conversation view with message history and contact info](docs/screenshots/hoi-thoai.webp)](docs/screenshots/hoi-thoai.webp) | [![Ticket list with status, SLA, and assignment](docs/screenshots/phieu-ho-tro.webp)](docs/screenshots/phieu-ho-tro.webp) |
+| **Customer profile** | **Support reports** |
+| [![Customer profile with contact info and support metrics](docs/screenshots/ho-so-khach-hang.webp)](docs/screenshots/ho-so-khach-hang.webp) | [![Reports with date filters, KPIs, and forecasts](docs/screenshots/bao-cao.webp)](docs/screenshots/bao-cao.webp) |
 
-## Công nghệ và cấu trúc
+### Knowledge base, automation & integrations
 
-| Thành phần | Công nghệ và vai trò |
+| Knowledge base | Workflows |
 | --- | --- |
-| [BACKEND](BACKEND/) | API và nghiệp vụ viết bằng Go. Lưu dữ liệu bằng JSON hoặc PostgreSQL. |
-| [FRONTEND](FRONTEND/) | Giao diện tiếng Việt dùng Next.js, React, TypeScript và Tailwind CSS. |
-| [compose.yaml](compose.yaml) | Khởi chạy frontend, backend và PostgreSQL cho môi trường local. |
+| [![List of knowledge base articles](docs/screenshots/kho-kien-thuc.webp)](docs/screenshots/kho-kien-thuc.webp) | [![Workflow builder with events, conditions, and actions](docs/screenshots/workflow.webp)](docs/screenshots/workflow.webp) |
+| **Channel integrations** | **Sign in** |
+| [![Channel configuration and connection status](docs/screenshots/tich-hop.webp)](docs/screenshots/tich-hop.webp) | [![Nexa sign-in screen](docs/screenshots/dang-nhap.webp)](docs/screenshots/dang-nhap.webp) |
 
-## Chạy trên máy cá nhân
+---
 
-Nếu chưa có mã nguồn, chạy các lệnh sau trong thư mục bạn muốn lưu dự án. Nếu đã có mã nguồn, mở terminal tại thư mục gốc của dự án.
+## Quick start
+
+If you don't have the source yet, clone it first:
 
 ```powershell
 git clone https://github.com/thankiemsama/Business-Automation.git
 cd Business-Automation
 ```
 
-### Docker Compose
+### Option 1 — Docker Compose (recommended)
 
-Cần Docker và Docker Compose. Từ thư mục gốc, chạy:
+Requires Docker and Docker Compose. From the project root:
 
 ```powershell
 docker compose up --build
 ```
 
-Mở [http://127.0.0.1:3000](http://127.0.0.1:3000).
+Then open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
-### Go và Node.js
+### Option 2 — Go + Node.js
 
-Cần Go 1.24 trở lên và Node.js 24. Mở hai terminal tại thư mục gốc của dự án.
+Requires Go 1.24+ and Node.js 24. Open **two terminals** in the project root.
 
-Chạy API trong terminal thứ nhất.
+**Terminal 1 — API server:**
 
 ```powershell
 cd BACKEND
 go run ./cmd/api
 ```
 
-API mặc định nghe tại `http://127.0.0.1:8080` và lưu dữ liệu bằng JSON nếu chưa cấu hình `DATABASE_URL`. Kiểm tra API qua [http://127.0.0.1:8080/readyz](http://127.0.0.1:8080/readyz).
+The API listens on `http://127.0.0.1:8080` and stores data in JSON when `DATABASE_URL` is not set. Check its status at [http://127.0.0.1:8080/readyz](http://127.0.0.1:8080/readyz).
 
-Chạy giao diện trong terminal thứ hai.
+**Terminal 2 — Frontend:**
 
 ```powershell
 cd FRONTEND
@@ -101,56 +106,80 @@ npm ci
 npm run dev
 ```
 
-Mở [http://localhost:3000](http://localhost:3000).
+Then open [http://localhost:3000](http://localhost:3000).
 
-Với cả hai cách chạy, chọn **Tạo tài khoản** để tạo doanh nghiệp và tài khoản chủ doanh nghiệp. Sau khi đăng nhập, vào **Đội ngũ** để thêm nhân viên.
+### First login
 
-## Bật email và thông báo đẩy
+With either setup:
 
-| Tính năng | Cấu hình backend |
-| --- | --- |
-| Gửi email, báo cáo định kỳ và thư khảo sát CSAT | Đặt `RESEND_API_KEY` và `EMAIL_FROM` đã xác minh trên Resend. Đặt `APP_ORIGIN` theo URL frontend để liên kết CSAT mở đúng địa chỉ. Docker Compose đã đặt origin local. |
-| Nhận email qua Resend | Cấu hình biến môi trường dành cho thư đến và webhook `email.received` theo [hướng dẫn vận hành](OPERATIONS.md#zalo-oa-whatsapp-và-resend-inbound). Resend cần một endpoint HTTPS có thể truy cập từ bên ngoài. |
-| Web Push | Đặt `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` và `VAPID_SUBJECT`. Trên trình duyệt hỗ trợ Web Push, mở **Thông báo → Bật Web Push** rồi cấp quyền. |
-| Xác nhận email khi đăng ký | Tự bật khi có `RESEND_API_KEY` + `EMAIL_FROM` + `APP_ORIGIN`: chủ tenant mới phải bấm link 30 phút (dùng 1 lần) trước lần đăng nhập đầu. Instance demo: đặt `NEXA_AUTO_CONFIRM_EMAIL=true` để bỏ bước chờ. |
-| MFA (TOTP) | Đặt `NEXA_SECURITY_KEY` (32 byte, base64 — sinh bằng `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). Thiếu khóa này, mục MFA trả 503. |
-| CAPTCHA (tùy chọn) | Tạo cặp khóa Cloudflare Turnstile rồi đặt `NEXA_TURNSTILE_SECRET` (secret) và build ảnh với `NEXT_PUBLIC_NEXA_TURNSTILE_SITE_KEY` (site key) — widget hiện ở màn hình đăng nhập/đăng ký/quên mật khẩu. Không đặt biến nào thì CAPTCHA tắt. |
+1. Click **Create account** to create a new organization and owner account.
+2. After signing in, go to **Team** to add staff members.
 
-Với Docker Compose, đặt các biến trên trong tệp `.env` ở thư mục gốc rồi chạy lại `docker compose up -d`. Khi chạy trực tiếp, đặt biến bằng `$env:TÊN_BIẾN = 'giá-trị'` trong terminal chạy Go rồi khởi động lại API. Với cấu hình local mặc định, dùng `http://localhost:3000` làm `APP_ORIGIN` khi chạy trực tiếp. Giữ khóa thật trong môi trường local hoặc kho bí mật.
+---
 
-## Tài liệu
+## Demo data
 
-## Tài khoản demo (cố định)
-
-Bảng demo mẫu ngành **E-commerce**, chạy 1 lệnh, dữ liệu cố định, chạy lại không trùng:
+To load the fixed **E-commerce** demo dataset (deterministic — safe to re-run), use the seed script:
 
 ```powershell
-# Chạy ở local (Go API đang chạy tại 127.0.0.1:8080):
+# Local (Go API running on 127.0.0.1:8080)
 cd BACKEND
 .\scripts\seed-demo.ps1
 ```
 
-Với instance **Render**, Go API chỉ nghe trong container (loopback), nên chạy seed từ máy của bạn qua BFF của web:
+On the **Render** instance, the Go API only listens on loopback inside the container, so run the seed from your machine through the web BFF:
 
 ```powershell
-.\scripts\seed-demo.ps1 -Mode bff -BaseUrl https://<ten-mien-cua-ban>.onrender.com
+.\scripts\seed-demo.ps1 -Mode bff -BaseUrl https://<your-domain>.onrender.com
 ```
 
-Chế độ `bff` tự động kèm `Origin` đúng và giữ cookie phiên HttpOnly của BFF. Chạy lại nhiều lần không tạo trùng.
+The `bff` mode automatically sends the correct `Origin` header and keeps the BFF's HttpOnly session cookie. Running it multiple times never creates duplicates.
 
-| Role | Email | Mật khẩu | Quyền |
+| Role | Email | Password | Permissions |
 | --- | --- | --- | --- |
-| Owner | `owner@nexa.local` | `NexaDemo!2026` | Toàn quyền + dữ liệu demo |
-| Agent | `agent@nexa.local` | `NexaDemo!2026` | Nhận và xử lý đơn |
+| Owner | `owner@nexa.local` | `NexaDemo!2026` | Full access + demo data |
+| Agent | `agent@nexa.local` | `NexaDemo!2026` | Receive and handle tickets |
 
-Dữ liệu demo (mẫu E-commerce): 8 hồ sơ khách hàng, 5 bài KB (hoàn tiền, vận chuyển, COD, đổi hàng, khuyến mãi), 3 automation từ khóa, 5 hội thoại đơn hàng, 2 phiếu hỗ trợ (1 phiếu high priority), 2 quy tắc Workflow (tự tạo phiếu theo từ khóa + nhắc phiếu ngán 3 ngày) và 2 kịch bản AI Sparring (giải quyết + chuyển người thật). Đổi mật khẩu khi chạy instance công khai bằng `-Password`.
+**What the demo dataset contains** (E-commerce sample): 8 customer profiles, 5 KB articles (refunds, shipping, COD, exchanges, promotions), 3 keyword automations, 5 order conversations, 2 support tickets (1 high-priority), 2 workflow rules (auto-create ticket by keyword + stale-ticket reminder), and 2 AI sparring scenarios. Use `-Password` to change the password on public instances.
 
-Script cũ tạo email ngẫu nhiên: `scripts/demo.ps1` (không còn khuyến nghị cho demo pitch).
+The older `scripts/demo.ps1` generates random emails and is no longer recommended for demo pitches.
 
-> **Ghi chú (G1):** trên instance công khai có Resend thật, lần chạy seed tạo owner *mới* sẽ ở trạng thái chờ xác nhận email — seed dừng kèm hướng dẫn mở link `/account/verify`. Để seed không bị chặn, đặt `NEXA_AUTO_CONFIRM_EMAIL=true` (chỉ dùng cho instance demo, không dùng cho hệ thật).
+> **Note:** On public instances with real Resend, the first seed run leaves the new owner in "email confirmation pending" — the seed stops with instructions to open the `/account/verify` link. To skip this on demo instances, set `NEXA_AUTO_CONFIRM_EMAIL=true` (demo only, never in production).
 
-## Cấu trúc thư mục
+---
 
-- [Backend](BACKEND/README.md) — cấu hình lưu trữ, API và kiểm thử.
-- [Frontend](FRONTEND/README.md) — cấu hình môi trường và kiểm tra giao diện.
-- [Vận hành và tích hợp](OPERATIONS.md) — chat, email, OpenAI, workflow và các tùy chọn quản trị.
+## Enabling email & push notifications
+
+| Feature | Backend configuration |
+| --- | --- |
+| Outbound email (reports, CSAT surveys) | Set `RESEND_API_KEY` and `EMAIL_FROM` with a verified Resend domain. Set `APP_ORIGIN` to the frontend URL so CSAT links resolve correctly. Docker Compose already sets a local origin. |
+| Inbound email via Resend | Configure the inbound-email env vars and the `email.received` webhook per the [operations guide](OPERATIONS.md#zalo-oa-whatsapp-và-resend-inbound). Resend requires an HTTPS endpoint reachable from the internet. |
+| Web Push | Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`. In a Web Push–capable browser, open **Notifications → Enable Web Push** and grant permission. |
+| Email confirmation on signup | Enabled automatically when `RESEND_API_KEY` + `EMAIL_FROM` + `APP_ORIGIN` are set: new owners must click a one-time link (valid 30 minutes) before first login. Demo instances: set `NEXA_AUTO_CONFIRM_EMAIL=true` to skip. |
+| MFA (TOTP) | Set `NEXA_SECURITY_KEY` (32 bytes, base64 — generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). Without it, MFA endpoints return 503. |
+| CAPTCHA (optional) | Create a Cloudflare Turnstile key pair, set `NEXA_TURNSTILE_SECRET`, and build the image with `NEXT_PUBLIC_NEXA_TURNSTILE_SITE_KEY`. The widget appears on the sign-in / sign-up / forgot-password screens. If neither variable is set, CAPTCHA is off. |
+
+**How to apply the variables:**
+
+- **Docker Compose** — put the variables in a `.env` file at the project root, then run `docker compose up -d` again.
+- **Running directly** — set them in the Go terminal (`$env:VARIABLE = 'value'`) and restart the API. For default local configuration use `http://localhost:3000` as `APP_ORIGIN`.
+
+Keep real keys in local environment variables or a secrets vault — never commit them.
+
+---
+
+## Project layout
+
+```text
+BACKEND/    Go API, services, repositories, demo scripts
+FRONTEND/   Next.js application (App Router, TypeScript, Tailwind)
+docs/       Screenshots and security audit reports
+compose.yaml / compose.private.yaml   Docker setups
+OPERATIONS.md   Operations & integration guide (chat, email, OpenAI, workflows)
+```
+
+Sub-project docs:
+
+- [Backend](BACKEND/README.md) — storage configuration, API reference, and tests.
+- [Frontend](FRONTEND/README.md) — environment configuration and UI checks.
+- [Operations & integrations](OPERATIONS.md) — chat, email, OpenAI, workflows, and admin options.
